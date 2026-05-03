@@ -1,7 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using ScaledAxisCSharp.Config;
-
 namespace ScaledAxisCSharp.DirectInput;
 
 internal sealed unsafe class JoystickDevice

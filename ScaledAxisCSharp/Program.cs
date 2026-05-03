@@ -1,6 +1,4 @@
 using System.Text.Json;
-using ScaledAxisCSharp.Config;
-using ScaledAxisCSharp.DirectInput;
 
 namespace ScaledAxisCSharp;
 

@@ -1,5 +1,3 @@
-using ScaledAxisCSharp.VJoy;
-
 namespace ScaledAxisCSharp.Config;
 
 internal sealed record ScaledAxisRoute(
