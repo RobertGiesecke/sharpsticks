@@ -1,0 +1,16 @@
+{
+  "VJoyDeviceId": 1,
+  "PollIntervalMs": 5,
+  "LeftDeviceName": "LEFT VPC Stick WarBRD",
+  "RightDeviceName": "RIGHT VPC Stick WarBRD",
+  "ModifierAxis": "u",
+  "ModifierMin": -1.0,
+  "ModifierMax": 1.0,
+  "NormalSlope": 1.0,
+  "ModifierPrecisionSlope": 0.184,
+  "HoldPrecisionSlope": 0.508,
+  "EnableAxis5XOverride": false,
+  "Axis5OverrideAxis": "r",
+  "Axis5OverrideDeadzone": 0.05,
+  "PulseMs": 50
+}

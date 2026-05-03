@@ -24,6 +24,7 @@ internal static class Program
 					{
 						"list" => ListDevices(),
 						"run" => Run(args.Skip(1).ToArray()),
+						"run-itb-minimal" => RunItbMinimal(args.Skip(1).ToArray()),
 						_ => FailWithUsage($"Unknown command '{args[0]}'."),
 					};
 			}
@@ -75,6 +76,24 @@ internal static class Program
 		return 0;
 	}
 
+	private static int RunItbMinimal(string[] args)
+	{
+		var configPath = ParseConfigPath(args);
+		var config = LoadItbMinimalConfig(configPath);
+		var runtime = ItbMinimalRuntime.Build(config);
+
+		using var cts = new CancellationTokenSource();
+		Console.CancelKeyPress += (_, eventArgs) =>
+		{
+			eventArgs.Cancel = true;
+			cts.Cancel();
+		};
+
+		Console.WriteLine($"Running ITB minimal profile with config '{configPath}'. Press Ctrl+C to stop.");
+		runtime.Run(cts.Token);
+		return 0;
+	}
+
 	private static string ParseConfigPath(string[] args)
 	{
 		for (var index = 0; index < args.Length; index++)
@@ -107,6 +126,18 @@ internal static class Program
 		       ?? throw new InvalidOperationException("Config file could not be deserialized.");
 	}
 
+	private static ItbMinimalConfig LoadItbMinimalConfig(string configPath)
+	{
+		if (!File.Exists(configPath))
+		{
+			throw new FileNotFoundException($"Config file not found: {configPath}");
+		}
+
+		var json = File.ReadAllText(configPath);
+		return JsonSerializer.Deserialize(json, AppJsonContext.Default.ItbMinimalConfig)
+		       ?? throw new InvalidOperationException("Config file could not be deserialized.");
+	}
+
 	private static int FailWithUsage(string message)
 	{
 		Console.Error.WriteLine(message);
@@ -119,5 +150,6 @@ internal static class Program
 		Console.WriteLine("Usage:");
 		Console.WriteLine("  ScaledAxisCSharp list");
 		Console.WriteLine("  ScaledAxisCSharp run --config <path-to-config.json>");
+		Console.WriteLine("  ScaledAxisCSharp run-itb-minimal --config <path-to-itb-config.json>");
 	}
 }
