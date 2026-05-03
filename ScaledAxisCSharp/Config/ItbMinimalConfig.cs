@@ -35,14 +35,6 @@ public sealed class ItbMinimalConfig
 	public double ModifierPrecisionSlope { get; set; } = 0.184;
 	public double HoldPrecisionSlope { get; set; } = 0.508;
 
-	public bool EnableAxis5XOverride { get; set; }
-	public DeviceAxisSource Axis5OverrideAxis { get; set; } = new()
-	{
-		DeviceName = "RIGHT VPC Stick WarBRD",
-		Axis = "ry",
-	};
-	public double Axis5OverrideDeadzone { get; set; } = 0.05;
-
 	public DeviceButtonSource PrimaryFireButton { get; set; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
@@ -94,7 +86,6 @@ public sealed class ItbMinimalConfig
 		RequireAxisSource(YAxis, nameof(YAxis));
 		RequireAxisSource(ZAxis, nameof(ZAxis));
 		RequireAxisSource(ModifierAxis, nameof(ModifierAxis));
-		RequireAxisSource(Axis5OverrideAxis, nameof(Axis5OverrideAxis));
 		RequireButtonSource(PrimaryFireButton, nameof(PrimaryFireButton));
 		RequireButtonSource(LeftPrimaryButton, nameof(LeftPrimaryButton));
 		RequireButtonSource(LeftAuxButton, nameof(LeftAuxButton));

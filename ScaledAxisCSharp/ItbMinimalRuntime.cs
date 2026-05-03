@@ -12,7 +12,6 @@ internal sealed class ItbMinimalRuntime
 	private readonly AxisBinding _YAxis;
 	private readonly AxisBinding _ZAxis;
 	private readonly AxisBinding _ModifierAxis;
-	private readonly AxisBinding _Axis5OverrideAxis;
 	private readonly ButtonBinding _PrimaryFireButton;
 	private readonly ButtonBinding _LeftPrimaryButton;
 	private readonly ButtonBinding _LeftAuxButton;
@@ -30,7 +29,6 @@ internal sealed class ItbMinimalRuntime
 		AxisBinding yAxis,
 		AxisBinding zAxis,
 		AxisBinding modifierAxis,
-		AxisBinding axis5OverrideAxis,
 		ButtonBinding primaryFireButton,
 		ButtonBinding leftPrimaryButton,
 		ButtonBinding leftAuxButton,
@@ -45,7 +43,6 @@ internal sealed class ItbMinimalRuntime
 		_YAxis = yAxis;
 		_ZAxis = zAxis;
 		_ModifierAxis = modifierAxis;
-		_Axis5OverrideAxis = axis5OverrideAxis;
 		_PrimaryFireButton = primaryFireButton;
 		_LeftPrimaryButton = leftPrimaryButton;
 		_LeftAuxButton = leftAuxButton;
@@ -73,7 +70,6 @@ internal sealed class ItbMinimalRuntime
 		var yAxis = ResolveAxisBinding(connectedDevices, config.YAxis);
 		var zAxis = ResolveAxisBinding(connectedDevices, config.ZAxis);
 		var modifierAxis = ResolveAxisBinding(connectedDevices, config.ModifierAxis);
-		var axis5OverrideAxis = ResolveAxisBinding(connectedDevices, config.Axis5OverrideAxis);
 		var primaryFireButton = ResolveButtonBinding(connectedDevices, config.PrimaryFireButton);
 		var leftPrimaryButton = ResolveButtonBinding(connectedDevices, config.LeftPrimaryButton);
 		var leftAuxButton = ResolveButtonBinding(connectedDevices, config.LeftAuxButton);
@@ -89,7 +85,6 @@ internal sealed class ItbMinimalRuntime
 				yAxis.DeviceId,
 				zAxis.DeviceId,
 				modifierAxis.DeviceId,
-				axis5OverrideAxis.DeviceId,
 				primaryFireButton.DeviceId,
 				leftPrimaryButton.DeviceId,
 				leftAuxButton.DeviceId,
@@ -120,7 +115,6 @@ internal sealed class ItbMinimalRuntime
 			yAxis,
 			zAxis,
 			modifierAxis,
-			axis5OverrideAxis,
 			primaryFireButton,
 			leftPrimaryButton,
 			leftAuxButton,
@@ -196,18 +190,6 @@ internal sealed class ItbMinimalRuntime
 			? ApplyPrecisionCurve(rightZ)
 			: ApplyModifierCurve(rightZ, modifierValue);
 
-		AxisDebugSample? axis5OverrideSample = null;
-		var axis5OverrideActive = false;
-		if (_Config.EnableAxis5XOverride && TryReadAxisSample(states, _Axis5OverrideAxis, out var overrideSample))
-		{
-			axis5OverrideSample = overrideSample;
-			if (Math.Abs(overrideSample.NormalizedValue) >= _Config.Axis5OverrideDeadzone)
-			{
-				axis5OverrideActive = true;
-				outputX = overrideSample.NormalizedValue;
-			}
-		}
-
 		_VJoyDevice.SetAxis(VJoyAxis.X, outputX);
 		_VJoyDevice.SetAxis(VJoyAxis.Y, outputY);
 		_VJoyDevice.SetAxis(VJoyAxis.Z, outputZ);
@@ -230,22 +212,6 @@ internal sealed class ItbMinimalRuntime
 			AppendAxisDebugLine(debugLines, "x", xSample, outputX);
 			AppendAxisDebugLine(debugLines, "y", ySample, outputY);
 			AppendAxisDebugLine(debugLines, "z", zSample, outputZ);
-
-			if (axis5OverrideSample is { } axis5Sample)
-			{
-				debugLines.Append("axis5-override raw=");
-				debugLines.Append(axis5Sample.RawValue);
-				debugLines.Append(" range=");
-				debugLines.Append(axis5Sample.RangeMin);
-				debugLines.Append("..");
-				debugLines.Append(axis5Sample.RangeMax);
-				debugLines.Append(" decoder=");
-				debugLines.Append(axis5Sample.DecoderKind);
-				debugLines.Append(" norm=");
-				debugLines.Append(FormatDouble(axis5Sample.NormalizedValue));
-				debugLines.Append(" active=");
-				debugLines.AppendLine(axis5OverrideActive ? "yes" : "no");
-			}
 		}
 	}
 

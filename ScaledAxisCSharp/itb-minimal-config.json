@@ -22,12 +22,6 @@
   "NormalSlope": 1.0,
   "ModifierPrecisionSlope": 0.184,
   "HoldPrecisionSlope": 0.508,
-  "EnableAxis5XOverride": false,
-  "Axis5OverrideAxis": {
-    "DeviceName": "RIGHT VPC Stick WarBRD",
-    "Axis": "ry"
-  },
-  "Axis5OverrideDeadzone": 0.05,
   "PrimaryFireButton": {
     "DeviceName": "RIGHT VPC Stick WarBRD",
     "Button": 1

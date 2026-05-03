@@ -467,6 +467,15 @@ internal sealed unsafe class JoystickDevice
 			return AxisDecoderKind.UnsignedCentered;
 		}
 
+		if (rawValue == 0)
+		{
+			// rawValue == 0 is ambiguous: it is the center of a native-signed axis AND the minimum
+			// of an unsigned-centered axis (e.g. a non-auto-centering slider at its rest position).
+			// Return Unknown so NormalizeBase falls through to UnsignedCentered, which correctly
+			// maps 0 to -1.0. A native-signed axis will cache NativeSigned on the first non-zero read.
+			return AxisDecoderKind.Unknown;
+		}
+
 		var unsignedCenteredMidpoint = GetUnsignedCenteredMax(range) / 2.0;
 		var nativeDistanceFromCenter = Math.Abs(rawValue);
 		var unsignedCenteredDistanceFromCenter = Math.Abs(rawValue - unsignedCenteredMidpoint);
