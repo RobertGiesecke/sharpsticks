@@ -3,44 +3,59 @@ namespace ScaledAxisCSharp;
 internal sealed class ItbMinimalRuntime
 {
 	private readonly ItbMinimalConfig _config;
+	private readonly IReadOnlyDictionary<int, JoystickDevice> _devices;
 	private readonly int _pollIntervalMs;
-	private readonly JoystickDevice _leftDevice;
-	private readonly JoystickDevice _rightDevice;
 	private readonly VJoyDevice _vJoyDevice;
-	private readonly AxisBinding _rightXAxis;
-	private readonly AxisBinding _rightYAxis;
-	private readonly AxisBinding _rightZAxis;
+	private readonly AxisBinding _xAxis;
+	private readonly AxisBinding _yAxis;
+	private readonly AxisBinding _zAxis;
 	private readonly AxisBinding _modifierAxis;
 	private readonly AxisBinding _axis5OverrideAxis;
+	private readonly ButtonBinding _primaryFireButton;
+	private readonly ButtonBinding _leftPrimaryButton;
+	private readonly ButtonBinding _leftAuxButton;
+	private readonly ButtonBinding _secondaryFireButton;
+	private readonly IReadOnlyList<ButtonBinding> _precisionButtons;
 	private bool _secondaryFirePrevious;
 	private int _pulse71RemainingMs;
 	private int _pulse72RemainingMs;
 
 	private ItbMinimalRuntime(
 		ItbMinimalConfig config,
-		JoystickDevice leftDevice,
-		JoystickDevice rightDevice,
+		IReadOnlyDictionary<int, JoystickDevice> devices,
 		VJoyDevice vJoyDevice,
+		AxisBinding xAxis,
+		AxisBinding yAxis,
+		AxisBinding zAxis,
 		AxisBinding modifierAxis,
-		AxisBinding rightXAxis,
-		AxisBinding rightYAxis,
-		AxisBinding rightZAxis,
-		AxisBinding axis5OverrideAxis)
+		AxisBinding axis5OverrideAxis,
+		ButtonBinding primaryFireButton,
+		ButtonBinding leftPrimaryButton,
+		ButtonBinding leftAuxButton,
+		ButtonBinding secondaryFireButton,
+		IReadOnlyList<ButtonBinding> precisionButtons)
 	{
 		_config = config;
+		_devices = devices;
 		_pollIntervalMs = config.PollIntervalMs;
-		_leftDevice = leftDevice;
-		_rightDevice = rightDevice;
 		_vJoyDevice = vJoyDevice;
+		_xAxis = xAxis;
+		_yAxis = yAxis;
+		_zAxis = zAxis;
 		_modifierAxis = modifierAxis;
-		_rightXAxis = rightXAxis;
-		_rightYAxis = rightYAxis;
-		_rightZAxis = rightZAxis;
 		_axis5OverrideAxis = axis5OverrideAxis;
+		_primaryFireButton = primaryFireButton;
+		_leftPrimaryButton = leftPrimaryButton;
+		_leftAuxButton = leftAuxButton;
+		_secondaryFireButton = secondaryFireButton;
+		_precisionButtons = precisionButtons;
 	}
 
 	public static ItbMinimalRuntime Build(ItbMinimalConfig config)
 	{
+		ArgumentNullException.ThrowIfNull(config);
+		config.Validate();
+
 		if (config.PollIntervalMs < 1)
 		{
 			throw new InvalidOperationException("PollIntervalMs must be at least 1.");
@@ -51,84 +66,92 @@ internal sealed class ItbMinimalRuntime
 			throw new InvalidOperationException("PulseMs must be zero or greater.");
 		}
 
-		var devices = JoystickDevice.EnumerateConnected();
-		var leftDevice = ResolveDevice(devices, config.LeftDeviceName);
-		var rightDevice = ResolveDevice(devices, config.RightDeviceName);
+		var connectedDevices = JoystickDevice.EnumerateConnected();
+		var xAxis = ResolveAxisBinding(connectedDevices, config.XAxis);
+		var yAxis = ResolveAxisBinding(connectedDevices, config.YAxis);
+		var zAxis = ResolveAxisBinding(connectedDevices, config.ZAxis);
+		var modifierAxis = ResolveAxisBinding(connectedDevices, config.ModifierAxis);
+		var axis5OverrideAxis = ResolveAxisBinding(connectedDevices, config.Axis5OverrideAxis);
+		var primaryFireButton = ResolveButtonBinding(connectedDevices, config.PrimaryFireButton);
+		var leftPrimaryButton = ResolveButtonBinding(connectedDevices, config.LeftPrimaryButton);
+		var leftAuxButton = ResolveButtonBinding(connectedDevices, config.LeftAuxButton);
+		var secondaryFireButton = ResolveButtonBinding(connectedDevices, config.SecondaryFireButton);
+		var precisionButtons = config.PrecisionButtons
+			.Select(source => ResolveButtonBinding(connectedDevices, source))
+			.ToArray();
+
+		var selectedDevices = CollectDevices(
+			connectedDevices,
+			[
+				xAxis.DeviceId,
+				yAxis.DeviceId,
+				zAxis.DeviceId,
+				modifierAxis.DeviceId,
+				axis5OverrideAxis.DeviceId,
+				primaryFireButton.DeviceId,
+				leftPrimaryButton.DeviceId,
+				leftAuxButton.DeviceId,
+				secondaryFireButton.DeviceId,
+				.. precisionButtons.Select(binding => binding.DeviceId)
+			]);
 
 		var vJoyDevice = VJoyDevice.Open(
 			config.VJoyDeviceId,
 			[
-				new ButtonRoute(leftDevice.DeviceId, 1, 40),
-				new ButtonRoute(leftDevice.DeviceId, 11, 79),
-				new ButtonRoute(rightDevice.DeviceId, 1, 1),
-				new ButtonRoute(rightDevice.DeviceId, 18, 22),
+				new ButtonRoute(primaryFireButton.DeviceId, primaryFireButton.ButtonNumber, 1),
+				new ButtonRoute(leftPrimaryButton.DeviceId, leftPrimaryButton.ButtonNumber, 40),
+				new ButtonRoute(leftAuxButton.DeviceId, leftAuxButton.ButtonNumber, 79),
+				new ButtonRoute(secondaryFireButton.DeviceId, secondaryFireButton.ButtonNumber, 22),
 			],
 			[
-				new AxisRoute(new AxisBinding(rightDevice.DeviceId, PhysicalAxis.X, AxisMode.Signed, false, 0.0), VJoyAxis.X, 1.0, 0.0),
-				new AxisRoute(new AxisBinding(rightDevice.DeviceId, PhysicalAxis.Y, AxisMode.Signed, false, 0.0), VJoyAxis.Y, 1.0, 0.0),
-				new AxisRoute(new AxisBinding(rightDevice.DeviceId, PhysicalAxis.Z, AxisMode.Signed, false, 0.0), VJoyAxis.Z, 1.0, 0.0),
+				new AxisRoute(xAxis, VJoyAxis.X, 1.0, 0.0),
+				new AxisRoute(yAxis, VJoyAxis.Y, 1.0, 0.0),
+				new AxisRoute(zAxis, VJoyAxis.Z, 1.0, 0.0),
 			],
 			[]);
 
 		return new ItbMinimalRuntime(
 			config,
-			leftDevice,
-			rightDevice,
+			selectedDevices,
 			vJoyDevice,
-			new AxisBinding(leftDevice.DeviceId, PhysicalAxisParser.Parse(config.ModifierAxis), AxisMode.Signed, false, 0.0),
-			new AxisBinding(rightDevice.DeviceId, PhysicalAxis.X, AxisMode.Signed, false, 0.0),
-			new AxisBinding(rightDevice.DeviceId, PhysicalAxis.Y, AxisMode.Signed, false, 0.0),
-			new AxisBinding(rightDevice.DeviceId, PhysicalAxis.Z, AxisMode.Signed, false, 0.0),
-			new AxisBinding(rightDevice.DeviceId, PhysicalAxisParser.Parse(config.Axis5OverrideAxis), AxisMode.Signed, false, 0.0));
+			xAxis,
+			yAxis,
+			zAxis,
+			modifierAxis,
+			axis5OverrideAxis,
+			primaryFireButton,
+			leftPrimaryButton,
+			leftAuxButton,
+			secondaryFireButton,
+			precisionButtons);
 	}
 
 	public void Run(CancellationToken cancellationToken)
 	{
 		using (_vJoyDevice)
 		{
-			var leftReadFailed = false;
-			var rightReadFailed = false;
+			var currentStates = new Dictionary<int, JoystickState>(_devices.Count);
+			var lastReportedReadFailure = new HashSet<int>();
 
 			while (!cancellationToken.IsCancellationRequested)
 			{
-				if (!_leftDevice.TryRead(out var leftState, out var leftError))
+				currentStates.Clear();
+
+				foreach (var (deviceId, device) in _devices)
 				{
-					if (!leftReadFailed && leftError is not null)
+					if (device.TryRead(out var state, out var error))
 					{
-						Console.Error.WriteLine(leftError);
-						leftReadFailed = true;
+						currentStates[deviceId] = state;
+						lastReportedReadFailure.Remove(deviceId);
 					}
-
-					if (cancellationToken.WaitHandle.WaitOne(_pollIntervalMs))
+					else if (lastReportedReadFailure.Add(deviceId) && error is not null)
 					{
-						break;
+						Console.Error.WriteLine(error);
 					}
-
-					continue;
 				}
 
-				leftReadFailed = false;
-
-				if (!_rightDevice.TryRead(out var rightState, out var rightError))
-				{
-					if (!rightReadFailed && rightError is not null)
-					{
-						Console.Error.WriteLine(rightError);
-						rightReadFailed = true;
-					}
-
-					if (cancellationToken.WaitHandle.WaitOne(_pollIntervalMs))
-					{
-						break;
-					}
-
-					continue;
-				}
-
-				rightReadFailed = false;
-
-				ApplyAxes(leftState, rightState);
-				ApplyButtons(leftState, rightState);
+				ApplyAxes(currentStates);
+				ApplyButtons(currentStates);
 				AdvancePulses();
 
 				if (cancellationToken.WaitHandle.WaitOne(_pollIntervalMs))
@@ -139,14 +162,17 @@ internal sealed class ItbMinimalRuntime
 		}
 	}
 
-	private void ApplyAxes(in JoystickState leftState, in JoystickState rightState)
+	private void ApplyAxes(IReadOnlyDictionary<int, JoystickState> states)
 	{
-		var modifierValue = _leftDevice.ReadNormalizedAxis(leftState, _modifierAxis);
-		var rightX = _rightDevice.ReadNormalizedAxis(rightState, _rightXAxis);
-		var rightY = _rightDevice.ReadNormalizedAxis(rightState, _rightYAxis);
-		var rightZ = _rightDevice.ReadNormalizedAxis(rightState, _rightZAxis);
+		if (!TryReadAxis(states, _modifierAxis, out var modifierValue) ||
+		    !TryReadAxis(states, _xAxis, out var rightX) ||
+		    !TryReadAxis(states, _yAxis, out var rightY) ||
+		    !TryReadAxis(states, _zAxis, out var rightZ))
+		{
+			return;
+		}
 
-		var precisionMode = leftState.IsButtonPressed(2) || rightState.IsButtonPressed(2) || rightState.IsButtonPressed(16);
+		var precisionMode = _precisionButtons.Any(binding => IsPressed(states, binding));
 		var outputX = precisionMode
 			? ApplyPrecisionCurve(rightX)
 			: ApplyModifierCurve(rightX, modifierValue);
@@ -159,8 +185,8 @@ internal sealed class ItbMinimalRuntime
 
 		if (_config.EnableAxis5XOverride)
 		{
-			var axis5OverrideValue = _rightDevice.ReadNormalizedAxis(rightState, _axis5OverrideAxis);
-			if (Math.Abs(axis5OverrideValue) >= _config.Axis5OverrideDeadzone)
+			if (TryReadAxis(states, _axis5OverrideAxis, out var axis5OverrideValue) &&
+			    Math.Abs(axis5OverrideValue) >= _config.Axis5OverrideDeadzone)
 			{
 				outputX = axis5OverrideValue;
 			}
@@ -171,13 +197,31 @@ internal sealed class ItbMinimalRuntime
 		_vJoyDevice.SetAxis(VJoyAxis.Z, outputZ);
 	}
 
-	private void ApplyButtons(in JoystickState leftState, in JoystickState rightState)
+	private bool TryReadAxis(IReadOnlyDictionary<int, JoystickState> states, AxisBinding binding, out double value)
 	{
-		_vJoyDevice.SetButton(1, rightState.IsButtonPressed(1));
-		_vJoyDevice.SetButton(40, leftState.IsButtonPressed(1));
-		_vJoyDevice.SetButton(79, leftState.IsButtonPressed(11));
+		if (!states.TryGetValue(binding.DeviceId, out var state) ||
+		    !_devices.TryGetValue(binding.DeviceId, out var device))
+		{
+			value = 0.0;
+			return false;
+		}
 
-		var secondaryFire = rightState.IsButtonPressed(18);
+		value = device.ReadNormalizedAxis(state, binding);
+		return true;
+	}
+
+	private bool IsPressed(IReadOnlyDictionary<int, JoystickState> states, ButtonBinding binding)
+	{
+		return states.TryGetValue(binding.DeviceId, out var state) && state.IsButtonPressed(binding.ButtonNumber);
+	}
+
+	private void ApplyButtons(IReadOnlyDictionary<int, JoystickState> states)
+	{
+		_vJoyDevice.SetButton(1, IsPressed(states, _primaryFireButton));
+		_vJoyDevice.SetButton(40, IsPressed(states, _leftPrimaryButton));
+		_vJoyDevice.SetButton(79, IsPressed(states, _leftAuxButton));
+
+		var secondaryFire = IsPressed(states, _secondaryFireButton);
 		_vJoyDevice.SetButton(22, secondaryFire);
 
 		if (secondaryFire && !_secondaryFirePrevious)
@@ -227,8 +271,48 @@ internal sealed class ItbMinimalRuntime
 		return normalizedInput * _config.HoldPrecisionSlope;
 	}
 
+	private static Dictionary<int, JoystickDevice> CollectDevices(IReadOnlyList<JoystickDevice> devices, IEnumerable<int> deviceIds)
+	{
+		var byId = devices.ToDictionary(device => device.DeviceId);
+		var selected = new Dictionary<int, JoystickDevice>();
+
+		foreach (var deviceId in deviceIds.Distinct())
+		{
+			if (!byId.TryGetValue(deviceId, out var device))
+			{
+				throw new InvalidOperationException($"Configured joystick {deviceId} is not available via DirectInput.");
+			}
+
+			selected[deviceId] = device;
+		}
+
+		return selected;
+	}
+
+	private static AxisBinding ResolveAxisBinding(IReadOnlyList<JoystickDevice> devices, DeviceAxisSource source)
+	{
+		var device = ResolveDevice(devices, source.DeviceName);
+		return new AxisBinding(device.DeviceId, PhysicalAxisParser.Parse(source.Axis), AxisMode.Signed, false, 0.0);
+	}
+
+	private static ButtonBinding ResolveButtonBinding(IReadOnlyList<JoystickDevice> devices, DeviceButtonSource source)
+	{
+		if (source.Button < 1)
+		{
+			throw new InvalidOperationException("ITB button sources are 1-based.");
+		}
+
+		var device = ResolveDevice(devices, source.DeviceName);
+		return new ButtonBinding(device.DeviceId, source.Button);
+	}
+
 	private static JoystickDevice ResolveDevice(IReadOnlyList<JoystickDevice> devices, string productName)
 	{
+		if (string.IsNullOrWhiteSpace(productName))
+		{
+			throw new InvalidOperationException("DeviceName is required.");
+		}
+
 		var exactMatches = devices
 			.Where(device => string.Equals(device.Name, productName, StringComparison.OrdinalIgnoreCase))
 			.ToArray();
@@ -261,4 +345,6 @@ internal sealed class ItbMinimalRuntime
 
 		throw new InvalidOperationException($"No joystick device matched '{productName}'.");
 	}
+
+	private readonly record struct ButtonBinding(int DeviceId, int ButtonNumber);
 }

@@ -1,16 +1,62 @@
 {
   "VJoyDeviceId": 1,
   "PollIntervalMs": 5,
-  "LeftDeviceName": "LEFT VPC Stick WarBRD",
-  "RightDeviceName": "RIGHT VPC Stick WarBRD",
-  "ModifierAxis": "slider1",
+  "XAxis": {
+    "DeviceName": "RIGHT VPC Stick WarBRD",
+    "Axis": "x"
+  },
+  "YAxis": {
+    "DeviceName": "RIGHT VPC Stick WarBRD",
+    "Axis": "y"
+  },
+  "ZAxis": {
+    "DeviceName": "RIGHT VPC Stick WarBRD",
+    "Axis": "z"
+  },
+  "ModifierAxis": {
+    "DeviceName": "LEFT VPC Stick WarBRD",
+    "Axis": "slider1"
+  },
   "ModifierMin": -1.0,
   "ModifierMax": 1.0,
   "NormalSlope": 1.0,
   "ModifierPrecisionSlope": 0.184,
   "HoldPrecisionSlope": 0.508,
   "EnableAxis5XOverride": false,
-  "Axis5OverrideAxis": "ry",
+  "Axis5OverrideAxis": {
+    "DeviceName": "RIGHT VPC Stick WarBRD",
+    "Axis": "ry"
+  },
   "Axis5OverrideDeadzone": 0.05,
+  "PrimaryFireButton": {
+    "DeviceName": "RIGHT VPC Stick WarBRD",
+    "Button": 1
+  },
+  "LeftPrimaryButton": {
+    "DeviceName": "LEFT VPC Stick WarBRD",
+    "Button": 1
+  },
+  "LeftAuxButton": {
+    "DeviceName": "LEFT VPC Stick WarBRD",
+    "Button": 11
+  },
+  "SecondaryFireButton": {
+    "DeviceName": "RIGHT VPC Stick WarBRD",
+    "Button": 18
+  },
+  "PrecisionButtons": [
+    {
+      "DeviceName": "LEFT VPC Stick WarBRD",
+      "Button": 2
+    },
+    {
+      "DeviceName": "RIGHT VPC Stick WarBRD",
+      "Button": 2
+    },
+    {
+      "DeviceName": "RIGHT VPC Stick WarBRD",
+      "Button": 16
+    }
+  ],
   "PulseMs": 50
 }
