@@ -1,0 +1,48 @@
+{
+  "VJoyDeviceId": 1,
+  "PollIntervalMs": 8,
+  "ButtonMappings": [
+    {
+      "SourceDeviceId": 0,
+      "SourceButton": 1,
+      "TargetButton": 1
+    }
+  ],
+  "AxisMappings": [
+    {
+      "Source": {
+        "DeviceId": 0,
+        "Axis": "x",
+        "Mode": "signed",
+        "Invert": false,
+        "Deadzone": 0.02
+      },
+      "TargetAxis": "x",
+      "Scale": 1.0,
+      "Offset": 0.0
+    }
+  ],
+  "ScaledAxisMappings": [
+    {
+      "ValueSource": {
+        "DeviceId": 0,
+        "Axis": "y",
+        "Mode": "signed",
+        "Invert": true,
+        "Deadzone": 0.02
+      },
+      "FactorSource": {
+        "DeviceId": 1,
+        "Axis": "u",
+        "Mode": "unsigned",
+        "Invert": false,
+        "Deadzone": 0.0
+      },
+      "TargetAxis": "ry",
+      "FactorLow": 0.35,
+      "FactorHigh": 1.0,
+      "OutputScale": 1.0,
+      "OutputOffset": 0.0
+    }
+  ]
+}
