@@ -10,7 +10,7 @@ public static class AxisBindingParser
 			return new AxisBinding(
 				input.DeviceId,
 				PhysicalAxis.Parse(input.Axis),
-				AxisModeParser.Parse(input.Mode),
+				AxisMode.Parse(input.Mode),
 				input.Invert,
 				input.Deadzone);
 		}

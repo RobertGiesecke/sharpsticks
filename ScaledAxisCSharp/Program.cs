@@ -198,9 +198,9 @@ internal static class Program
 		}
 
 		var pollIntervalMs = intervalMs ?? 100;
-		var mode = string.IsNullOrWhiteSpace(modeValue) ? AxisMode.Signed : AxisModeParser.Parse(modeValue);
-		var axes = ParseAxes(axisList);
-		var device = ResolveDevice(deviceSelector);
+		var mode = string.IsNullOrWhiteSpace(modeValue) ? AxisMode.Signed : AxisMode.Parse(modeValue);
+		var axes = PhysicalAxis.ParseList(axisList);
+		var device = JoystickDevice.ResolveDevice(deviceSelector);
 
 		using var cts = new CancellationTokenSource();
 		Console.CancelKeyPress += (_, eventArgs) =>
@@ -311,76 +311,6 @@ internal static class Program
 		var json = File.ReadAllText(configPath);
 		return JsonSerializer.Deserialize(json, AppJsonContext.Default.ItbMinimalConfig)
 		       ?? throw new InvalidOperationException("Config file could not be deserialized.");
-	}
-
-	private static IReadOnlyList<PhysicalAxis> ParseAxes(string? axisList)
-	{
-		if (string.IsNullOrWhiteSpace(axisList))
-		{
-			return
-			[
-				PhysicalAxis.X,
-				PhysicalAxis.Y,
-				PhysicalAxis.Z,
-				PhysicalAxis.Rx,
-				PhysicalAxis.Ry,
-				PhysicalAxis.Rz,
-				PhysicalAxis.Slider1,
-				PhysicalAxis.Slider2,
-			];
-		}
-
-		return axisList
-			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-			.Select(PhysicalAxis.Parse)
-			.Distinct()
-			.ToArray();
-	}
-
-	private static JoystickDevice ResolveDevice(string selector)
-	{
-		var devices = JoystickDevice.EnumerateConnected();
-
-		if (int.TryParse(selector, out var deviceId))
-		{
-			var byId = devices.FirstOrDefault(device => device.DeviceId == deviceId);
-			if (byId is not null)
-			{
-				return byId;
-			}
-		}
-
-		var exactMatches = devices
-			.Where(device => string.Equals(device.Name, selector, StringComparison.OrdinalIgnoreCase))
-			.ToArray();
-
-		if (exactMatches.Length == 1)
-		{
-			return exactMatches[0];
-		}
-
-		if (exactMatches.Length > 1)
-		{
-			throw new InvalidOperationException(
-				$"Multiple joystick devices match '{selector}'. Use the numeric id from the list command.");
-		}
-
-		var partialMatches = devices
-			.Where(device => device.Name.Contains(selector, StringComparison.OrdinalIgnoreCase))
-			.ToArray();
-
-		if (partialMatches.Length == 1)
-		{
-			return partialMatches[0];
-		}
-
-		if (partialMatches.Length > 1)
-		{
-			throw new InvalidOperationException(
-				$"Multiple joystick devices partially match '{selector}'. Use the full name or numeric id from the list command.");
-		}
-
-		throw new InvalidOperationException($"No DirectInput device matched '{selector}'.");
 	}
 
 	private static string FormatAxisName(PhysicalAxis axis)

@@ -20,5 +20,30 @@ public static class PhysicalAxisParser
 					$"Unsupported physical axis '{value}'. Use x, y, z, rx, ry, rz, slider1 or slider2."),
 			};
 		}
+
+		public static IReadOnlyList<PhysicalAxis> ParseList(string? axisList)
+		{
+			if (string.IsNullOrWhiteSpace(axisList))
+			{
+				return
+				[
+					PhysicalAxis.X,
+					PhysicalAxis.Y,
+					PhysicalAxis.Z,
+					PhysicalAxis.Rx,
+					PhysicalAxis.Ry,
+					PhysicalAxis.Rz,
+					PhysicalAxis.Slider1,
+					PhysicalAxis.Slider2,
+				];
+			}
+
+			return axisList
+				.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+				.Select(PhysicalAxis.Parse)
+				.Distinct()
+				.ToArray();
+		}
+
 	}
 }

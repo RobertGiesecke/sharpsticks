@@ -2,18 +2,22 @@ namespace ScaledAxisCSharp.Config;
 
 public static class AxisModeParser
 {
-	public static AxisMode Parse(string value)
+	extension(AxisMode)
 	{
-		if (string.Equals(value, "signed", StringComparison.OrdinalIgnoreCase))
+		public static AxisMode Parse(string value)
 		{
-			return AxisMode.Signed;
-		}
+			if (string.Equals(value, "signed", StringComparison.OrdinalIgnoreCase))
+			{
+				return AxisMode.Signed;
+			}
 
-		if (string.Equals(value, "unsigned", StringComparison.OrdinalIgnoreCase))
-		{
-			return AxisMode.Unsigned;
-		}
+			if (string.Equals(value, "unsigned", StringComparison.OrdinalIgnoreCase))
+			{
+				return AxisMode.Unsigned;
+			}
 
-		throw new InvalidOperationException($"Unsupported axis mode '{value}'. Use 'signed' or 'unsigned'.");
+			throw new InvalidOperationException($"Unsupported axis mode '{value}'. Use 'signed' or 'unsigned'.");
+		}
+		
 	}
 }

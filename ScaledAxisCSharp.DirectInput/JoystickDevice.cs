@@ -506,7 +506,7 @@ public sealed unsafe class JoystickDevice
 		}
 
 		var unsignedCenteredMidpoint = GetUnsignedCenteredMax(range) / 2.0;
-		var nativeDistanceFromCenter = Math.Abs(rawValue);
+		var nativeDistanceFromCenter = rawValue;
 		var unsignedCenteredDistanceFromCenter = Math.Abs(rawValue - unsignedCenteredMidpoint);
 
 		if (unsignedCenteredDistanceFromCenter < nativeDistanceFromCenter)
@@ -644,5 +644,51 @@ public sealed unsafe class JoystickDevice
 			_DirectInput = directInputPointer;
 			return _DirectInput;
 		}
+	}
+
+	public static JoystickDevice ResolveDevice(string selector)
+	{
+		var devices = JoystickDevice.EnumerateConnected();
+
+		if (int.TryParse(selector, out var deviceId))
+		{
+			var byId = devices.FirstOrDefault(device => device.DeviceId == deviceId);
+			if (byId is not null)
+			{
+				return byId;
+			}
+		}
+
+		var exactMatches = devices
+			.Where(device => string.Equals(device.Name, selector, StringComparison.OrdinalIgnoreCase))
+			.ToArray();
+
+		if (exactMatches.Length == 1)
+		{
+			return exactMatches[0];
+		}
+
+		if (exactMatches.Length > 1)
+		{
+			throw new InvalidOperationException(
+				$"Multiple joystick devices match '{selector}'. Use the numeric id from the list command.");
+		}
+
+		var partialMatches = devices
+			.Where(device => device.Name.Contains(selector, StringComparison.OrdinalIgnoreCase))
+			.ToArray();
+
+		if (partialMatches.Length == 1)
+		{
+			return partialMatches[0];
+		}
+
+		if (partialMatches.Length > 1)
+		{
+			throw new InvalidOperationException(
+				$"Multiple joystick devices partially match '{selector}'. Use the full name or numeric id from the list command.");
+		}
+
+		throw new InvalidOperationException($"No DirectInput device matched '{selector}'.");
 	}
 }
