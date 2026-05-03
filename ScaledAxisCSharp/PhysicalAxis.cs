@@ -5,7 +5,9 @@ internal enum PhysicalAxis
 	X,
 	Y,
 	Z,
-	R,
-	U,
-	V,
+	Rx,
+	Ry,
+	Rz,
+	Slider1,
+	Slider2,
 }

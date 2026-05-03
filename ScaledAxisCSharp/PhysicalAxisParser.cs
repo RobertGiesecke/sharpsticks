@@ -9,10 +9,13 @@ internal static class PhysicalAxisParser
 			"x" => PhysicalAxis.X,
 			"y" => PhysicalAxis.Y,
 			"z" => PhysicalAxis.Z,
-			"r" or "rx" => PhysicalAxis.R,
-			"u" or "slider1" => PhysicalAxis.U,
-			"v" or "slider2" => PhysicalAxis.V,
-			_ => throw new InvalidOperationException($"Unsupported physical axis '{value}'. Use x, y, z, r, u or v."),
+			"r" or "rx" => PhysicalAxis.Rx,
+			"ry" => PhysicalAxis.Ry,
+			"rz" => PhysicalAxis.Rz,
+			"u" or "slider1" => PhysicalAxis.Slider1,
+			"v" or "slider2" => PhysicalAxis.Slider2,
+			_ => throw new InvalidOperationException(
+				$"Unsupported physical axis '{value}'. Use x, y, z, rx, ry, rz, slider1 or slider2."),
 		};
 	}
 }

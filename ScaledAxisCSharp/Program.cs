@@ -8,7 +8,7 @@ internal static class Program
 	{
 		if (!OperatingSystem.IsWindows())
 		{
-			Console.Error.WriteLine("This tool only runs on Windows because it depends on WinMM and vJoy.");
+			Console.Error.WriteLine("This tool only runs on Windows because it depends on DirectInput and vJoy.");
 			return 1;
 		}
 
@@ -31,7 +31,7 @@ internal static class Program
 		}
 		catch (Exception ex)
 		{
-			Console.Error.WriteLine(ex.Message);
+			Console.Error.WriteLine(ex);
 			return 1;
 		}
 	}
@@ -41,18 +41,15 @@ internal static class Program
 		var devices = JoystickDevice.EnumerateConnected();
 		if (devices.Count == 0)
 		{
-			Console.WriteLine("No WinMM joystick devices found.");
+			Console.WriteLine("No DirectInput joystick devices found.");
 			return 0;
 		}
 
 		foreach (var device in devices)
 		{
 			Console.WriteLine($"Device {device.DeviceId}: {device.Name}");
-			Console.WriteLine($"  Axes: {device.Caps.NumAxes}, Buttons: {device.Caps.NumButtons}");
-			Console.WriteLine(
-				$"  X[{device.Caps.XMin}..{device.Caps.XMax}] Y[{device.Caps.YMin}..{device.Caps.YMax}] Z[{device.Caps.ZMin}..{device.Caps.ZMax}]");
-			Console.WriteLine(
-				$"  R[{device.Caps.RMin}..{device.Caps.RMax}] U[{device.Caps.UMin}..{device.Caps.UMax}] V[{device.Caps.VMin}..{device.Caps.VMax}]");
+			Console.WriteLine($"  Instance: {device.InstanceName}");
+			Console.WriteLine($"  Axes: {device.Caps.NumAxes}, Buttons: {device.Caps.NumButtons}, POVs: {device.Caps.NumPovs}");
 		}
 
 		return 0;

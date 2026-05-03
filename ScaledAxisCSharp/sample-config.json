@@ -33,7 +33,7 @@
       },
       "FactorSource": {
         "DeviceId": 1,
-        "Axis": "u",
+        "Axis": "slider1",
         "Mode": "unsigned",
         "Invert": false,
         "Deadzone": 0.0

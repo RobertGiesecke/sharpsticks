@@ -8,7 +8,7 @@ public sealed class ItbMinimalConfig
 	public string LeftDeviceName { get; set; } = "LEFT VPC Stick WarBRD";
 	public string RightDeviceName { get; set; } = "RIGHT VPC Stick WarBRD";
 
-	public string ModifierAxis { get; set; } = "u";
+	public string ModifierAxis { get; set; } = "slider1";
 	public double ModifierMin { get; set; } = -1.0;
 	public double ModifierMax { get; set; } = 1.0;
 
@@ -17,7 +17,7 @@ public sealed class ItbMinimalConfig
 	public double HoldPrecisionSlope { get; set; } = 0.508;
 
 	public bool EnableAxis5XOverride { get; set; }
-	public string Axis5OverrideAxis { get; set; } = "r";
+	public string Axis5OverrideAxis { get; set; } = "ry";
 	public double Axis5OverrideDeadzone { get; set; } = 0.05;
 
 	public int PulseMs { get; set; } = 50;
