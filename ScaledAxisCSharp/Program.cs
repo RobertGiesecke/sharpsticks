@@ -206,6 +206,7 @@ internal static class Program
 		Console.CancelKeyPress += (_, eventArgs) =>
 		{
 			eventArgs.Cancel = true;
+			// ReSharper disable once AccessToDisposedClosure
 			cts.Cancel();
 		};
 
@@ -253,6 +254,7 @@ internal static class Program
 		Console.CancelKeyPress += (_, eventArgs) =>
 		{
 			eventArgs.Cancel = true;
+			// ReSharper disable once AccessToDisposedClosure
 			cts.Cancel();
 		};
 
@@ -276,6 +278,7 @@ internal static class Program
 		Console.CancelKeyPress += (_, eventArgs) =>
 		{
 			eventArgs.Cancel = true;
+			// ReSharper disable once AccessToDisposedClosure
 			cts.Cancel();
 		};
 
