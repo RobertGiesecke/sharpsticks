@@ -139,6 +139,27 @@ internal static unsafe class DirectInputNative
 		return vtable->SetProperty(device, &propertyGuid, &range);
 	}
 
+	public static int GetRangeProperty(nint device, uint offset, out DirectInputPropertyRange range)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		range = new DirectInputPropertyRange
+		{
+			Header = new DirectInputPropertyHeader
+			{
+				Size = (uint)sizeof(DirectInputPropertyRange),
+				HeaderSize = (uint)sizeof(DirectInputPropertyHeader),
+				Object = offset,
+				How = DiPhByOffset,
+			},
+		};
+
+		var propertyGuid = DiPropRange;
+		fixed (DirectInputPropertyRange* rangePointer = &range)
+		{
+			return vtable->GetProperty(device, &propertyGuid, rangePointer);
+		}
+	}
+
 	public static int GetCapabilities(nint device, out DirectInputDeviceCaps caps)
 	{
 		var vtable = *(DirectInputDevice8VTable**)device;
@@ -203,7 +224,7 @@ internal unsafe struct DirectInputDevice8VTable
 	public delegate* unmanaged[Stdcall]<nint, uint> Release;
 	public delegate* unmanaged[Stdcall]<nint, DirectInputDeviceCaps*, int> GetCapabilities;
 	public delegate* unmanaged[Stdcall]<nint, delegate* unmanaged[Stdcall]<DirectInputDeviceObjectInstanceNative*, nint, int>, nint, uint, int> EnumObjects;
-	public nint GetProperty;
+	public delegate* unmanaged[Stdcall]<nint, Guid*, DirectInputPropertyRange*, int> GetProperty;
 	public delegate* unmanaged[Stdcall]<nint, Guid*, DirectInputPropertyRange*, int> SetProperty;
 	public delegate* unmanaged[Stdcall]<nint, int> Acquire;
 	public nint Unacquire;

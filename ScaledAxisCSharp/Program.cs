@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Text.Json;
 
 namespace ScaledAxisCSharp;
@@ -14,26 +15,112 @@ internal static class Program
 
 		try
 		{
-			switch (args.Length)
-			{
-				case 0:
-					PrintUsage();
-					return 1;
-				default:
-					return args[0].ToLowerInvariant() switch
-					{
-						"list" => ListDevices(),
-						"run" => Run(args.Skip(1).ToArray()),
-						"run-itb-minimal" => RunItbMinimal(args.Skip(1).ToArray()),
-						_ => FailWithUsage($"Unknown command '{args[0]}'."),
-					};
-			}
+			return BuildRootCommand().Parse(args).Invoke();
 		}
 		catch (Exception ex)
 		{
 			Console.Error.WriteLine(ex.Message);
 			return 1;
 		}
+	}
+
+	private static RootCommand BuildRootCommand() =>
+		new("DirectInput to vJoy CLI.")
+		{
+			BuildListCommand(),
+			BuildRunCommand(),
+			BuildRunItbMinimalCommand(),
+		};
+
+	private static Command BuildListCommand()
+	{
+		var command = new Command("list", "List available DirectInput joystick devices.");
+		command.SetAction(_ => ListDevices());
+		return command;
+	}
+
+	private static Command BuildRunCommand()
+	{
+		var configOption = CreateConfigOption();
+		var debugOption = CreateDebugOption();
+		var debugIntervalOption = CreateDebugIntervalOption();
+
+		var command = new Command("run", "Run the generic routing profile.")
+		{
+			configOption,
+			debugOption,
+			debugIntervalOption,
+		};
+		command.SetAction(parseResult =>
+		{
+			var configPath = parseResult.GetRequiredValue(configOption);
+			var debugLogger = CreateDebugLogger(
+				parseResult.GetValue(debugOption),
+				parseResult.GetValue(debugIntervalOption));
+			return Run(configPath, debugLogger);
+		});
+
+		return command;
+	}
+
+	private static Command BuildRunItbMinimalCommand()
+	{
+		var configOption = CreateConfigOption();
+		var debugOption = CreateDebugOption();
+		var debugIntervalOption = CreateDebugIntervalOption();
+
+		var command = new Command("run-itb-minimal", "Run the ITB minimal profile.")
+		{
+			configOption,
+			debugOption,
+			debugIntervalOption,
+		};
+		command.SetAction(parseResult =>
+		{
+			var configPath = parseResult.GetRequiredValue(configOption);
+			var debugLogger = CreateDebugLogger(
+				parseResult.GetValue(debugOption),
+				parseResult.GetValue(debugIntervalOption));
+			return RunItbMinimal(configPath, debugLogger);
+		});
+
+		return command;
+	}
+
+	private static Option<string> CreateConfigOption()
+	{
+		return new Option<string>("--config", ["-c"])
+		{
+			Description = "Path to the JSON config file.",
+			Required = true,
+		};
+	}
+
+	private static Option<bool> CreateDebugOption() =>
+		new("--debug")
+		{
+			Description = "Enable periodic debug logging to stderr.",
+		};
+
+	private static Option<int?> CreateDebugIntervalOption() =>
+		new("--debug-interval-ms")
+		{
+			Description = "Debug log interval in milliseconds. Defaults to 250 when debug is enabled.",
+		};
+
+	private static DebugLogger? CreateDebugLogger(bool enabled, int? intervalMs)
+	{
+		if (!enabled && intervalMs is null)
+		{
+			return null;
+		}
+
+		if (intervalMs is < 1)
+		{
+			throw new InvalidOperationException("--debug-interval-ms must be an integer greater than 0.");
+		}
+
+		return new DebugLogger(intervalMs ?? 250);
 	}
 
 	private static int ListDevices()
@@ -49,16 +136,16 @@ internal static class Program
 		{
 			Console.WriteLine($"Device {device.DeviceId}: {device.Name}");
 			Console.WriteLine($"  Instance: {device.InstanceName}");
-			Console.WriteLine($"  Axes: {device.Caps.NumAxes}, Buttons: {device.Caps.NumButtons}, POVs: {device.Caps.NumPovs}");
+			Console.WriteLine(
+				$"  Axes: {device.Caps.NumAxes}, Buttons: {device.Caps.NumButtons}, POVs: {device.Caps.NumPovs}");
 		}
 
 		return 0;
 	}
 
-	private static int Run(string[] args)
+	private static int Run(string configPath, DebugLogger? debugLogger)
 	{
-		var configPath = ParseConfigPath(args);
-		var debugLogger = ParseDebugLogger(args);
+		configPath = Path.GetFullPath(configPath);
 		var config = LoadConfig(configPath);
 		var runtime = Runtime.Build(config);
 
@@ -79,10 +166,9 @@ internal static class Program
 		return 0;
 	}
 
-	private static int RunItbMinimal(string[] args)
+	private static int RunItbMinimal(string configPath, DebugLogger? debugLogger)
 	{
-		var configPath = ParseConfigPath(args);
-		var debugLogger = ParseDebugLogger(args);
+		configPath = Path.GetFullPath(configPath);
 		var config = LoadItbMinimalConfig(configPath);
 		var runtime = ItbMinimalRuntime.Build(config);
 
@@ -101,61 +187,6 @@ internal static class Program
 
 		runtime.Run(cts.Token, debugLogger);
 		return 0;
-	}
-
-	private static string ParseConfigPath(string[] args)
-	{
-		for (var index = 0; index < args.Length; index++)
-		{
-			var current = args[index];
-			if (string.Equals(current, "--config", StringComparison.OrdinalIgnoreCase) ||
-			    string.Equals(current, "-c", StringComparison.OrdinalIgnoreCase))
-			{
-				if (index + 1 >= args.Length)
-				{
-					throw new InvalidOperationException("Missing value for --config.");
-				}
-
-				return Path.GetFullPath(args[index + 1]);
-			}
-		}
-
-		throw new InvalidOperationException("Missing required --config option.");
-	}
-
-	private static DebugLogger? ParseDebugLogger(string[] args)
-	{
-		var enabled = false;
-		int? intervalMs = null;
-
-		for (var index = 0; index < args.Length; index++)
-		{
-			var current = args[index];
-			if (string.Equals(current, "--debug", StringComparison.OrdinalIgnoreCase))
-			{
-				enabled = true;
-				continue;
-			}
-
-			if (string.Equals(current, "--debug-interval-ms", StringComparison.OrdinalIgnoreCase))
-			{
-				if (index + 1 >= args.Length)
-				{
-					throw new InvalidOperationException("Missing value for --debug-interval-ms.");
-				}
-
-				if (!int.TryParse(args[index + 1], out var parsedInterval) || parsedInterval < 1)
-				{
-					throw new InvalidOperationException("--debug-interval-ms must be an integer greater than 0.");
-				}
-
-				intervalMs = parsedInterval;
-				enabled = true;
-				index++;
-			}
-		}
-
-		return enabled ? new DebugLogger(intervalMs ?? 250) : null;
 	}
 
 	private static AppConfig LoadConfig(string configPath)
@@ -180,20 +211,5 @@ internal static class Program
 		var json = File.ReadAllText(configPath);
 		return JsonSerializer.Deserialize(json, AppJsonContext.Default.ItbMinimalConfig)
 		       ?? throw new InvalidOperationException("Config file could not be deserialized.");
-	}
-
-	private static int FailWithUsage(string message)
-	{
-		Console.Error.WriteLine(message);
-		PrintUsage();
-		return 1;
-	}
-
-	private static void PrintUsage()
-	{
-		Console.WriteLine("Usage:");
-		Console.WriteLine("  ScaledAxisCSharp list");
-		Console.WriteLine("  ScaledAxisCSharp run --config <path-to-config.json> [--debug] [--debug-interval-ms <ms>]");
-		Console.WriteLine("  ScaledAxisCSharp run-itb-minimal --config <path-to-itb-config.json> [--debug] [--debug-interval-ms <ms>]");
 	}
 }

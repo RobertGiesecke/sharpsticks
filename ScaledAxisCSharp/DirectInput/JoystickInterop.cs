@@ -6,9 +6,15 @@ internal sealed unsafe class JoystickDevice
 	private const int AxisRangeMax = 32767;
 	private const int DefaultAxisRangeMin = 0;
 	private const int DefaultAxisRangeMax = 65535;
+	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _axisRanges;
 	private readonly nint _devicePointer;
 
-	private JoystickDevice(int deviceId, DirectInputDeviceInfo info, DirectInputDeviceCaps caps, nint devicePointer)
+	private JoystickDevice(
+		int deviceId,
+		DirectInputDeviceInfo info,
+		DirectInputDeviceCaps caps,
+		nint devicePointer,
+		IReadOnlyDictionary<PhysicalAxis, AxisRange> axisRanges)
 	{
 		DeviceId = deviceId;
 		InstanceGuid = info.InstanceGuid;
@@ -16,6 +22,7 @@ internal sealed unsafe class JoystickDevice
 		InstanceName = info.InstanceName;
 		Caps = new JoystickCaps(caps.Axes, caps.Buttons, caps.Povs);
 		_devicePointer = devicePointer;
+		_axisRanges = axisRanges;
 	}
 
 	public int DeviceId { get; }
@@ -70,19 +77,23 @@ internal sealed unsafe class JoystickDevice
 	public AxisDebugSample ReadAxisDebugSample(in JoystickState state, AxisBinding binding)
 	{
 		var rawValue = state.GetAxisValue(binding.Axis);
-		var (min, max) = GetNormalizationRange(rawValue);
-		var normalized = Normalize(rawValue, min, max, binding.Mode, binding.Invert, binding.Deadzone);
-		return new AxisDebugSample(rawValue, min, max, normalized);
+		if (!_axisRanges.TryGetValue(binding.Axis, out var range))
+		{
+			range = GetFallbackRange(rawValue);
+		}
+
+		var normalized = Normalize(rawValue, range.Min, range.Max, binding.Mode, binding.Invert, binding.Deadzone);
+		return new AxisDebugSample(rawValue, range.Min, range.Max, normalized);
 	}
 
-	private static (int Min, int Max) GetNormalizationRange(int rawValue)
+	private static AxisRange GetFallbackRange(int rawValue)
 	{
 		if (rawValue < AxisRangeMin || rawValue > AxisRangeMax)
 		{
-			return (DefaultAxisRangeMin, DefaultAxisRangeMax);
+			return new AxisRange(DefaultAxisRangeMin, DefaultAxisRangeMax);
 		}
 
-		return (AxisRangeMin, AxisRangeMax);
+		return new AxisRange(AxisRangeMin, AxisRangeMax);
 	}
 
 	public static IReadOnlyList<JoystickDevice> EnumerateConnected()
@@ -149,7 +160,8 @@ internal sealed unsafe class JoystickDevice
 			}
 
 			var objectInfos = EnumerateObjects(devicePointer);
-			using var dataFormatScope = DataFormatScope.Create(BuildObjectFormats(objectInfos));
+			var axisEntries = BuildAxisFormatEntries(objectInfos);
+			using var dataFormatScope = DataFormatScope.Create(BuildObjectFormats(axisEntries, objectInfos));
 			var dataFormat = dataFormatScope.DataFormat;
 
 			var setFormatResult = DirectInputNative.SetDataFormat(devicePointer, in dataFormat);
@@ -158,7 +170,7 @@ internal sealed unsafe class JoystickDevice
 				return null;
 			}
 
-			ConfigureAxisRanges(devicePointer, objectInfos);
+			var axisRanges = ConfigureAxisRanges(devicePointer, axisEntries);
 
 			var capsResult = DirectInputNative.GetCapabilities(devicePointer, out var caps);
 			if (!DirectInputNative.Succeeded(capsResult))
@@ -172,7 +184,7 @@ internal sealed unsafe class JoystickDevice
 				return null;
 			}
 
-			return new JoystickDevice(deviceId, info, caps, devicePointer);
+			return new JoystickDevice(deviceId, info, caps, devicePointer, axisRanges);
 		}
 		catch
 		{
@@ -202,24 +214,41 @@ internal sealed unsafe class JoystickDevice
 		return objectInfos;
 	}
 
-	private static List<DirectInputObjectDataFormat> BuildObjectFormats(IReadOnlyList<DirectInputDeviceObjectInfo> objects)
+	private static List<AxisFormatEntry> BuildAxisFormatEntries(IReadOnlyList<DirectInputDeviceObjectInfo> objects)
 	{
-		var objectFormats = new List<DirectInputObjectDataFormat>();
+		var axisEntries = new List<AxisFormatEntry>();
 		var sliderIndex = 0;
 
 		foreach (var axis in objects.Where(IsAxisObject).OrderBy(GetAxisSortKey))
 		{
-			var offset = GetAxisOffset(axis.TypeGuid, ref sliderIndex);
-			if (offset is null)
+			var physicalAxis = GetPhysicalAxis(axis.TypeGuid, ref sliderIndex);
+			if (physicalAxis is null)
 			{
 				continue;
 			}
 
+			axisEntries.Add(new AxisFormatEntry(
+				physicalAxis.Value,
+				DirectInputNative.GetAxisOffset(physicalAxis.Value),
+				axis.Type));
+		}
+
+		return axisEntries;
+	}
+
+	private static List<DirectInputObjectDataFormat> BuildObjectFormats(
+		IReadOnlyList<AxisFormatEntry> axisEntries,
+		IReadOnlyList<DirectInputDeviceObjectInfo> objects)
+	{
+		var objectFormats = new List<DirectInputObjectDataFormat>();
+
+		foreach (var axisEntry in axisEntries)
+		{
 			objectFormats.Add(new DirectInputObjectDataFormat
 			{
 				GuidPointer = 0,
-				Offset = offset.Value,
-				Type = axis.Type,
+				Offset = axisEntry.Offset,
+				Type = axisEntry.Type,
 				Flags = 0,
 			});
 		}
@@ -255,12 +284,25 @@ internal sealed unsafe class JoystickDevice
 		return objectFormats;
 	}
 
-	private static void ConfigureAxisRanges(nint devicePointer, IReadOnlyList<DirectInputDeviceObjectInfo> objects)
+	private static Dictionary<PhysicalAxis, AxisRange> ConfigureAxisRanges(nint devicePointer, IReadOnlyList<AxisFormatEntry> axisEntries)
 	{
-		foreach (var axis in objects.Where(IsAxisObject))
+		var ranges = new Dictionary<PhysicalAxis, AxisRange>();
+
+		foreach (var axisEntry in axisEntries)
 		{
-			DirectInputNative.SetRangeProperty(devicePointer, axis.Offset, AxisRangeMin, AxisRangeMax);
+			DirectInputNative.SetRangeProperty(devicePointer, axisEntry.Offset, AxisRangeMin, AxisRangeMax);
+
+			if (DirectInputNative.Succeeded(DirectInputNative.GetRangeProperty(devicePointer, axisEntry.Offset, out var range)))
+			{
+				ranges[axisEntry.Axis] = new AxisRange(range.Min, range.Max);
+			}
+			else
+			{
+				ranges[axisEntry.Axis] = new AxisRange(AxisRangeMin, AxisRangeMax);
+			}
 		}
+
+		return ranges;
 	}
 
 	private static bool IsAxisObject(DirectInputDeviceObjectInfo objectInfo)
@@ -286,19 +328,19 @@ internal sealed unsafe class JoystickDevice
 		return int.MaxValue;
 	}
 
-	private static uint? GetAxisOffset(Guid axisGuid, ref int sliderIndex)
+	private static PhysicalAxis? GetPhysicalAxis(Guid axisGuid, ref int sliderIndex)
 	{
-		if (axisGuid == DirectInputNative.GuidXAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.X);
-		if (axisGuid == DirectInputNative.GuidYAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Y);
-		if (axisGuid == DirectInputNative.GuidZAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Z);
-		if (axisGuid == DirectInputNative.GuidRxAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Rx);
-		if (axisGuid == DirectInputNative.GuidRyAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Ry);
-		if (axisGuid == DirectInputNative.GuidRzAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Rz);
+		if (axisGuid == DirectInputNative.GuidXAxis) return PhysicalAxis.X;
+		if (axisGuid == DirectInputNative.GuidYAxis) return PhysicalAxis.Y;
+		if (axisGuid == DirectInputNative.GuidZAxis) return PhysicalAxis.Z;
+		if (axisGuid == DirectInputNative.GuidRxAxis) return PhysicalAxis.Rx;
+		if (axisGuid == DirectInputNative.GuidRyAxis) return PhysicalAxis.Ry;
+		if (axisGuid == DirectInputNative.GuidRzAxis) return PhysicalAxis.Rz;
 		if (axisGuid == DirectInputNative.GuidSlider && sliderIndex < 2)
 		{
-			var offset = DirectInputNative.GetAxisOffset(sliderIndex == 0 ? PhysicalAxis.Slider1 : PhysicalAxis.Slider2);
+			var axis = sliderIndex == 0 ? PhysicalAxis.Slider1 : PhysicalAxis.Slider2;
 			sliderIndex++;
-			return offset;
+			return axis;
 		}
 
 		return null;
@@ -446,6 +488,8 @@ internal sealed unsafe class JoystickDevice
 }
 
 internal readonly record struct JoystickCaps(uint NumAxes, uint NumButtons, uint NumPovs);
+internal readonly record struct AxisRange(int Min, int Max);
+internal readonly record struct AxisFormatEntry(PhysicalAxis Axis, uint Offset, uint Type);
 
 internal readonly record struct AxisDebugSample(int RawValue, int RangeMin, int RangeMax, double NormalizedValue);
 
