@@ -4,6 +4,8 @@ internal sealed unsafe class JoystickDevice
 {
 	private const int AxisRangeMin = -32767;
 	private const int AxisRangeMax = 32767;
+	private const int DefaultAxisRangeMin = 0;
+	private const int DefaultAxisRangeMax = 65535;
 	private readonly nint _devicePointer;
 
 	private JoystickDevice(int deviceId, DirectInputDeviceInfo info, DirectInputDeviceCaps caps, nint devicePointer)
@@ -63,7 +65,18 @@ internal sealed unsafe class JoystickDevice
 	public double ReadNormalizedAxis(in JoystickState state, AxisBinding binding)
 	{
 		var rawValue = state.GetAxisValue(binding.Axis);
-		return Normalize(rawValue, AxisRangeMin, AxisRangeMax, binding.Mode, binding.Invert, binding.Deadzone);
+		var (min, max) = GetNormalizationRange(rawValue);
+		return Normalize(rawValue, min, max, binding.Mode, binding.Invert, binding.Deadzone);
+	}
+
+	private static (int Min, int Max) GetNormalizationRange(int rawValue)
+	{
+		if (rawValue < AxisRangeMin || rawValue > AxisRangeMax)
+		{
+			return (DefaultAxisRangeMin, DefaultAxisRangeMax);
+		}
+
+		return (AxisRangeMin, AxisRangeMax);
 	}
 
 	public static IReadOnlyList<JoystickDevice> EnumerateConnected()
