@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.VJoy;
 
 internal enum VjdStatus
 {

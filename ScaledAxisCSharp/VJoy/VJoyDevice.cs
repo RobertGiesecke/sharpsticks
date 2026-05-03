@@ -1,4 +1,6 @@
-namespace ScaledAxisCSharp;
+using ScaledAxisCSharp.Config;
+
+namespace ScaledAxisCSharp.VJoy;
 
 internal sealed class VJoyDevice : IDisposable
 {

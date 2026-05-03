@@ -1,3 +1,7 @@
+using ScaledAxisCSharp.Config;
+using ScaledAxisCSharp.DirectInput;
+using ScaledAxisCSharp.VJoy;
+
 namespace ScaledAxisCSharp;
 
 internal sealed class ItbMinimalRuntime

@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.DirectInput;
 
 internal static unsafe class DirectInputNative
 {

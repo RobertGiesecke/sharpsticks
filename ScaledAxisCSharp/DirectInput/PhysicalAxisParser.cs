@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.DirectInput;
 
 internal static class PhysicalAxisParser
 {

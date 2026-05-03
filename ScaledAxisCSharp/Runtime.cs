@@ -1,4 +1,8 @@
-﻿namespace ScaledAxisCSharp;
+using ScaledAxisCSharp.Config;
+using ScaledAxisCSharp.DirectInput;
+using ScaledAxisCSharp.VJoy;
+
+namespace ScaledAxisCSharp;
 
 internal sealed class Runtime
 {
@@ -97,7 +101,7 @@ internal sealed class Runtime
 		{
 			if (!connectedDevices.TryGetValue(deviceId, out var device))
 			{
-				throw new InvalidOperationException($"Configured joystick {deviceId} is not available via WinMM.");
+				throw new InvalidOperationException($"Configured joystick {deviceId} is not available via DirectInput.");
 			}
 
 			devices.Add(deviceId, device);

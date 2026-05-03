@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.Config;
 
 public sealed class AppConfig
 {

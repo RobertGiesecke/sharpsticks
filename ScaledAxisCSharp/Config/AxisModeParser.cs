@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.Config;
 
 internal static class AxisModeParser
 {

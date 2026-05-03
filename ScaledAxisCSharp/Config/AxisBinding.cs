@@ -1,4 +1,6 @@
-﻿namespace ScaledAxisCSharp;
+using ScaledAxisCSharp.DirectInput;
+
+namespace ScaledAxisCSharp.Config;
 
 internal sealed record AxisBinding(int DeviceId, PhysicalAxis Axis, AxisMode Mode, bool Invert, double Deadzone)
 {

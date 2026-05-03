@@ -1,7 +1,7 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
-namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.VJoy;
 
 internal static class VJoyNative
 {
