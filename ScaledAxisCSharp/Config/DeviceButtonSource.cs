@@ -2,6 +2,6 @@
 
 public sealed class DeviceButtonSource
 {
-	public string DeviceName { get; set; } = string.Empty;
-	public int Button { get; set; }
+	public required string DeviceName { get; init; }
+	public required int Button { get; init; }
 }

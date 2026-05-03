@@ -377,7 +377,7 @@ internal sealed class ItbMinimalRuntime
 	private static AxisBinding ResolveAxisBinding(IReadOnlyList<JoystickDevice> devices, DeviceAxisSource source)
 	{
 		var device = ResolveDevice(devices, source.DeviceName);
-		return new AxisBinding(device.DeviceId, PhysicalAxisParser.Parse(source.Axis), AxisMode.Signed, false, 0.0);
+		return new AxisBinding(device.DeviceId, source.Axis, AxisMode.Signed, false, 0.0);
 	}
 
 	private static ButtonBinding ResolveButtonBinding(IReadOnlyList<JoystickDevice> devices, DeviceButtonSource source)

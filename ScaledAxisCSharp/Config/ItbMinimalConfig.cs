@@ -1,84 +1,84 @@
 namespace ScaledAxisCSharp.Config;
 
-public sealed class ItbMinimalConfig
+public sealed record ItbMinimalConfig
 {
-	public int VJoyDeviceId { get; set; } = 1;
-	public int PollIntervalMs { get; set; } = 5;
+	public int VJoyDeviceId { get; init; } = 1;
+	public int PollIntervalMs { get; init; } = 5;
 
-	public DeviceAxisSource XAxis { get; set; } = new()
+	public DeviceAxisSource XAxis { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
-		Axis = "x",
+		Axis = PhysicalAxis.X,
 	};
 
-	public DeviceAxisSource YAxis { get; set; } = new()
+	public DeviceAxisSource YAxis { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
-		Axis = "y",
+		Axis = PhysicalAxis.Y,
 	};
 
-	public DeviceAxisSource ZAxis { get; set; } = new()
+	public DeviceAxisSource ZAxis { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
-		Axis = "z",
+		Axis = PhysicalAxis.Z,
 	};
 
-	public DeviceAxisSource ModifierAxis { get; set; } = new()
+	public DeviceAxisSource ModifierAxis { get; init; } = new()
 	{
 		DeviceName = "LEFT VPC Stick WarBRD",
-		Axis = "slider1",
+		Axis = PhysicalAxis.Slider1,
 	};
-	public double ModifierMin { get; set; } = -1.0;
-	public double ModifierMax { get; set; } = 1.0;
+	public double ModifierMin { get; init; } = -1.0;
+	public double ModifierMax { get; init; } = 1.0;
 
-	public double NormalSlope { get; set; } = 1.0;
-	public double ModifierPrecisionSlope { get; set; } = 0.184;
-	public double HoldPrecisionSlope { get; set; } = 0.508;
+	public double NormalSlope { get; init; } = 1.0;
+	public double ModifierPrecisionSlope { get; init; } = 0.184;
+	public double HoldPrecisionSlope { get; init; } = 0.508;
 
-	public DeviceButtonSource PrimaryFireButton { get; set; } = new()
+	public DeviceButtonSource PrimaryFireButton { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
 		Button = 1,
 	};
 
-	public DeviceButtonSource LeftPrimaryButton { get; set; } = new()
+	public DeviceButtonSource LeftPrimaryButton { get; init; } = new()
 	{
 		DeviceName = "LEFT VPC Stick WarBRD",
 		Button = 1,
 	};
 
-	public DeviceButtonSource LeftAuxButton { get; set; } = new()
+	public DeviceButtonSource LeftAuxButton { get; init; } = new()
 	{
 		DeviceName = "LEFT VPC Stick WarBRD",
 		Button = 11,
 	};
 
-	public DeviceButtonSource SecondaryFireButton { get; set; } = new()
+	public DeviceButtonSource SecondaryFireButton { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
 		Button = 18,
 	};
 
-	public List<DeviceButtonSource> PrecisionButtons { get; set; } =
+	public List<DeviceButtonSource> PrecisionButtons { get; init; } =
 	[
-		new DeviceButtonSource
+		new()
 		{
 			DeviceName = "LEFT VPC Stick WarBRD",
 			Button = 2,
 		},
-		new DeviceButtonSource
+		new()
 		{
 			DeviceName = "RIGHT VPC Stick WarBRD",
 			Button = 2,
 		},
-		new DeviceButtonSource
+		new()
 		{
 			DeviceName = "RIGHT VPC Stick WarBRD",
 			Button = 16,
 		}
 	];
 
-	public int PulseMs { get; set; } = 50;
+	public int PulseMs { get; init; } = 50;
 
 	public void Validate()
 	{
@@ -112,11 +112,6 @@ public sealed class ItbMinimalConfig
 		if (string.IsNullOrWhiteSpace(source.DeviceName))
 		{
 			throw new InvalidOperationException($"{propertyName}.DeviceName is required.");
-		}
-
-		if (string.IsNullOrWhiteSpace(source.Axis))
-		{
-			throw new InvalidOperationException($"{propertyName}.Axis is required.");
 		}
 	}
 

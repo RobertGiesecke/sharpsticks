@@ -1,6 +1,9 @@
+using System.Text.Json.Serialization;
+
 namespace ScaledAxisCSharp.DirectInput;
 
-internal enum PhysicalAxis
+[JsonConverter(typeof(JsonStringEnumConverter<PhysicalAxis>))]
+public enum PhysicalAxis
 {
 	X,
 	Y,

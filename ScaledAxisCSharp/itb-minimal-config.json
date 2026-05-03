@@ -3,19 +3,19 @@
   "PollIntervalMs": 5,
   "XAxis": {
     "DeviceName": "RIGHT VPC Stick WarBRD",
-    "Axis": "x"
+    "Axis": "X"
   },
   "YAxis": {
     "DeviceName": "RIGHT VPC Stick WarBRD",
-    "Axis": "y"
+    "Axis": "Y"
   },
   "ZAxis": {
     "DeviceName": "RIGHT VPC Stick WarBRD",
-    "Axis": "z"
+    "Axis": "Z"
   },
   "ModifierAxis": {
     "DeviceName": "LEFT VPC Stick WarBRD",
-    "Axis": "slider1"
+    "Axis": "Slider1"
   },
   "ModifierMin": -1.0,
   "ModifierMax": 1.0,

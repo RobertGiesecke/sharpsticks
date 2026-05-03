@@ -1,7 +1,7 @@
 ﻿namespace ScaledAxisCSharp.Config;
 
-public sealed class DeviceAxisSource
+public sealed record DeviceAxisSource
 {
-	public string DeviceName { get; set; } = string.Empty;
-	public string Axis { get; set; } = "x";
+	public required string DeviceName { get; init; }
+	public required PhysicalAxis Axis { get; init; }
 }
