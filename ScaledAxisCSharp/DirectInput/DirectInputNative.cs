@@ -11,7 +11,7 @@ internal static unsafe class DirectInputNative
 	public const uint DiSclBackground = 0x00000008;
 	public const int DiEnumContinue = 1;
 
-	public static readonly Guid IID_IDirectInput8W = new(0xBF798031, 0x483A, 0x4DA2, 0xAA, 0x99, 0x5D, 0x64, 0xED, 0x36, 0x97, 0x00);
+	public static readonly Guid IidIDirectInput8W = new(0xBF798031, 0x483A, 0x4DA2, 0xAA, 0x99, 0x5D, 0x64, 0xED, 0x36, 0x97, 0x00);
 	public static readonly Guid GuidXAxis = new(0xA36D02E0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 	public static readonly Guid GuidYAxis = new(0xA36D02E1, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
 	public static readonly Guid GuidZAxis = new(0xA36D02E2, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
@@ -70,7 +70,7 @@ internal static unsafe class DirectInputNative
 			return 0;
 		}
 
-		var vtable = *(IUnknownVTable**)comObject;
+		var vtable = *(UnknownVTable**)comObject;
 		return (int)vtable->Release(comObject);
 	}
 
@@ -196,155 +196,4 @@ internal static unsafe class DirectInputNative
 			return vtable->GetDeviceState(device, (int)GetStateSize(), statePointer);
 		}
 	}
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal unsafe struct IUnknownVTable
-{
-	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, int> QueryInterface;
-	public delegate* unmanaged[Stdcall]<nint, uint> AddRef;
-	public delegate* unmanaged[Stdcall]<nint, uint> Release;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal unsafe struct DirectInput8VTable
-{
-	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, int> QueryInterface;
-	public delegate* unmanaged[Stdcall]<nint, uint> AddRef;
-	public delegate* unmanaged[Stdcall]<nint, uint> Release;
-	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, nint, int> CreateDevice;
-	public delegate* unmanaged[Stdcall]<nint, uint, delegate* unmanaged[Stdcall]<DirectInputDeviceInstanceNative*, nint, int>, nint, uint, int> EnumDevices;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal unsafe struct DirectInputDevice8VTable
-{
-	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, int> QueryInterface;
-	public delegate* unmanaged[Stdcall]<nint, uint> AddRef;
-	public delegate* unmanaged[Stdcall]<nint, uint> Release;
-	public delegate* unmanaged[Stdcall]<nint, DirectInputDeviceCaps*, int> GetCapabilities;
-	public delegate* unmanaged[Stdcall]<nint, delegate* unmanaged[Stdcall]<DirectInputDeviceObjectInstanceNative*, nint, int>, nint, uint, int> EnumObjects;
-	public delegate* unmanaged[Stdcall]<nint, Guid*, DirectInputPropertyRange*, int> GetProperty;
-	public delegate* unmanaged[Stdcall]<nint, Guid*, DirectInputPropertyRange*, int> SetProperty;
-	public delegate* unmanaged[Stdcall]<nint, int> Acquire;
-	public nint Unacquire;
-	public delegate* unmanaged[Stdcall]<nint, int, DirectInputJoyState2*, int> GetDeviceState;
-	public nint GetDeviceData;
-	public delegate* unmanaged[Stdcall]<nint, DirectInputDataFormat*, int> SetDataFormat;
-	public nint SetEventNotification;
-	public delegate* unmanaged[Stdcall]<nint, nint, uint, int> SetCooperativeLevel;
-	public nint GetObjectInfo;
-	public nint GetDeviceInfo;
-	public nint RunControlPanel;
-	public nint Initialize;
-	public nint CreateEffect;
-	public nint EnumEffects;
-	public nint GetEffectInfo;
-	public nint GetForceFeedbackState;
-	public nint SendForceFeedbackCommand;
-	public nint EnumCreatedEffectObjects;
-	public nint Escape;
-	public delegate* unmanaged[Stdcall]<nint, int> Poll;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal struct DirectInputDeviceCaps
-{
-	public uint Size;
-	public uint Flags;
-	public uint DeviceType;
-	public uint Axes;
-	public uint Buttons;
-	public uint Povs;
-	public uint ForceFeedbackSamplePeriod;
-	public uint ForceFeedbackMinTimeResolution;
-	public uint FirmwareRevision;
-	public uint HardwareRevision;
-	public uint ForceFeedbackDriverVersion;
-}
-
-[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal unsafe struct DirectInputDeviceInstanceNative
-{
-	public uint Size;
-	public Guid InstanceGuid;
-	public Guid ProductGuid;
-	public uint DeviceType;
-	public fixed char InstanceName[260];
-	public fixed char ProductName[260];
-	public Guid ForceFeedbackDriverGuid;
-	public ushort UsagePage;
-	public ushort Usage;
-}
-
-[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal unsafe struct DirectInputDeviceObjectInstanceNative
-{
-	public uint Size;
-	public Guid TypeGuid;
-	public uint Offset;
-	public uint Type;
-	public uint Flags;
-	public fixed char Name[260];
-	public uint ForceFeedbackMaxForce;
-	public uint ForceFeedbackForceResolution;
-	public ushort CollectionNumber;
-	public ushort DesignatorIndex;
-	public ushort UsagePage;
-	public ushort Usage;
-	public uint Dimension;
-	public ushort Exponent;
-	public ushort ReportId;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal struct DirectInputObjectDataFormat
-{
-	public nint GuidPointer;
-	public uint Offset;
-	public uint Type;
-	public uint Flags;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal struct DirectInputDataFormat
-{
-	public uint Size;
-	public uint ObjectSize;
-	public uint Flags;
-	public uint DataSize;
-	public uint ObjectCount;
-	public nint ObjectDataFormats;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal struct DirectInputPropertyHeader
-{
-	public uint Size;
-	public uint HeaderSize;
-	public uint Object;
-	public uint How;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal struct DirectInputPropertyRange
-{
-	public DirectInputPropertyHeader Header;
-	public int Min;
-	public int Max;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-internal unsafe struct DirectInputJoyState2
-{
-	public int X;
-	public int Y;
-	public int Z;
-	public int Rx;
-	public int Ry;
-	public int Rz;
-	public fixed int Sliders[2];
-	public fixed uint Povs[4];
-	public fixed byte Buttons[128];
-	public fixed int ExtendedAxes[24];
 }

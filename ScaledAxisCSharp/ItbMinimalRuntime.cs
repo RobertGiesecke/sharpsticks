@@ -4,23 +4,23 @@ namespace ScaledAxisCSharp;
 
 internal sealed class ItbMinimalRuntime
 {
-	private readonly ItbMinimalConfig _config;
-	private readonly IReadOnlyDictionary<int, JoystickDevice> _devices;
-	private readonly int _pollIntervalMs;
-	private readonly VJoyDevice _vJoyDevice;
-	private readonly AxisBinding _xAxis;
-	private readonly AxisBinding _yAxis;
-	private readonly AxisBinding _zAxis;
-	private readonly AxisBinding _modifierAxis;
-	private readonly AxisBinding _axis5OverrideAxis;
-	private readonly ButtonBinding _primaryFireButton;
-	private readonly ButtonBinding _leftPrimaryButton;
-	private readonly ButtonBinding _leftAuxButton;
-	private readonly ButtonBinding _secondaryFireButton;
-	private readonly IReadOnlyList<ButtonBinding> _precisionButtons;
-	private bool _secondaryFirePrevious;
-	private int _pulse71RemainingMs;
-	private int _pulse72RemainingMs;
+	private readonly ItbMinimalConfig _Config;
+	private readonly IReadOnlyDictionary<int, JoystickDevice> _Devices;
+	private readonly int _PollIntervalMs;
+	private readonly VJoyDevice _VJoyDevice;
+	private readonly AxisBinding _XAxis;
+	private readonly AxisBinding _YAxis;
+	private readonly AxisBinding _ZAxis;
+	private readonly AxisBinding _ModifierAxis;
+	private readonly AxisBinding _Axis5OverrideAxis;
+	private readonly ButtonBinding _PrimaryFireButton;
+	private readonly ButtonBinding _LeftPrimaryButton;
+	private readonly ButtonBinding _LeftAuxButton;
+	private readonly ButtonBinding _SecondaryFireButton;
+	private readonly IReadOnlyList<ButtonBinding> _PrecisionButtons;
+	private bool _SecondaryFirePrevious;
+	private int _Pulse71RemainingMs;
+	private int _Pulse72RemainingMs;
 
 	private ItbMinimalRuntime(
 		ItbMinimalConfig config,
@@ -37,20 +37,20 @@ internal sealed class ItbMinimalRuntime
 		ButtonBinding secondaryFireButton,
 		IReadOnlyList<ButtonBinding> precisionButtons)
 	{
-		_config = config;
-		_devices = devices;
-		_pollIntervalMs = config.PollIntervalMs;
-		_vJoyDevice = vJoyDevice;
-		_xAxis = xAxis;
-		_yAxis = yAxis;
-		_zAxis = zAxis;
-		_modifierAxis = modifierAxis;
-		_axis5OverrideAxis = axis5OverrideAxis;
-		_primaryFireButton = primaryFireButton;
-		_leftPrimaryButton = leftPrimaryButton;
-		_leftAuxButton = leftAuxButton;
-		_secondaryFireButton = secondaryFireButton;
-		_precisionButtons = precisionButtons;
+		_Config = config;
+		_Devices = devices;
+		_PollIntervalMs = config.PollIntervalMs;
+		_VJoyDevice = vJoyDevice;
+		_XAxis = xAxis;
+		_YAxis = yAxis;
+		_ZAxis = zAxis;
+		_ModifierAxis = modifierAxis;
+		_Axis5OverrideAxis = axis5OverrideAxis;
+		_PrimaryFireButton = primaryFireButton;
+		_LeftPrimaryButton = leftPrimaryButton;
+		_LeftAuxButton = leftAuxButton;
+		_SecondaryFireButton = secondaryFireButton;
+		_PrecisionButtons = precisionButtons;
 	}
 
 	public static ItbMinimalRuntime Build(ItbMinimalConfig config)
@@ -130,9 +130,9 @@ internal sealed class ItbMinimalRuntime
 
 	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
-		using (_vJoyDevice)
+		using (_VJoyDevice)
 		{
-			var currentStates = new Dictionary<int, JoystickState>(_devices.Count);
+			var currentStates = new Dictionary<int, JoystickState>(_Devices.Count);
 			var lastReportedReadFailure = new HashSet<int>();
 			LogStartup(debugLogger);
 
@@ -140,7 +140,7 @@ internal sealed class ItbMinimalRuntime
 			{
 				currentStates.Clear();
 
-				foreach (var (deviceId, device) in _devices)
+				foreach (var (deviceId, device) in _Devices)
 				{
 					if (device.TryRead(out var state, out var error))
 					{
@@ -163,7 +163,7 @@ internal sealed class ItbMinimalRuntime
 					debugLogger.WriteBlock(debugLines);
 				}
 
-				if (cancellationToken.WaitHandle.WaitOne(_pollIntervalMs))
+				if (cancellationToken.WaitHandle.WaitOne(_PollIntervalMs))
 				{
 					break;
 				}
@@ -173,10 +173,10 @@ internal sealed class ItbMinimalRuntime
 
 	private void ApplyAxes(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
-		if (!TryReadAxisSample(states, _modifierAxis, out var modifierSample) ||
-		    !TryReadAxisSample(states, _xAxis, out var xSample) ||
-		    !TryReadAxisSample(states, _yAxis, out var ySample) ||
-		    !TryReadAxisSample(states, _zAxis, out var zSample))
+		if (!TryReadAxisSample(states, _ModifierAxis, out var modifierSample) ||
+		    !TryReadAxisSample(states, _XAxis, out var xSample) ||
+		    !TryReadAxisSample(states, _YAxis, out var ySample) ||
+		    !TryReadAxisSample(states, _ZAxis, out var zSample))
 		{
 			return;
 		}
@@ -185,7 +185,7 @@ internal sealed class ItbMinimalRuntime
 		var rightX = xSample.NormalizedValue;
 		var rightY = ySample.NormalizedValue;
 		var rightZ = zSample.NormalizedValue;
-		var precisionMode = _precisionButtons.Any(binding => IsPressed(states, binding));
+		var precisionMode = _PrecisionButtons.Any(binding => IsPressed(states, binding));
 		var outputX = precisionMode
 			? ApplyPrecisionCurve(rightX)
 			: ApplyModifierCurve(rightX, modifierValue);
@@ -198,19 +198,19 @@ internal sealed class ItbMinimalRuntime
 
 		AxisDebugSample? axis5OverrideSample = null;
 		var axis5OverrideActive = false;
-		if (_config.EnableAxis5XOverride && TryReadAxisSample(states, _axis5OverrideAxis, out var overrideSample))
+		if (_Config.EnableAxis5XOverride && TryReadAxisSample(states, _Axis5OverrideAxis, out var overrideSample))
 		{
 			axis5OverrideSample = overrideSample;
-			if (Math.Abs(overrideSample.NormalizedValue) >= _config.Axis5OverrideDeadzone)
+			if (Math.Abs(overrideSample.NormalizedValue) >= _Config.Axis5OverrideDeadzone)
 			{
 				axis5OverrideActive = true;
 				outputX = overrideSample.NormalizedValue;
 			}
 		}
 
-		_vJoyDevice.SetAxis(VJoyAxis.X, outputX);
-		_vJoyDevice.SetAxis(VJoyAxis.Y, outputY);
-		_vJoyDevice.SetAxis(VJoyAxis.Z, outputZ);
+		_VJoyDevice.SetAxis(VJoyAxis.X, outputX);
+		_VJoyDevice.SetAxis(VJoyAxis.Y, outputY);
+		_VJoyDevice.SetAxis(VJoyAxis.Z, outputZ);
 
 		if (debugLines is not null)
 		{
@@ -260,7 +260,7 @@ internal sealed class ItbMinimalRuntime
 	private bool TryReadAxisSample(IReadOnlyDictionary<int, JoystickState> states, AxisBinding binding, out AxisDebugSample sample)
 	{
 		if (!states.TryGetValue(binding.DeviceId, out var state) ||
-		    !_devices.TryGetValue(binding.DeviceId, out var device))
+		    !_Devices.TryGetValue(binding.DeviceId, out var device))
 		{
 			sample = default;
 			return false;
@@ -277,30 +277,30 @@ internal sealed class ItbMinimalRuntime
 
 	private void ApplyButtons(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
-		var primaryFire = IsPressed(states, _primaryFireButton);
-		var leftPrimary = IsPressed(states, _leftPrimaryButton);
-		var leftAux = IsPressed(states, _leftAuxButton);
-		var secondaryFire = IsPressed(states, _secondaryFireButton);
+		var primaryFire = IsPressed(states, _PrimaryFireButton);
+		var leftPrimary = IsPressed(states, _LeftPrimaryButton);
+		var leftAux = IsPressed(states, _LeftAuxButton);
+		var secondaryFire = IsPressed(states, _SecondaryFireButton);
 
-		_vJoyDevice.SetButton(1, primaryFire);
-		_vJoyDevice.SetButton(40, leftPrimary);
-		_vJoyDevice.SetButton(79, leftAux);
-		_vJoyDevice.SetButton(22, secondaryFire);
+		_VJoyDevice.SetButton(1, primaryFire);
+		_VJoyDevice.SetButton(40, leftPrimary);
+		_VJoyDevice.SetButton(79, leftAux);
+		_VJoyDevice.SetButton(22, secondaryFire);
 
-		if (secondaryFire && !_secondaryFirePrevious)
+		if (secondaryFire && !_SecondaryFirePrevious)
 		{
-			_pulse72RemainingMs = _config.PulseMs;
+			_Pulse72RemainingMs = _Config.PulseMs;
 		}
 
-		if (!secondaryFire && _secondaryFirePrevious)
+		if (!secondaryFire && _SecondaryFirePrevious)
 		{
-			_pulse71RemainingMs = _config.PulseMs;
+			_Pulse71RemainingMs = _Config.PulseMs;
 		}
 
-		_secondaryFirePrevious = secondaryFire;
+		_SecondaryFirePrevious = secondaryFire;
 
-		_vJoyDevice.SetButton(71, _pulse71RemainingMs > 0);
-		_vJoyDevice.SetButton(72, _pulse72RemainingMs > 0);
+		_VJoyDevice.SetButton(71, _Pulse71RemainingMs > 0);
+		_VJoyDevice.SetButton(72, _Pulse72RemainingMs > 0);
 
 		if (debugLines is not null)
 		{
@@ -313,41 +313,41 @@ internal sealed class ItbMinimalRuntime
 			debugLines.Append(" secondary=");
 			debugLines.Append(secondaryFire ? "down" : "up");
 			debugLines.Append(" pulse71=");
-			debugLines.Append(_pulse71RemainingMs > 0 ? "on" : "off");
+			debugLines.Append(_Pulse71RemainingMs > 0 ? "on" : "off");
 			debugLines.Append(" pulse72=");
-			debugLines.AppendLine(_pulse72RemainingMs > 0 ? "on" : "off");
+			debugLines.AppendLine(_Pulse72RemainingMs > 0 ? "on" : "off");
 		}
 	}
 
 	private void AdvancePulses()
 	{
-		if (_pulse71RemainingMs > 0)
+		if (_Pulse71RemainingMs > 0)
 		{
-			_pulse71RemainingMs = Math.Max(0, _pulse71RemainingMs - _pollIntervalMs);
+			_Pulse71RemainingMs = Math.Max(0, _Pulse71RemainingMs - _PollIntervalMs);
 		}
 
-		if (_pulse72RemainingMs > 0)
+		if (_Pulse72RemainingMs > 0)
 		{
-			_pulse72RemainingMs = Math.Max(0, _pulse72RemainingMs - _pollIntervalMs);
+			_Pulse72RemainingMs = Math.Max(0, _Pulse72RemainingMs - _PollIntervalMs);
 		}
 	}
 
 	private double ApplyModifierCurve(double normalizedInput, double normalizedModifier)
 	{
-		var modifierSpan = _config.ModifierMax - _config.ModifierMin;
+		var modifierSpan = _Config.ModifierMax - _Config.ModifierMin;
 		if (modifierSpan == 0.0)
 		{
 			return 0.0;
 		}
 
-		var blend = Math.Clamp((normalizedModifier - _config.ModifierMin) / modifierSpan, 0.0, 1.0);
-		var slope = _config.NormalSlope + ((_config.ModifierPrecisionSlope - _config.NormalSlope) * blend);
+		var blend = Math.Clamp((normalizedModifier - _Config.ModifierMin) / modifierSpan, 0.0, 1.0);
+		var slope = _Config.NormalSlope + ((_Config.ModifierPrecisionSlope - _Config.NormalSlope) * blend);
 		return normalizedInput * slope;
 	}
 
 	private double ApplyPrecisionCurve(double normalizedInput)
 	{
-		return normalizedInput * _config.HoldPrecisionSlope;
+		return normalizedInput * _Config.HoldPrecisionSlope;
 	}
 
 	private void LogStartup(DebugLogger? debugLogger)
@@ -357,7 +357,7 @@ internal sealed class ItbMinimalRuntime
 			return;
 		}
 
-		foreach (var device in _devices.Values.OrderBy(device => device.DeviceId))
+		foreach (var device in _Devices.Values.OrderBy(device => device.DeviceId))
 		{
 			debugLogger.WriteLine(
 				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");

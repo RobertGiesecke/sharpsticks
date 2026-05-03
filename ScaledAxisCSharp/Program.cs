@@ -28,6 +28,7 @@ internal static class Program
 		new("DirectInput to vJoy CLI.")
 		{
 			BuildListCommand(),
+			BuildWatchAxisCommand(),
 			BuildRunCommand(),
 			BuildRunItbMinimalCommand(),
 		};
@@ -58,6 +59,46 @@ internal static class Program
 				parseResult.GetValue(debugOption),
 				parseResult.GetValue(debugIntervalOption));
 			return Run(configPath, debugLogger);
+		});
+
+		return command;
+	}
+
+	private static Command BuildWatchAxisCommand()
+	{
+		var deviceOption = new Option<string>("--device")
+		{
+			Description = "DirectInput device id or device name fragment.",
+			Required = true,
+		};
+		var axesOption = new Option<string>("--axes")
+		{
+			Description = "Comma-separated axes to watch. Defaults to x,y,z,rx,ry,rz,slider1,slider2.",
+		};
+		var modeOption = new Option<string>("--mode")
+		{
+			Description = "Axis normalization mode: signed or unsigned. Defaults to signed.",
+		};
+		var intervalOption = new Option<int?>("--interval-ms")
+		{
+			Description = "Sampling interval in milliseconds. Defaults to 100.",
+		};
+
+		var command = new Command("watch-axis", "Watch raw DirectInput axis values without vJoy output.")
+		{
+			deviceOption,
+			axesOption,
+			modeOption,
+			intervalOption,
+		};
+
+		command.SetAction(parseResult =>
+		{
+			var deviceSelector = parseResult.GetRequiredValue(deviceOption);
+			var axisList = parseResult.GetValue(axesOption);
+			var mode = parseResult.GetValue(modeOption);
+			var intervalMs = parseResult.GetValue(intervalOption);
+			return WatchAxis(deviceSelector, axisList, mode, intervalMs);
 		});
 
 		return command;
@@ -143,6 +184,58 @@ internal static class Program
 		return 0;
 	}
 
+	private static int WatchAxis(string deviceSelector, string? axisList, string? modeValue, int? intervalMs)
+	{
+		if (intervalMs is < 1)
+		{
+			throw new InvalidOperationException("--interval-ms must be an integer greater than 0.");
+		}
+
+		var pollIntervalMs = intervalMs ?? 100;
+		var mode = string.IsNullOrWhiteSpace(modeValue) ? AxisMode.Signed : AxisModeParser.Parse(modeValue);
+		var axes = ParseAxes(axisList);
+		var device = ResolveDevice(deviceSelector);
+
+		using var cts = new CancellationTokenSource();
+		Console.CancelKeyPress += (_, eventArgs) =>
+		{
+			eventArgs.Cancel = true;
+			cts.Cancel();
+		};
+
+		Console.WriteLine($"Watching device {device.DeviceId}: {device.Name}");
+		Console.WriteLine($"Mode: {mode.ToString().ToLowerInvariant()}, interval: {pollIntervalMs} ms");
+		Console.WriteLine($"Axes: {string.Join(", ", axes.Select(FormatAxisName))}");
+
+		while (!cts.IsCancellationRequested)
+		{
+			if (device.TryRead(out var state, out var error))
+			{
+				var line = string.Join(
+					" | ",
+					axes.Select(axis =>
+					{
+						var sample = device.ReadAxisDebugSample(state, new AxisBinding(device.DeviceId, axis, mode, false, 0.0));
+						return
+							$"{FormatAxisName(axis)} raw={sample.RawValue} range={sample.RangeMin}..{sample.RangeMax} norm={sample.NormalizedValue:0.0000}";
+					}));
+
+				Console.WriteLine($"{DateTime.Now:HH:mm:ss.fff} {line}");
+			}
+			else if (error is not null)
+			{
+				Console.Error.WriteLine(error);
+			}
+
+			if (cts.Token.WaitHandle.WaitOne(pollIntervalMs))
+			{
+				break;
+			}
+		}
+
+		return 0;
+	}
+
 	private static int Run(string configPath, DebugLogger? debugLogger)
 	{
 		configPath = Path.GetFullPath(configPath);
@@ -211,5 +304,91 @@ internal static class Program
 		var json = File.ReadAllText(configPath);
 		return JsonSerializer.Deserialize(json, AppJsonContext.Default.ItbMinimalConfig)
 		       ?? throw new InvalidOperationException("Config file could not be deserialized.");
+	}
+
+	private static IReadOnlyList<PhysicalAxis> ParseAxes(string? axisList)
+	{
+		if (string.IsNullOrWhiteSpace(axisList))
+		{
+			return
+			[
+				PhysicalAxis.X,
+				PhysicalAxis.Y,
+				PhysicalAxis.Z,
+				PhysicalAxis.Rx,
+				PhysicalAxis.Ry,
+				PhysicalAxis.Rz,
+				PhysicalAxis.Slider1,
+				PhysicalAxis.Slider2,
+			];
+		}
+
+		return axisList
+			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+			.Select(PhysicalAxisParser.Parse)
+			.Distinct()
+			.ToArray();
+	}
+
+	private static JoystickDevice ResolveDevice(string selector)
+	{
+		var devices = JoystickDevice.EnumerateConnected();
+
+		if (int.TryParse(selector, out var deviceId))
+		{
+			var byId = devices.FirstOrDefault(device => device.DeviceId == deviceId);
+			if (byId is not null)
+			{
+				return byId;
+			}
+		}
+
+		var exactMatches = devices
+			.Where(device => string.Equals(device.Name, selector, StringComparison.OrdinalIgnoreCase))
+			.ToArray();
+
+		if (exactMatches.Length == 1)
+		{
+			return exactMatches[0];
+		}
+
+		if (exactMatches.Length > 1)
+		{
+			throw new InvalidOperationException(
+				$"Multiple joystick devices match '{selector}'. Use the numeric id from the list command.");
+		}
+
+		var partialMatches = devices
+			.Where(device => device.Name.Contains(selector, StringComparison.OrdinalIgnoreCase))
+			.ToArray();
+
+		if (partialMatches.Length == 1)
+		{
+			return partialMatches[0];
+		}
+
+		if (partialMatches.Length > 1)
+		{
+			throw new InvalidOperationException(
+				$"Multiple joystick devices partially match '{selector}'. Use the full name or numeric id from the list command.");
+		}
+
+		throw new InvalidOperationException($"No DirectInput device matched '{selector}'.");
+	}
+
+	private static string FormatAxisName(PhysicalAxis axis)
+	{
+		return axis switch
+		{
+			PhysicalAxis.X => "x",
+			PhysicalAxis.Y => "y",
+			PhysicalAxis.Z => "z",
+			PhysicalAxis.Rx => "rx",
+			PhysicalAxis.Ry => "ry",
+			PhysicalAxis.Rz => "rz",
+			PhysicalAxis.Slider1 => "slider1",
+			PhysicalAxis.Slider2 => "slider2",
+			_ => axis.ToString(),
+		};
 	}
 }

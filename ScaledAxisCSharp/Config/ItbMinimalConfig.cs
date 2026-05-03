@@ -147,15 +147,3 @@ public sealed class ItbMinimalConfig
 		}
 	}
 }
-
-public sealed class DeviceAxisSource
-{
-	public string DeviceName { get; set; } = string.Empty;
-	public string Axis { get; set; } = "x";
-}
-
-public sealed class DeviceButtonSource
-{
-	public string DeviceName { get; set; } = string.Empty;
-	public int Button { get; set; }
-}

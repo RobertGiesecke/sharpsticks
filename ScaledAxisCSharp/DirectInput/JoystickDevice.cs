@@ -6,8 +6,8 @@ internal sealed unsafe class JoystickDevice
 	private const int AxisRangeMax = 32767;
 	private const int DefaultAxisRangeMin = 0;
 	private const int DefaultAxisRangeMax = 65535;
-	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _axisRanges;
-	private readonly nint _devicePointer;
+	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _AxisRanges;
+	private readonly nint _DevicePointer;
 
 	private JoystickDevice(
 		int deviceId,
@@ -21,8 +21,8 @@ internal sealed unsafe class JoystickDevice
 		Name = info.ProductName;
 		InstanceName = info.InstanceName;
 		Caps = new JoystickCaps(caps.Axes, caps.Buttons, caps.Povs);
-		_devicePointer = devicePointer;
-		_axisRanges = axisRanges;
+		_DevicePointer = devicePointer;
+		_AxisRanges = axisRanges;
 	}
 
 	public int DeviceId { get; }
@@ -33,10 +33,10 @@ internal sealed unsafe class JoystickDevice
 
 	public bool TryRead(out JoystickState state, out string? error)
 	{
-		var pollResult = DirectInputNative.Poll(_devicePointer);
+		var pollResult = DirectInputNative.Poll(_DevicePointer);
 		if (!DirectInputNative.Succeeded(pollResult))
 		{
-			var acquireResult = DirectInputNative.Acquire(_devicePointer);
+			var acquireResult = DirectInputNative.Acquire(_DevicePointer);
 			if (!DirectInputNative.Succeeded(acquireResult))
 			{
 				state = default;
@@ -44,16 +44,16 @@ internal sealed unsafe class JoystickDevice
 				return false;
 			}
 
-			pollResult = DirectInputNative.Poll(_devicePointer);
+			pollResult = DirectInputNative.Poll(_DevicePointer);
 		}
 
-		var stateResult = DirectInputNative.GetDeviceState(_devicePointer, out var rawState);
+		var stateResult = DirectInputNative.GetDeviceState(_DevicePointer, out var rawState);
 		if (!DirectInputNative.Succeeded(stateResult))
 		{
-			var acquireResult = DirectInputNative.Acquire(_devicePointer);
+			var acquireResult = DirectInputNative.Acquire(_DevicePointer);
 			if (DirectInputNative.Succeeded(acquireResult))
 			{
-				stateResult = DirectInputNative.GetDeviceState(_devicePointer, out rawState);
+				stateResult = DirectInputNative.GetDeviceState(_DevicePointer, out rawState);
 			}
 
 			if (!DirectInputNative.Succeeded(stateResult))
@@ -77,7 +77,7 @@ internal sealed unsafe class JoystickDevice
 	public AxisDebugSample ReadAxisDebugSample(in JoystickState state, AxisBinding binding)
 	{
 		var rawValue = state.GetAxisValue(binding.Axis);
-		if (!_axisRanges.TryGetValue(binding.Axis, out var range))
+		if (!_AxisRanges.TryGetValue(binding.Axis, out var range))
 		{
 			range = GetFallbackRange(rawValue);
 		}
@@ -417,11 +417,11 @@ internal sealed unsafe class JoystickDevice
 
 	private sealed class DataFormatScope : IDisposable
 	{
-		private readonly nint _objectBuffer;
+		private readonly nint _ObjectBuffer;
 
 		private DataFormatScope(nint objectBuffer, DirectInputDataFormat dataFormat)
 		{
-			_objectBuffer = objectBuffer;
+			_ObjectBuffer = objectBuffer;
 			DataFormat = dataFormat;
 		}
 
@@ -453,26 +453,26 @@ internal sealed unsafe class JoystickDevice
 
 		public void Dispose()
 		{
-			Marshal.FreeHGlobal(_objectBuffer);
+			Marshal.FreeHGlobal(_ObjectBuffer);
 		}
 	}
 
 	private static class DirectInputContext
 	{
-		private static nint _directInput;
+		private static nint _DirectInput;
 
 		public static nint GetOrCreate()
 		{
-			if (_directInput != 0)
+			if (_DirectInput != 0)
 			{
-				return _directInput;
+				return _DirectInput;
 			}
 
 			var instanceHandle = DirectInputNative.GetModuleHandle(null);
 			var result = DirectInputNative.DirectInput8Create(
 				instanceHandle,
 				DirectInputNative.DirectInputVersion,
-				in DirectInputNative.IID_IDirectInput8W,
+				in DirectInputNative.IidIDirectInput8W,
 				out var directInputPointer,
 				IntPtr.Zero);
 
@@ -481,123 +481,8 @@ internal sealed unsafe class JoystickDevice
 				throw new InvalidOperationException($"DirectInput8Create failed with HRESULT 0x{result:X8}.");
 			}
 
-			_directInput = directInputPointer;
-			return _directInput;
+			_DirectInput = directInputPointer;
+			return _DirectInput;
 		}
-	}
-}
-
-internal readonly record struct JoystickCaps(uint NumAxes, uint NumButtons, uint NumPovs);
-internal readonly record struct AxisRange(int Min, int Max);
-internal readonly record struct AxisFormatEntry(PhysicalAxis Axis, uint Offset, uint Type);
-
-internal readonly record struct AxisDebugSample(int RawValue, int RangeMin, int RangeMax, double NormalizedValue);
-
-internal readonly record struct JoystickState(
-	int X,
-	int Y,
-	int Z,
-	int Rx,
-	int Ry,
-	int Rz,
-	int Slider1,
-	int Slider2,
-	ulong ButtonBitsLow,
-	ulong ButtonBitsHigh)
-{
-	public static unsafe JoystickState FromNative(DirectInputJoyState2 state)
-	{
-		ulong buttonBitsLow = 0;
-		ulong buttonBitsHigh = 0;
-
-		for (var index = 0; index < 64; index++)
-		{
-			if ((state.Buttons[index] & 0x80) != 0)
-			{
-				buttonBitsLow |= 1UL << index;
-			}
-		}
-
-		for (var index = 0; index < 64; index++)
-		{
-			if ((state.Buttons[index + 64] & 0x80) != 0)
-			{
-				buttonBitsHigh |= 1UL << index;
-			}
-		}
-
-		return new JoystickState(
-			state.X,
-			state.Y,
-			state.Z,
-			state.Rx,
-			state.Ry,
-			state.Rz,
-			state.Sliders[0],
-			state.Sliders[1],
-			buttonBitsLow,
-			buttonBitsHigh);
-	}
-
-	public int GetAxisValue(PhysicalAxis axis)
-	{
-		return axis switch
-		{
-			PhysicalAxis.X => X,
-			PhysicalAxis.Y => Y,
-			PhysicalAxis.Z => Z,
-			PhysicalAxis.Rx => Rx,
-			PhysicalAxis.Ry => Ry,
-			PhysicalAxis.Rz => Rz,
-			PhysicalAxis.Slider1 => Slider1,
-			PhysicalAxis.Slider2 => Slider2,
-			_ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
-		};
-	}
-
-	public bool IsButtonPressed(int buttonNumber)
-	{
-		if (buttonNumber < 1 || buttonNumber > 128)
-		{
-			return false;
-		}
-
-		var zeroBasedIndex = buttonNumber - 1;
-		if (zeroBasedIndex < 64)
-		{
-			return ((ButtonBitsLow >> zeroBasedIndex) & 1UL) != 0;
-		}
-
-		return ((ButtonBitsHigh >> (zeroBasedIndex - 64)) & 1UL) != 0;
-	}
-}
-
-internal readonly record struct DirectInputDeviceInfo(Guid InstanceGuid, string ProductName, string InstanceName)
-{
-	public static unsafe DirectInputDeviceInfo FromNative(DirectInputDeviceInstanceNative* native)
-	{
-		return new DirectInputDeviceInfo(
-			native->InstanceGuid,
-			ReadNullTerminatedString(native->ProductName, 260),
-			ReadNullTerminatedString(native->InstanceName, 260));
-	}
-
-	private static unsafe string ReadNullTerminatedString(char* buffer, int capacity)
-	{
-		var length = 0;
-		while (length < capacity && buffer[length] != '\0')
-		{
-			length++;
-		}
-
-		return new string(buffer, 0, length);
-	}
-}
-
-internal readonly record struct DirectInputDeviceObjectInfo(Guid TypeGuid, uint Offset, uint Type)
-{
-	public static unsafe DirectInputDeviceObjectInfo FromNative(DirectInputDeviceObjectInstanceNative* native)
-	{
-		return new DirectInputDeviceObjectInfo(native->TypeGuid, native->Offset, native->Type);
 	}
 }
