@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace ScaledAxisCSharp;
 
 internal sealed class ItbMinimalRuntime
@@ -126,12 +128,13 @@ internal sealed class ItbMinimalRuntime
 			precisionButtons);
 	}
 
-	public void Run(CancellationToken cancellationToken)
+	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
 		using (_vJoyDevice)
 		{
 			var currentStates = new Dictionary<int, JoystickState>(_devices.Count);
 			var lastReportedReadFailure = new HashSet<int>();
+			LogStartup(debugLogger);
 
 			while (!cancellationToken.IsCancellationRequested)
 			{
@@ -150,9 +153,15 @@ internal sealed class ItbMinimalRuntime
 					}
 				}
 
-				ApplyAxes(currentStates);
-				ApplyButtons(currentStates);
+				var debugLines = debugLogger?.ShouldLogNow() == true ? new StringBuilder() : null;
+				ApplyAxes(currentStates, debugLines);
+				ApplyButtons(currentStates, debugLines);
 				AdvancePulses();
+
+				if (debugLogger is not null && debugLines is not null)
+				{
+					debugLogger.WriteBlock(debugLines);
+				}
 
 				if (cancellationToken.WaitHandle.WaitOne(_pollIntervalMs))
 				{
@@ -162,16 +171,20 @@ internal sealed class ItbMinimalRuntime
 		}
 	}
 
-	private void ApplyAxes(IReadOnlyDictionary<int, JoystickState> states)
+	private void ApplyAxes(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
-		if (!TryReadAxis(states, _modifierAxis, out var modifierValue) ||
-		    !TryReadAxis(states, _xAxis, out var rightX) ||
-		    !TryReadAxis(states, _yAxis, out var rightY) ||
-		    !TryReadAxis(states, _zAxis, out var rightZ))
+		if (!TryReadAxisSample(states, _modifierAxis, out var modifierSample) ||
+		    !TryReadAxisSample(states, _xAxis, out var xSample) ||
+		    !TryReadAxisSample(states, _yAxis, out var ySample) ||
+		    !TryReadAxisSample(states, _zAxis, out var zSample))
 		{
 			return;
 		}
 
+		var modifierValue = modifierSample.NormalizedValue;
+		var rightX = xSample.NormalizedValue;
+		var rightY = ySample.NormalizedValue;
+		var rightZ = zSample.NormalizedValue;
 		var precisionMode = _precisionButtons.Any(binding => IsPressed(states, binding));
 		var outputX = precisionMode
 			? ApplyPrecisionCurve(rightX)
@@ -183,30 +196,77 @@ internal sealed class ItbMinimalRuntime
 			? ApplyPrecisionCurve(rightZ)
 			: ApplyModifierCurve(rightZ, modifierValue);
 
-		if (_config.EnableAxis5XOverride)
+		AxisDebugSample? axis5OverrideSample = null;
+		var axis5OverrideActive = false;
+		if (_config.EnableAxis5XOverride && TryReadAxisSample(states, _axis5OverrideAxis, out var overrideSample))
 		{
-			if (TryReadAxis(states, _axis5OverrideAxis, out var axis5OverrideValue) &&
-			    Math.Abs(axis5OverrideValue) >= _config.Axis5OverrideDeadzone)
+			axis5OverrideSample = overrideSample;
+			if (Math.Abs(overrideSample.NormalizedValue) >= _config.Axis5OverrideDeadzone)
 			{
-				outputX = axis5OverrideValue;
+				axis5OverrideActive = true;
+				outputX = overrideSample.NormalizedValue;
 			}
 		}
 
 		_vJoyDevice.SetAxis(VJoyAxis.X, outputX);
 		_vJoyDevice.SetAxis(VJoyAxis.Y, outputY);
 		_vJoyDevice.SetAxis(VJoyAxis.Z, outputZ);
+
+		if (debugLines is not null)
+		{
+			debugLines.Append("modifier raw=");
+			debugLines.Append(modifierSample.RawValue);
+			debugLines.Append(" range=");
+			debugLines.Append(modifierSample.RangeMin);
+			debugLines.Append("..");
+			debugLines.Append(modifierSample.RangeMax);
+			debugLines.Append(" norm=");
+			debugLines.Append(FormatDouble(modifierValue));
+			debugLines.Append(" precision=");
+			debugLines.AppendLine(precisionMode ? "on" : "off");
+
+			AppendAxisDebugLine(debugLines, "x", xSample, outputX);
+			AppendAxisDebugLine(debugLines, "y", ySample, outputY);
+			AppendAxisDebugLine(debugLines, "z", zSample, outputZ);
+
+			if (axis5OverrideSample is { } axis5Sample)
+			{
+				debugLines.Append("axis5-override raw=");
+				debugLines.Append(axis5Sample.RawValue);
+				debugLines.Append(" range=");
+				debugLines.Append(axis5Sample.RangeMin);
+				debugLines.Append("..");
+				debugLines.Append(axis5Sample.RangeMax);
+				debugLines.Append(" norm=");
+				debugLines.Append(FormatDouble(axis5Sample.NormalizedValue));
+				debugLines.Append(" active=");
+				debugLines.AppendLine(axis5OverrideActive ? "yes" : "no");
+			}
+		}
 	}
 
 	private bool TryReadAxis(IReadOnlyDictionary<int, JoystickState> states, AxisBinding binding, out double value)
 	{
+		if (TryReadAxisSample(states, binding, out var sample))
+		{
+			value = sample.NormalizedValue;
+			return true;
+		}
+
+		value = 0.0;
+		return false;
+	}
+
+	private bool TryReadAxisSample(IReadOnlyDictionary<int, JoystickState> states, AxisBinding binding, out AxisDebugSample sample)
+	{
 		if (!states.TryGetValue(binding.DeviceId, out var state) ||
 		    !_devices.TryGetValue(binding.DeviceId, out var device))
 		{
-			value = 0.0;
+			sample = default;
 			return false;
 		}
 
-		value = device.ReadNormalizedAxis(state, binding);
+		sample = device.ReadAxisDebugSample(state, binding);
 		return true;
 	}
 
@@ -215,13 +275,16 @@ internal sealed class ItbMinimalRuntime
 		return states.TryGetValue(binding.DeviceId, out var state) && state.IsButtonPressed(binding.ButtonNumber);
 	}
 
-	private void ApplyButtons(IReadOnlyDictionary<int, JoystickState> states)
+	private void ApplyButtons(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
-		_vJoyDevice.SetButton(1, IsPressed(states, _primaryFireButton));
-		_vJoyDevice.SetButton(40, IsPressed(states, _leftPrimaryButton));
-		_vJoyDevice.SetButton(79, IsPressed(states, _leftAuxButton));
-
+		var primaryFire = IsPressed(states, _primaryFireButton);
+		var leftPrimary = IsPressed(states, _leftPrimaryButton);
+		var leftAux = IsPressed(states, _leftAuxButton);
 		var secondaryFire = IsPressed(states, _secondaryFireButton);
+
+		_vJoyDevice.SetButton(1, primaryFire);
+		_vJoyDevice.SetButton(40, leftPrimary);
+		_vJoyDevice.SetButton(79, leftAux);
 		_vJoyDevice.SetButton(22, secondaryFire);
 
 		if (secondaryFire && !_secondaryFirePrevious)
@@ -238,6 +301,22 @@ internal sealed class ItbMinimalRuntime
 
 		_vJoyDevice.SetButton(71, _pulse71RemainingMs > 0);
 		_vJoyDevice.SetButton(72, _pulse72RemainingMs > 0);
+
+		if (debugLines is not null)
+		{
+			debugLines.Append("buttons primary=");
+			debugLines.Append(primaryFire ? "down" : "up");
+			debugLines.Append(" left-primary=");
+			debugLines.Append(leftPrimary ? "down" : "up");
+			debugLines.Append(" left-aux=");
+			debugLines.Append(leftAux ? "down" : "up");
+			debugLines.Append(" secondary=");
+			debugLines.Append(secondaryFire ? "down" : "up");
+			debugLines.Append(" pulse71=");
+			debugLines.Append(_pulse71RemainingMs > 0 ? "on" : "off");
+			debugLines.Append(" pulse72=");
+			debugLines.AppendLine(_pulse72RemainingMs > 0 ? "on" : "off");
+		}
 	}
 
 	private void AdvancePulses()
@@ -269,6 +348,40 @@ internal sealed class ItbMinimalRuntime
 	private double ApplyPrecisionCurve(double normalizedInput)
 	{
 		return normalizedInput * _config.HoldPrecisionSlope;
+	}
+
+	private void LogStartup(DebugLogger? debugLogger)
+	{
+		if (debugLogger is null)
+		{
+			return;
+		}
+
+		foreach (var device in _devices.Values.OrderBy(device => device.DeviceId))
+		{
+			debugLogger.WriteLine(
+				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");
+		}
+	}
+
+	private static void AppendAxisDebugLine(StringBuilder debugLines, string label, AxisDebugSample sample, double output)
+	{
+		debugLines.Append(label);
+		debugLines.Append(" raw=");
+		debugLines.Append(sample.RawValue);
+		debugLines.Append(" range=");
+		debugLines.Append(sample.RangeMin);
+		debugLines.Append("..");
+		debugLines.Append(sample.RangeMax);
+		debugLines.Append(" norm=");
+		debugLines.Append(FormatDouble(sample.NormalizedValue));
+		debugLines.Append(" out=");
+		debugLines.AppendLine(FormatDouble(output));
+	}
+
+	private static string FormatDouble(double value)
+	{
+		return value.ToString("0.0000");
 	}
 
 	private static Dictionary<int, JoystickDevice> CollectDevices(IReadOnlyList<JoystickDevice> devices, IEnumerable<int> deviceIds)

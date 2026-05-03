@@ -58,6 +58,7 @@ internal static class Program
 	private static int Run(string[] args)
 	{
 		var configPath = ParseConfigPath(args);
+		var debugLogger = ParseDebugLogger(args);
 		var config = LoadConfig(configPath);
 		var runtime = Runtime.Build(config);
 
@@ -69,13 +70,19 @@ internal static class Program
 		};
 
 		Console.WriteLine($"Running with config '{configPath}'. Press Ctrl+C to stop.");
-		runtime.Run(cts.Token);
+		if (debugLogger is not null)
+		{
+			Console.WriteLine($"Debug logging enabled with interval {debugLogger.IntervalMs} ms.");
+		}
+
+		runtime.Run(cts.Token, debugLogger);
 		return 0;
 	}
 
 	private static int RunItbMinimal(string[] args)
 	{
 		var configPath = ParseConfigPath(args);
+		var debugLogger = ParseDebugLogger(args);
 		var config = LoadItbMinimalConfig(configPath);
 		var runtime = ItbMinimalRuntime.Build(config);
 
@@ -87,7 +94,12 @@ internal static class Program
 		};
 
 		Console.WriteLine($"Running ITB minimal profile with config '{configPath}'. Press Ctrl+C to stop.");
-		runtime.Run(cts.Token);
+		if (debugLogger is not null)
+		{
+			Console.WriteLine($"Debug logging enabled with interval {debugLogger.IntervalMs} ms.");
+		}
+
+		runtime.Run(cts.Token, debugLogger);
 		return 0;
 	}
 
@@ -109,6 +121,41 @@ internal static class Program
 		}
 
 		throw new InvalidOperationException("Missing required --config option.");
+	}
+
+	private static DebugLogger? ParseDebugLogger(string[] args)
+	{
+		var enabled = false;
+		int? intervalMs = null;
+
+		for (var index = 0; index < args.Length; index++)
+		{
+			var current = args[index];
+			if (string.Equals(current, "--debug", StringComparison.OrdinalIgnoreCase))
+			{
+				enabled = true;
+				continue;
+			}
+
+			if (string.Equals(current, "--debug-interval-ms", StringComparison.OrdinalIgnoreCase))
+			{
+				if (index + 1 >= args.Length)
+				{
+					throw new InvalidOperationException("Missing value for --debug-interval-ms.");
+				}
+
+				if (!int.TryParse(args[index + 1], out var parsedInterval) || parsedInterval < 1)
+				{
+					throw new InvalidOperationException("--debug-interval-ms must be an integer greater than 0.");
+				}
+
+				intervalMs = parsedInterval;
+				enabled = true;
+				index++;
+			}
+		}
+
+		return enabled ? new DebugLogger(intervalMs ?? 250) : null;
 	}
 
 	private static AppConfig LoadConfig(string configPath)
@@ -146,7 +193,7 @@ internal static class Program
 	{
 		Console.WriteLine("Usage:");
 		Console.WriteLine("  ScaledAxisCSharp list");
-		Console.WriteLine("  ScaledAxisCSharp run --config <path-to-config.json>");
-		Console.WriteLine("  ScaledAxisCSharp run-itb-minimal --config <path-to-itb-config.json>");
+		Console.WriteLine("  ScaledAxisCSharp run --config <path-to-config.json> [--debug] [--debug-interval-ms <ms>]");
+		Console.WriteLine("  ScaledAxisCSharp run-itb-minimal --config <path-to-itb-config.json> [--debug] [--debug-interval-ms <ms>]");
 	}
 }

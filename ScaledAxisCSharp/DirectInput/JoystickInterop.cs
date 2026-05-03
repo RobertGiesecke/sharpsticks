@@ -64,9 +64,15 @@ internal sealed unsafe class JoystickDevice
 
 	public double ReadNormalizedAxis(in JoystickState state, AxisBinding binding)
 	{
+		return ReadAxisDebugSample(state, binding).NormalizedValue;
+	}
+
+	public AxisDebugSample ReadAxisDebugSample(in JoystickState state, AxisBinding binding)
+	{
 		var rawValue = state.GetAxisValue(binding.Axis);
 		var (min, max) = GetNormalizationRange(rawValue);
-		return Normalize(rawValue, min, max, binding.Mode, binding.Invert, binding.Deadzone);
+		var normalized = Normalize(rawValue, min, max, binding.Mode, binding.Invert, binding.Deadzone);
+		return new AxisDebugSample(rawValue, min, max, normalized);
 	}
 
 	private static (int Min, int Max) GetNormalizationRange(int rawValue)
@@ -440,6 +446,8 @@ internal sealed unsafe class JoystickDevice
 }
 
 internal readonly record struct JoystickCaps(uint NumAxes, uint NumButtons, uint NumPovs);
+
+internal readonly record struct AxisDebugSample(int RawValue, int RangeMin, int RangeMax, double NormalizedValue);
 
 internal readonly record struct JoystickState(
 	int X,

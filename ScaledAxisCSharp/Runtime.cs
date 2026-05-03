@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace ScaledAxisCSharp;
 
 internal sealed class Runtime
@@ -107,12 +109,13 @@ internal sealed class Runtime
 		return new Runtime(config.PollIntervalMs, devices, buttonRoutes, axisRoutes, scaledAxisRoutes, vJoyDevice);
 	}
 
-	public void Run(CancellationToken cancellationToken)
+	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
 		using (_VJoyDevice)
 		{
 			var currentStates = new Dictionary<int, JoystickState>(_Devices.Count);
 			var lastReportedReadFailure = new HashSet<int>();
+			LogStartup(debugLogger);
 
 			while (!cancellationToken.IsCancellationRequested)
 			{
@@ -129,8 +132,14 @@ internal sealed class Runtime
 						Console.Error.WriteLine(error);
 					}
 
-				ApplyButtons(currentStates);
-				ApplyAxes(currentStates);
+				var debugLines = debugLogger?.ShouldLogNow() == true ? new StringBuilder() : null;
+				ApplyButtons(currentStates, debugLines);
+				ApplyAxes(currentStates, debugLines);
+
+				if (debugLogger is not null && debugLines is not null)
+				{
+					debugLogger.WriteBlock(debugLines);
+				}
 
 				if (cancellationToken.WaitHandle.WaitOne(_PollIntervalMs))
 				{
@@ -140,7 +149,7 @@ internal sealed class Runtime
 		}
 	}
 
-	private void ApplyButtons(IReadOnlyDictionary<int, JoystickState> states)
+	private void ApplyButtons(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
 		var aggregatedTargets = new Dictionary<int, bool>();
 
@@ -160,12 +169,24 @@ internal sealed class Runtime
 			{
 				aggregatedTargets[route.TargetButton] = current || pressed;
 			}
+
+			if (debugLines is not null)
+			{
+				debugLines.Append("button ");
+				debugLines.Append(route.SourceDeviceId);
+				debugLines.Append(':');
+				debugLines.Append(route.SourceButton);
+				debugLines.Append(" -> ");
+				debugLines.Append(route.TargetButton);
+				debugLines.Append(" = ");
+				debugLines.AppendLine(pressed ? "down" : "up");
+			}
 		}
 
 		foreach (var (button, isPressed) in aggregatedTargets) _VJoyDevice.SetButton(button, isPressed);
 	}
 
-	private void ApplyAxes(IReadOnlyDictionary<int, JoystickState> states)
+	private void ApplyAxes(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
 		foreach (var route in _AxisRoutes)
 		{
@@ -175,9 +196,14 @@ internal sealed class Runtime
 				continue;
 			}
 
-			var value = device.ReadNormalizedAxis(state, route.Source);
-			value = value * route.Scale + route.Offset;
-			_VJoyDevice.SetAxis(route.TargetAxis, value);
+			var sample = device.ReadAxisDebugSample(state, route.Source);
+			var output = sample.NormalizedValue * route.Scale + route.Offset;
+			_VJoyDevice.SetAxis(route.TargetAxis, output);
+
+			if (debugLines is not null)
+			{
+				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis, route.TargetAxis, sample, output);
+			}
 		}
 
 		foreach (var route in _ScaledAxisRoutes)
@@ -194,8 +220,10 @@ internal sealed class Runtime
 				continue;
 			}
 
-			var sourceValue = valueDevice.ReadNormalizedAxis(valueState, route.ValueSource);
-			var factorValue = factorDevice.ReadNormalizedAxis(factorState, route.FactorSource);
+			var valueSample = valueDevice.ReadAxisDebugSample(valueState, route.ValueSource);
+			var factorSample = factorDevice.ReadAxisDebugSample(factorState, route.FactorSource);
+			var sourceValue = valueSample.NormalizedValue;
+			var factorValue = factorSample.NormalizedValue;
 			var factorT = route.FactorSource.Mode == AxisMode.Signed
 				? Math.Clamp((factorValue + 1.0) * 0.5, 0.0, 1.0)
 				: Math.Clamp(factorValue, 0.0, 1.0);
@@ -203,6 +231,85 @@ internal sealed class Runtime
 			var blendedFactor = route.FactorLow + (route.FactorHigh - route.FactorLow) * factorT;
 			var output = sourceValue * blendedFactor * route.OutputScale + route.OutputOffset;
 			_VJoyDevice.SetAxis(route.TargetAxis, output);
+
+			if (debugLines is not null)
+			{
+				debugLines.Append("scaled-axis ");
+				debugLines.Append(route.TargetAxis);
+				debugLines.Append(" value dev ");
+				debugLines.Append(route.ValueSource.DeviceId);
+				debugLines.Append('/');
+				debugLines.Append(route.ValueSource.Axis);
+				debugLines.Append(" raw=");
+				debugLines.Append(valueSample.RawValue);
+				debugLines.Append(" range=");
+				debugLines.Append(valueSample.RangeMin);
+				debugLines.Append("..");
+				debugLines.Append(valueSample.RangeMax);
+				debugLines.Append(" norm=");
+				debugLines.Append(FormatDouble(valueSample.NormalizedValue));
+				debugLines.Append(" factor dev ");
+				debugLines.Append(route.FactorSource.DeviceId);
+				debugLines.Append('/');
+				debugLines.Append(route.FactorSource.Axis);
+				debugLines.Append(" raw=");
+				debugLines.Append(factorSample.RawValue);
+				debugLines.Append(" range=");
+				debugLines.Append(factorSample.RangeMin);
+				debugLines.Append("..");
+				debugLines.Append(factorSample.RangeMax);
+				debugLines.Append(" norm=");
+				debugLines.Append(FormatDouble(factorSample.NormalizedValue));
+				debugLines.Append(" blend=");
+				debugLines.Append(FormatDouble(blendedFactor));
+				debugLines.Append(" out=");
+				debugLines.AppendLine(FormatDouble(output));
+			}
 		}
+	}
+
+	private void LogStartup(DebugLogger? debugLogger)
+	{
+		if (debugLogger is null)
+		{
+			return;
+		}
+
+		foreach (var device in _Devices.Values.OrderBy(device => device.DeviceId))
+		{
+			debugLogger.WriteLine(
+				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");
+		}
+	}
+
+	private static void AppendAxisDebugLine(
+		StringBuilder debugLines,
+		int deviceId,
+		PhysicalAxis axis,
+		VJoyAxis targetAxis,
+		AxisDebugSample sample,
+		double output)
+	{
+		debugLines.Append("axis ");
+		debugLines.Append(deviceId);
+		debugLines.Append('/');
+		debugLines.Append(axis);
+		debugLines.Append(" -> ");
+		debugLines.Append(targetAxis);
+		debugLines.Append(" raw=");
+		debugLines.Append(sample.RawValue);
+		debugLines.Append(" range=");
+		debugLines.Append(sample.RangeMin);
+		debugLines.Append("..");
+		debugLines.Append(sample.RangeMax);
+		debugLines.Append(" norm=");
+		debugLines.Append(FormatDouble(sample.NormalizedValue));
+		debugLines.Append(" out=");
+		debugLines.AppendLine(FormatDouble(output));
+	}
+
+	private static string FormatDouble(double value)
+	{
+		return value.ToString("0.0000");
 	}
 }
