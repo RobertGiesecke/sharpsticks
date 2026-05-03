@@ -7,7 +7,10 @@ internal unsafe struct DirectInputDevice8VTable
 	public delegate* unmanaged[Stdcall]<nint, uint> AddRef;
 	public delegate* unmanaged[Stdcall]<nint, uint> Release;
 	public delegate* unmanaged[Stdcall]<nint, DirectInputDeviceCaps*, int> GetCapabilities;
-	public delegate* unmanaged[Stdcall]<nint, delegate* unmanaged[Stdcall]<DirectInputDeviceObjectInstanceNative*, nint, int>, nint, uint, int> EnumObjects;
+
+	public delegate* unmanaged[Stdcall]<nint, delegate* unmanaged[Stdcall]<DirectInputDeviceObjectInstanceNative*, nint,
+		int>, nint, uint, int> EnumObjects;
+
 	public delegate* unmanaged[Stdcall]<nint, Guid*, DirectInputPropertyRange*, int> GetProperty;
 	public delegate* unmanaged[Stdcall]<nint, Guid*, DirectInputPropertyRange*, int> SetProperty;
 	public delegate* unmanaged[Stdcall]<nint, int> Acquire;

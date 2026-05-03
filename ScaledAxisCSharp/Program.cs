@@ -24,14 +24,16 @@ internal static class Program
 		}
 	}
 
-	private static RootCommand BuildRootCommand() =>
-		new("DirectInput to vJoy CLI.")
+	private static RootCommand BuildRootCommand()
+	{
+		return new RootCommand("DirectInput to vJoy CLI.")
 		{
 			BuildListCommand(),
 			BuildWatchAxisCommand(),
 			BuildRunCommand(),
 			BuildRunItbMinimalCommand(),
 		};
+	}
 
 	private static Command BuildListCommand()
 	{
@@ -130,24 +132,28 @@ internal static class Program
 
 	private static Option<string> CreateConfigOption()
 	{
-		return new Option<string>("--config", ["-c"])
+		return new Option<string>("--config", "-c")
 		{
 			Description = "Path to the JSON config file.",
 			Required = true,
 		};
 	}
 
-	private static Option<bool> CreateDebugOption() =>
-		new("--debug")
+	private static Option<bool> CreateDebugOption()
+	{
+		return new Option<bool>("--debug")
 		{
 			Description = "Enable periodic debug logging to stderr.",
 		};
+	}
 
-	private static Option<int?> CreateDebugIntervalOption() =>
-		new("--debug-interval-ms")
+	private static Option<int?> CreateDebugIntervalOption()
+	{
+		return new Option<int?>("--debug-interval-ms")
 		{
 			Description = "Debug log interval in milliseconds. Defaults to 250 when debug is enabled.",
 		};
+	}
 
 	private static DebugLogger? CreateDebugLogger(bool enabled, int? intervalMs)
 	{
@@ -215,7 +221,8 @@ internal static class Program
 					" | ",
 					axes.Select(axis =>
 					{
-						var sample = device.ReadAxisDebugSample(state, new AxisBinding(device.DeviceId, axis, mode, false, 0.0));
+						var sample = device.ReadAxisDebugSample(state,
+							new AxisBinding(device.DeviceId, axis, mode, false, 0.0));
 						return
 							$"{FormatAxisName(axis)} raw={sample.RawValue} range={sample.RangeMin}..{sample.RangeMax} decoder={FormatDecoderKind(sample.DecoderKind)} norm={sample.NormalizedValue:0.0000}";
 					}));
@@ -325,7 +332,7 @@ internal static class Program
 
 		return axisList
 			.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-			.Select(PhysicalAxisParser.Parse)
+			.Select(PhysicalAxis.Parse)
 			.Distinct()
 			.ToArray();
 	}

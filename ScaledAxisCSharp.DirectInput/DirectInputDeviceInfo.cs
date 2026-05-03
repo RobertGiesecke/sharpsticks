@@ -13,10 +13,7 @@ internal readonly record struct DirectInputDeviceInfo(Guid InstanceGuid, string 
 	private static unsafe string ReadNullTerminatedString(char* buffer, int capacity)
 	{
 		var length = 0;
-		while (length < capacity && buffer[length] != '\0')
-		{
-			length++;
-		}
+		while (length < capacity && buffer[length] != '\0') length++;
 
 		return new string(buffer, 0, length);
 	}

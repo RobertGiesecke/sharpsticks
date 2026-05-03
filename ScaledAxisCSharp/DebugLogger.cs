@@ -6,7 +6,6 @@ namespace ScaledAxisCSharp;
 internal sealed class DebugLogger
 {
 	private readonly Stopwatch _Stopwatch = Stopwatch.StartNew();
-	private readonly int _IntervalMs;
 	private long _NextLogAtMs;
 
 	public DebugLogger(int intervalMs)
@@ -16,10 +15,10 @@ internal sealed class DebugLogger
 			throw new InvalidOperationException("Debug interval must be at least 1 ms.");
 		}
 
-		_IntervalMs = intervalMs;
+		IntervalMs = intervalMs;
 	}
 
-	public int IntervalMs => _IntervalMs;
+	public int IntervalMs { get; }
 
 	public bool ShouldLogNow()
 	{
@@ -29,7 +28,7 @@ internal sealed class DebugLogger
 			return false;
 		}
 
-		_NextLogAtMs = now + _IntervalMs;
+		_NextLogAtMs = now + IntervalMs;
 		return true;
 	}
 
@@ -45,10 +44,7 @@ internal sealed class DebugLogger
 			return;
 		}
 
-		var lines = builder.ToString().TrimEnd().Split(Environment.NewLine, StringSplitOptions.None);
-		foreach (var line in lines)
-		{
-			WriteLine(line);
-		}
+		var lines = builder.ToString().TrimEnd().Split(Environment.NewLine);
+		foreach (var line in lines) WriteLine(line);
 	}
 }

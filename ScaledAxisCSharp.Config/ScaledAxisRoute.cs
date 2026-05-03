@@ -1,6 +1,6 @@
 namespace ScaledAxisCSharp.Config;
 
-internal sealed record ScaledAxisRoute(
+public sealed record ScaledAxisRoute(
 	AxisBinding ValueSource,
 	AxisBinding FactorSource,
 	VJoyAxis TargetAxis,

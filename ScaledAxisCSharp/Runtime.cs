@@ -60,7 +60,7 @@ internal sealed class Runtime
 		foreach (var mapping in config.AxisMappings)
 		{
 			var source = AxisBinding.Parse(mapping.Source);
-			var targetAxis = VJoyAxisParser.Parse(mapping.TargetAxis);
+			var targetAxis = VJoyAxis.Parse(mapping.TargetAxis);
 
 			if (!claimedAxes.Add(targetAxis))
 			{
@@ -75,7 +75,7 @@ internal sealed class Runtime
 		{
 			var valueSource = AxisBinding.Parse(mapping.ValueSource);
 			var factorSource = AxisBinding.Parse(mapping.FactorSource);
-			var targetAxis = VJoyAxisParser.Parse(mapping.TargetAxis);
+			var targetAxis = VJoyAxis.Parse(mapping.TargetAxis);
 
 			if (!claimedAxes.Add(targetAxis))
 			{
@@ -99,7 +99,8 @@ internal sealed class Runtime
 		{
 			if (!connectedDevices.TryGetValue(deviceId, out var device))
 			{
-				throw new InvalidOperationException($"Configured joystick {deviceId} is not available via DirectInput.");
+				throw new InvalidOperationException(
+					$"Configured joystick {deviceId} is not available via DirectInput.");
 			}
 
 			devices.Add(deviceId, device);
@@ -202,7 +203,8 @@ internal sealed class Runtime
 
 			if (debugLines is not null)
 			{
-				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis, route.TargetAxis, sample, output);
+				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis, route.TargetAxis, sample,
+					output);
 			}
 		}
 
@@ -280,10 +282,8 @@ internal sealed class Runtime
 		}
 
 		foreach (var device in _Devices.Values.OrderBy(device => device.DeviceId))
-		{
 			debugLogger.WriteLine(
 				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");
-		}
 	}
 
 	private static void AppendAxisDebugLine(

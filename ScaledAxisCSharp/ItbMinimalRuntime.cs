@@ -6,20 +6,20 @@ internal sealed class ItbMinimalRuntime
 {
 	private readonly ItbMinimalConfig _Config;
 	private readonly IReadOnlyDictionary<int, JoystickDevice> _Devices;
+	private readonly ButtonBinding _LeftAuxButton;
+	private readonly ButtonBinding _LeftPrimaryButton;
+	private readonly AxisBinding _ModifierAxis;
 	private readonly int _PollIntervalMs;
+	private readonly IReadOnlyList<ButtonBinding> _PrecisionButtons;
+	private readonly ButtonBinding _PrimaryFireButton;
+	private readonly ButtonBinding _SecondaryFireButton;
 	private readonly VJoyDevice _VJoyDevice;
 	private readonly AxisBinding _XAxis;
 	private readonly AxisBinding _YAxis;
 	private readonly AxisBinding _ZAxis;
-	private readonly AxisBinding _ModifierAxis;
-	private readonly ButtonBinding _PrimaryFireButton;
-	private readonly ButtonBinding _LeftPrimaryButton;
-	private readonly ButtonBinding _LeftAuxButton;
-	private readonly ButtonBinding _SecondaryFireButton;
-	private readonly IReadOnlyList<ButtonBinding> _PrecisionButtons;
-	private bool _SecondaryFirePrevious;
 	private int _Pulse71RemainingMs;
 	private int _Pulse72RemainingMs;
+	private bool _SecondaryFirePrevious;
 
 	private ItbMinimalRuntime(
 		ItbMinimalConfig config,
@@ -89,7 +89,7 @@ internal sealed class ItbMinimalRuntime
 				leftPrimaryButton.DeviceId,
 				leftAuxButton.DeviceId,
 				secondaryFireButton.DeviceId,
-				.. precisionButtons.Select(binding => binding.DeviceId)
+				.. precisionButtons.Select(binding => binding.DeviceId),
 			]);
 
 		var vJoyDevice = VJoyDevice.Open(
@@ -135,7 +135,6 @@ internal sealed class ItbMinimalRuntime
 				currentStates.Clear();
 
 				foreach (var (deviceId, device) in _Devices)
-				{
 					if (device.TryRead(out var state, out var error))
 					{
 						currentStates[deviceId] = state;
@@ -145,7 +144,6 @@ internal sealed class ItbMinimalRuntime
 					{
 						Console.Error.WriteLine(error);
 					}
-				}
 
 				var debugLines = debugLogger?.ShouldLogNow() == true ? new StringBuilder() : null;
 				ApplyAxes(currentStates, debugLines);
@@ -227,7 +225,8 @@ internal sealed class ItbMinimalRuntime
 		return false;
 	}
 
-	private bool TryReadAxisSample(IReadOnlyDictionary<int, JoystickState> states, AxisBinding binding, out AxisDebugSample sample)
+	private bool TryReadAxisSample(IReadOnlyDictionary<int, JoystickState> states, AxisBinding binding,
+		out AxisDebugSample sample)
 	{
 		if (!states.TryGetValue(binding.DeviceId, out var state) ||
 		    !_Devices.TryGetValue(binding.DeviceId, out var device))
@@ -311,7 +310,7 @@ internal sealed class ItbMinimalRuntime
 		}
 
 		var blend = Math.Clamp((normalizedModifier - _Config.ModifierMin) / modifierSpan, 0.0, 1.0);
-		var slope = _Config.NormalSlope + ((_Config.ModifierPrecisionSlope - _Config.NormalSlope) * blend);
+		var slope = _Config.NormalSlope + (_Config.ModifierPrecisionSlope - _Config.NormalSlope) * blend;
 		return normalizedInput * slope;
 	}
 
@@ -328,13 +327,12 @@ internal sealed class ItbMinimalRuntime
 		}
 
 		foreach (var device in _Devices.Values.OrderBy(device => device.DeviceId))
-		{
 			debugLogger.WriteLine(
 				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");
-		}
 	}
 
-	private static void AppendAxisDebugLine(StringBuilder debugLines, string label, AxisDebugSample sample, double output)
+	private static void AppendAxisDebugLine(StringBuilder debugLines, string label, AxisDebugSample sample,
+		double output)
 	{
 		debugLines.Append(label);
 		debugLines.Append(" raw=");
@@ -356,7 +354,8 @@ internal sealed class ItbMinimalRuntime
 		return value.ToString("0.0000");
 	}
 
-	private static Dictionary<int, JoystickDevice> CollectDevices(IReadOnlyList<JoystickDevice> devices, IEnumerable<int> deviceIds)
+	private static Dictionary<int, JoystickDevice> CollectDevices(IReadOnlyList<JoystickDevice> devices,
+		IEnumerable<int> deviceIds)
 	{
 		var byId = devices.ToDictionary(device => device.DeviceId);
 		var selected = new Dictionary<int, JoystickDevice>();
@@ -365,7 +364,8 @@ internal sealed class ItbMinimalRuntime
 		{
 			if (!byId.TryGetValue(deviceId, out var device))
 			{
-				throw new InvalidOperationException($"Configured joystick {deviceId} is not available via DirectInput.");
+				throw new InvalidOperationException(
+					$"Configured joystick {deviceId} is not available via DirectInput.");
 			}
 
 			selected[deviceId] = device;

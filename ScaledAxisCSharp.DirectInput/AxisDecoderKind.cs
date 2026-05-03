@@ -1,6 +1,6 @@
 namespace ScaledAxisCSharp.DirectInput;
 
-internal enum AxisDecoderKind
+public enum AxisDecoderKind
 {
 	Unsigned,
 	NativeSigned,

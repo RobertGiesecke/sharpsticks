@@ -2,7 +2,7 @@ using System.Reflection;
 
 namespace ScaledAxisCSharp.VJoy;
 
-internal static class VJoyNative
+public static class VJoyNative
 {
 	static VJoyNative()
 	{

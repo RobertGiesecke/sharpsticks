@@ -1,6 +1,6 @@
 namespace ScaledAxisCSharp.VJoy;
 
-internal enum VJoyAxis : uint
+public enum VJoyAxis : uint
 {
 	X = 0x30,
 	Y = 0x31,

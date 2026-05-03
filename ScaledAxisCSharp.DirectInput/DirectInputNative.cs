@@ -11,16 +11,36 @@ internal static unsafe class DirectInputNative
 	public const uint DiSclBackground = 0x00000008;
 	public const int DiEnumContinue = 1;
 
-	public static readonly Guid IidIDirectInput8W = new(0xBF798031, 0x483A, 0x4DA2, 0xAA, 0x99, 0x5D, 0x64, 0xED, 0x36, 0x97, 0x00);
-	public static readonly Guid GuidXAxis = new(0xA36D02E0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidYAxis = new(0xA36D02E1, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidZAxis = new(0xA36D02E2, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidRxAxis = new(0xA36D02F4, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidRyAxis = new(0xA36D02F5, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidRzAxis = new(0xA36D02E3, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidSlider = new(0xA36D02E4, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidButton = new(0xA36D02F0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-	public static readonly Guid GuidPov = new(0xA36D02F2, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
+	public static readonly Guid IidIDirectInput8W =
+		new(0xBF798031, 0x483A, 0x4DA2, 0xAA, 0x99, 0x5D, 0x64, 0xED, 0x36, 0x97, 0x00);
+
+	public static readonly Guid GuidXAxis = new(0xA36D02E0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidYAxis = new(0xA36D02E1, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidZAxis = new(0xA36D02E2, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidRxAxis = new(0xA36D02F4, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidRyAxis = new(0xA36D02F5, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidRzAxis = new(0xA36D02E3, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidSlider = new(0xA36D02E4, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidButton = new(0xA36D02F0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
+	public static readonly Guid GuidPov = new(0xA36D02F2, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
+		0x00);
+
 	public static readonly Guid DiPropRange = new(4, 0, 0, 0xC0, 0, 0, 0, 0, 0, 0, 0x46);
 
 	[DllImport("dinput8.dll", PreserveSig = true)]
@@ -40,28 +60,46 @@ internal static unsafe class DirectInputNative
 	[DllImport("user32.dll")]
 	public static extern IntPtr GetDesktopWindow();
 
-	public static bool Succeeded(int hresult) => hresult >= 0;
-
-	public static int GetInstance(uint type) => (int)((type & 0x00FFFF00) >> 8);
-
-	public static uint GetAxisOffset(PhysicalAxis axis) => axis switch
+	public static bool Succeeded(int hresult)
 	{
-		PhysicalAxis.X => 0,
-		PhysicalAxis.Y => 4,
-		PhysicalAxis.Z => 8,
-		PhysicalAxis.Rx => 12,
-		PhysicalAxis.Ry => 16,
-		PhysicalAxis.Rz => 20,
-		PhysicalAxis.Slider1 => 24,
-		PhysicalAxis.Slider2 => 28,
-		_ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
-	};
+		return hresult >= 0;
+	}
 
-	public static uint GetButtonOffset(int zeroBasedButton) => 48u + (uint)zeroBasedButton;
+	public static int GetInstance(uint type)
+	{
+		return (int)((type & 0x00FFFF00) >> 8);
+	}
 
-	public static uint GetPovOffset(int zeroBasedPov) => 32u + ((uint)zeroBasedPov * 4u);
+	public static uint GetAxisOffset(PhysicalAxis axis)
+	{
+		return axis switch
+		{
+			PhysicalAxis.X => 0,
+			PhysicalAxis.Y => 4,
+			PhysicalAxis.Z => 8,
+			PhysicalAxis.Rx => 12,
+			PhysicalAxis.Ry => 16,
+			PhysicalAxis.Rz => 20,
+			PhysicalAxis.Slider1 => 24,
+			PhysicalAxis.Slider2 => 28,
+			_ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
+		};
+	}
 
-	public static uint GetStateSize() => 272;
+	public static uint GetButtonOffset(int zeroBasedButton)
+	{
+		return 48u + (uint)zeroBasedButton;
+	}
+
+	public static uint GetPovOffset(int zeroBasedPov)
+	{
+		return 32u + ((uint)zeroBasedPov * 4u);
+	}
+
+	public static uint GetStateSize()
+	{
+		return 272;
+	}
 
 	public static int Release(nint comObject)
 	{
@@ -165,7 +203,7 @@ internal static unsafe class DirectInputNative
 		var vtable = *(DirectInputDevice8VTable**)device;
 		caps = new DirectInputDeviceCaps
 		{
-			Size = (uint)sizeof(DirectInputDeviceCaps)
+			Size = (uint)sizeof(DirectInputDeviceCaps),
 		};
 
 		fixed (DirectInputDeviceCaps* capsPointer = &caps)

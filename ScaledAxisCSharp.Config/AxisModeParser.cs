@@ -1,6 +1,6 @@
 namespace ScaledAxisCSharp.Config;
 
-internal static class AxisModeParser
+public static class AxisModeParser
 {
 	public static AxisMode Parse(string value)
 	{

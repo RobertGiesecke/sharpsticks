@@ -1,6 +1,6 @@
 namespace ScaledAxisCSharp.VJoy;
 
-internal enum VjdStatus
+public enum VjdStatus
 {
 	Own = 0,
 	Free = 1,

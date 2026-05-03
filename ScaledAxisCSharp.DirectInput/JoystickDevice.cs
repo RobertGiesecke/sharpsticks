@@ -1,13 +1,13 @@
 namespace ScaledAxisCSharp.DirectInput;
 
-internal sealed unsafe class JoystickDevice
+public sealed unsafe class JoystickDevice
 {
 	private const int AxisRangeMin = -32767;
 	private const int AxisRangeMax = 32767;
 	private const int DefaultAxisRangeMin = 0;
 	private const int DefaultAxisRangeMax = 65535;
-	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _AxisRanges;
 	private readonly Dictionary<PhysicalAxis, AxisDecoderKind> _AxisDecoderKinds = [];
+	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _AxisRanges;
 	private readonly nint _DevicePointer;
 
 	private JoystickDevice(
@@ -208,10 +208,12 @@ internal sealed unsafe class JoystickDevice
 
 		try
 		{
-			var enumResult = DirectInputNative.EnumObjects(devicePointer, &EnumObjectsCallback, GCHandle.ToIntPtr(handle), 0);
+			var enumResult =
+				DirectInputNative.EnumObjects(devicePointer, &EnumObjectsCallback, GCHandle.ToIntPtr(handle), 0);
 			if (!DirectInputNative.Succeeded(enumResult))
 			{
-				throw new InvalidOperationException($"DirectInput object enumeration failed with HRESULT 0x{enumResult:X8}.");
+				throw new InvalidOperationException(
+					$"DirectInput object enumeration failed with HRESULT 0x{enumResult:X8}.");
 			}
 		}
 		finally
@@ -251,7 +253,6 @@ internal sealed unsafe class JoystickDevice
 		var objectFormats = new List<DirectInputObjectDataFormat>();
 
 		foreach (var axisEntry in axisEntries)
-		{
 			objectFormats.Add(new DirectInputObjectDataFormat
 			{
 				GuidPointer = 0,
@@ -259,7 +260,6 @@ internal sealed unsafe class JoystickDevice
 				Type = axisEntry.Type,
 				Flags = 0,
 			});
-		}
 
 		foreach (var pov in objects.Where(objectInfo => objectInfo.TypeGuid == DirectInputNative.GuidPov)
 			         .OrderBy(objectInfo => DirectInputNative.GetInstance(objectInfo.Type))
@@ -292,7 +292,8 @@ internal sealed unsafe class JoystickDevice
 		return objectFormats;
 	}
 
-	private static Dictionary<PhysicalAxis, AxisRange> ConfigureAxisRanges(nint devicePointer, IReadOnlyList<AxisFormatEntry> axisEntries)
+	private static Dictionary<PhysicalAxis, AxisRange> ConfigureAxisRanges(nint devicePointer,
+		IReadOnlyList<AxisFormatEntry> axisEntries)
 	{
 		var ranges = new Dictionary<PhysicalAxis, AxisRange>();
 
@@ -300,7 +301,8 @@ internal sealed unsafe class JoystickDevice
 		{
 			DirectInputNative.SetRangeProperty(devicePointer, axisEntry.Offset, AxisRangeMin, AxisRangeMax);
 
-			if (DirectInputNative.Succeeded(DirectInputNative.GetRangeProperty(devicePointer, axisEntry.Offset, out var range)))
+			if (DirectInputNative.Succeeded(
+				    DirectInputNative.GetRangeProperty(devicePointer, axisEntry.Offset, out var range)))
 			{
 				ranges[axisEntry.Axis] = new AxisRange(range.Min, range.Max);
 			}
@@ -326,24 +328,51 @@ internal sealed unsafe class JoystickDevice
 
 	private static int GetAxisSortKey(DirectInputDeviceObjectInfo objectInfo)
 	{
-		if (objectInfo.TypeGuid == DirectInputNative.GuidXAxis) return 0;
-		if (objectInfo.TypeGuid == DirectInputNative.GuidYAxis) return 1;
-		if (objectInfo.TypeGuid == DirectInputNative.GuidZAxis) return 2;
-		if (objectInfo.TypeGuid == DirectInputNative.GuidRxAxis) return 3;
-		if (objectInfo.TypeGuid == DirectInputNative.GuidRyAxis) return 4;
-		if (objectInfo.TypeGuid == DirectInputNative.GuidRzAxis) return 5;
-		if (objectInfo.TypeGuid == DirectInputNative.GuidSlider) return 6 + DirectInputNative.GetInstance(objectInfo.Type);
-		return int.MaxValue;
+		return objectInfo.TypeGuid switch
+		{
+			var guid when guid == DirectInputNative.GuidXAxis => 0,
+			var guid when guid == DirectInputNative.GuidYAxis => 1,
+			var guid when guid == DirectInputNative.GuidZAxis => 2,
+			var guid when guid == DirectInputNative.GuidRxAxis => 3,
+			var guid when guid == DirectInputNative.GuidRyAxis => 4,
+			var guid when guid == DirectInputNative.GuidRzAxis => 5,
+			var guid when guid == DirectInputNative.GuidSlider => 6 + DirectInputNative.GetInstance(objectInfo.Type),
+			_ => int.MaxValue,
+		};
 	}
 
 	private static PhysicalAxis? GetPhysicalAxis(Guid axisGuid, ref int sliderIndex)
 	{
-		if (axisGuid == DirectInputNative.GuidXAxis) return PhysicalAxis.X;
-		if (axisGuid == DirectInputNative.GuidYAxis) return PhysicalAxis.Y;
-		if (axisGuid == DirectInputNative.GuidZAxis) return PhysicalAxis.Z;
-		if (axisGuid == DirectInputNative.GuidRxAxis) return PhysicalAxis.Rx;
-		if (axisGuid == DirectInputNative.GuidRyAxis) return PhysicalAxis.Ry;
-		if (axisGuid == DirectInputNative.GuidRzAxis) return PhysicalAxis.Rz;
+		if (axisGuid == DirectInputNative.GuidXAxis)
+		{
+			return PhysicalAxis.X;
+		}
+
+		if (axisGuid == DirectInputNative.GuidYAxis)
+		{
+			return PhysicalAxis.Y;
+		}
+
+		if (axisGuid == DirectInputNative.GuidZAxis)
+		{
+			return PhysicalAxis.Z;
+		}
+
+		if (axisGuid == DirectInputNative.GuidRxAxis)
+		{
+			return PhysicalAxis.Rx;
+		}
+
+		if (axisGuid == DirectInputNative.GuidRyAxis)
+		{
+			return PhysicalAxis.Ry;
+		}
+
+		if (axisGuid == DirectInputNative.GuidRzAxis)
+		{
+			return PhysicalAxis.Rz;
+		}
+
 		if (axisGuid == DirectInputNative.GuidSlider && sliderIndex < 2)
 		{
 			var axis = sliderIndex == 0 ? PhysicalAxis.Slider1 : PhysicalAxis.Slider2;
@@ -400,7 +429,7 @@ internal sealed unsafe class JoystickDevice
 			return NormalizeUnsigned(rawValue, range.Min, range.Max);
 		}
 
-		if (range.Min < 0 && range.Max > 0)
+		if (range is { Min: < 0, Max: > 0 })
 		{
 			decoderKind = GetOrDetectSignedDecoder(axis, rawValue, range);
 			return decoderKind switch
@@ -495,17 +524,17 @@ internal sealed unsafe class JoystickDevice
 
 	private static double NormalizeSignedFromNativeRange(int rawValue, AxisRange range)
 	{
-		return (NormalizeUnsigned(rawValue, range.Min, range.Max) * 2.0) - 1.0;
+		return NormalizeUnsigned(rawValue, range.Min, range.Max) * 2.0 - 1.0;
 	}
 
 	private static double NormalizeSignedFromUnsignedCenteredRange(int rawValue, AxisRange range)
 	{
-		return (NormalizeUnsigned(rawValue, 0, GetUnsignedCenteredMax(range)) * 2.0) - 1.0;
+		return NormalizeUnsigned(rawValue, 0, GetUnsignedCenteredMax(range)) * 2.0 - 1.0;
 	}
 
 	private static int GetUnsignedCenteredMax(AxisRange range)
 	{
-		return checked((Math.Max(Math.Abs(range.Min), Math.Abs(range.Max)) * 2) + 1);
+		return checked(Math.Max(Math.Abs(range.Min), Math.Abs(range.Max)) * 2 + 1);
 	}
 
 	private static double ApplySignedDeadzone(double value, double deadzone)
@@ -558,6 +587,11 @@ internal sealed unsafe class JoystickDevice
 
 		public DirectInputDataFormat DataFormat { get; }
 
+		public void Dispose()
+		{
+			Marshal.FreeHGlobal(_ObjectBuffer);
+		}
+
 		public static DataFormatScope Create(IReadOnlyList<DirectInputObjectDataFormat> objectFormats)
 		{
 			var objectSize = Marshal.SizeOf<DirectInputObjectDataFormat>();
@@ -565,7 +599,7 @@ internal sealed unsafe class JoystickDevice
 
 			for (var index = 0; index < objectFormats.Count; index++)
 			{
-				var target = buffer + (index * objectSize);
+				var target = buffer + index * objectSize;
 				Marshal.StructureToPtr(objectFormats[index], target, false);
 			}
 
@@ -580,11 +614,6 @@ internal sealed unsafe class JoystickDevice
 			};
 
 			return new DataFormatScope(buffer, dataFormat);
-		}
-
-		public void Dispose()
-		{
-			Marshal.FreeHGlobal(_ObjectBuffer);
 		}
 	}
 

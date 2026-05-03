@@ -1,21 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
         <TargetFramework>net10.0-windows</TargetFramework>
         <LangVersion>preview</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PublishAot>true</PublishAot>
-        <InvariantGlobalization>true</InvariantGlobalization>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="System.CommandLine" Version="2.0.7"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj"/>
         <ProjectReference Include="..\ScaledAxisCSharp.DirectInput\ScaledAxisCSharp.DirectInput.csproj"/>
         <ProjectReference Include="..\ScaledAxisCSharp.VJoy\ScaledAxisCSharp.VJoy.csproj"/>
     </ItemGroup>

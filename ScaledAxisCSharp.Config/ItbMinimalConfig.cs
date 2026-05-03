@@ -28,6 +28,7 @@ public sealed record ItbMinimalConfig
 		DeviceName = "LEFT VPC Stick WarBRD",
 		Axis = PhysicalAxis.Slider1,
 	};
+
 	public double ModifierMin { get; init; } = -1.0;
 	public double ModifierMax { get; init; } = 1.0;
 
@@ -75,7 +76,7 @@ public sealed record ItbMinimalConfig
 		{
 			DeviceName = "RIGHT VPC Stick WarBRD",
 			Button = 16,
-		}
+		},
 	];
 
 	public int PulseMs { get; init; } = 50;
@@ -97,9 +98,7 @@ public sealed record ItbMinimalConfig
 		}
 
 		for (var index = 0; index < PrecisionButtons.Count; index++)
-		{
 			RequireButtonSource(PrecisionButtons[index], $"{nameof(PrecisionButtons)}[{index}]");
-		}
 	}
 
 	private static void RequireAxisSource(DeviceAxisSource? source, string propertyName)
