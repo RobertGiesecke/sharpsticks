@@ -217,7 +217,7 @@ internal static class Program
 					{
 						var sample = device.ReadAxisDebugSample(state, new AxisBinding(device.DeviceId, axis, mode, false, 0.0));
 						return
-							$"{FormatAxisName(axis)} raw={sample.RawValue} range={sample.RangeMin}..{sample.RangeMax} norm={sample.NormalizedValue:0.0000}";
+							$"{FormatAxisName(axis)} raw={sample.RawValue} range={sample.RangeMin}..{sample.RangeMax} decoder={FormatDecoderKind(sample.DecoderKind)} norm={sample.NormalizedValue:0.0000}";
 					}));
 
 				Console.WriteLine($"{DateTime.Now:HH:mm:ss.fff} {line}");
@@ -389,6 +389,17 @@ internal static class Program
 			PhysicalAxis.Slider1 => "slider1",
 			PhysicalAxis.Slider2 => "slider2",
 			_ => axis.ToString(),
+		};
+	}
+
+	private static string FormatDecoderKind(AxisDecoderKind decoderKind)
+	{
+		return decoderKind switch
+		{
+			AxisDecoderKind.Unsigned => "unsigned",
+			AxisDecoderKind.NativeSigned => "native-signed",
+			AxisDecoderKind.UnsignedCentered => "unsigned-centered",
+			_ => "unknown",
 		};
 	}
 }

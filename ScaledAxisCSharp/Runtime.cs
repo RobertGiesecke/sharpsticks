@@ -246,6 +246,8 @@ internal sealed class Runtime
 				debugLines.Append(valueSample.RangeMin);
 				debugLines.Append("..");
 				debugLines.Append(valueSample.RangeMax);
+				debugLines.Append(" decoder=");
+				debugLines.Append(valueSample.DecoderKind);
 				debugLines.Append(" norm=");
 				debugLines.Append(FormatDouble(valueSample.NormalizedValue));
 				debugLines.Append(" factor dev ");
@@ -258,6 +260,8 @@ internal sealed class Runtime
 				debugLines.Append(factorSample.RangeMin);
 				debugLines.Append("..");
 				debugLines.Append(factorSample.RangeMax);
+				debugLines.Append(" decoder=");
+				debugLines.Append(factorSample.DecoderKind);
 				debugLines.Append(" norm=");
 				debugLines.Append(FormatDouble(factorSample.NormalizedValue));
 				debugLines.Append(" blend=");
@@ -302,6 +306,8 @@ internal sealed class Runtime
 		debugLines.Append(sample.RangeMin);
 		debugLines.Append("..");
 		debugLines.Append(sample.RangeMax);
+		debugLines.Append(" decoder=");
+		debugLines.Append(sample.DecoderKind);
 		debugLines.Append(" norm=");
 		debugLines.Append(FormatDouble(sample.NormalizedValue));
 		debugLines.Append(" out=");

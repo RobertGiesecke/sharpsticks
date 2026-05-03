@@ -7,6 +7,7 @@ internal sealed unsafe class JoystickDevice
 	private const int DefaultAxisRangeMin = 0;
 	private const int DefaultAxisRangeMax = 65535;
 	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _AxisRanges;
+	private readonly Dictionary<PhysicalAxis, AxisDecoderKind> _AxisDecoderKinds = [];
 	private readonly nint _DevicePointer;
 
 	private JoystickDevice(
@@ -82,8 +83,15 @@ internal sealed unsafe class JoystickDevice
 			range = GetFallbackRange(rawValue);
 		}
 
-		var normalized = Normalize(rawValue, range.Min, range.Max, binding.Mode, binding.Invert, binding.Deadzone);
-		return new AxisDebugSample(rawValue, range.Min, range.Max, normalized);
+		var normalized = Normalize(
+			binding.Axis,
+			rawValue,
+			range,
+			binding.Mode,
+			binding.Invert,
+			binding.Deadzone,
+			out var decoderKind);
+		return new AxisDebugSample(rawValue, range.Min, range.Max, normalized, decoderKind);
 	}
 
 	private static AxisRange GetFallbackRange(int rawValue)
@@ -346,20 +354,16 @@ internal sealed unsafe class JoystickDevice
 		return null;
 	}
 
-	private static double Normalize(int rawValue, int min, int max, AxisMode mode, bool invert, double deadzone)
+	private double Normalize(
+		PhysicalAxis axis,
+		int rawValue,
+		AxisRange range,
+		AxisMode mode,
+		bool invert,
+		double deadzone,
+		out AxisDecoderKind decoderKind)
 	{
-		if (max <= min)
-		{
-			return 0.0;
-		}
-
-		var normalized = (rawValue - min) / (double)(max - min);
-		normalized = Math.Clamp(normalized, 0.0, 1.0);
-
-		if (mode == AxisMode.Signed)
-		{
-			normalized = (normalized * 2.0) - 1.0;
-		}
+		var normalized = NormalizeBase(axis, rawValue, range, mode, out decoderKind);
 
 		if (invert)
 		{
@@ -375,6 +379,124 @@ internal sealed unsafe class JoystickDevice
 		}
 
 		return normalized;
+	}
+
+	private double NormalizeBase(
+		PhysicalAxis axis,
+		int rawValue,
+		AxisRange range,
+		AxisMode mode,
+		out AxisDecoderKind decoderKind)
+	{
+		if (range.Max <= range.Min)
+		{
+			decoderKind = AxisDecoderKind.Unknown;
+			return 0.0;
+		}
+
+		if (mode == AxisMode.Unsigned)
+		{
+			decoderKind = AxisDecoderKind.Unsigned;
+			return NormalizeUnsigned(rawValue, range.Min, range.Max);
+		}
+
+		if (range.Min < 0 && range.Max > 0)
+		{
+			decoderKind = GetOrDetectSignedDecoder(axis, rawValue, range);
+			return decoderKind switch
+			{
+				AxisDecoderKind.NativeSigned => NormalizeSignedFromNativeRange(rawValue, range),
+				AxisDecoderKind.UnsignedCentered => NormalizeSignedFromUnsignedCenteredRange(rawValue, range),
+				_ => NormalizeSignedFromUnsignedCenteredRange(rawValue, range),
+			};
+		}
+
+		decoderKind = AxisDecoderKind.NativeSigned;
+		return NormalizeSignedFromNativeRange(rawValue, range);
+	}
+
+	private static double NormalizeUnsigned(int rawValue, int min, int max)
+	{
+		if (max <= min)
+		{
+			return 0.0;
+		}
+
+		var normalized = (rawValue - min) / (double)(max - min);
+		return Math.Clamp(normalized, 0.0, 1.0);
+	}
+
+	private AxisDecoderKind GetOrDetectSignedDecoder(PhysicalAxis axis, int rawValue, AxisRange range)
+	{
+		if (_AxisDecoderKinds.TryGetValue(axis, out var existing) &&
+		    existing is AxisDecoderKind.NativeSigned or AxisDecoderKind.UnsignedCentered)
+		{
+			if (existing == AxisDecoderKind.UnsignedCentered && rawValue < 0)
+			{
+				_AxisDecoderKinds[axis] = AxisDecoderKind.NativeSigned;
+				return AxisDecoderKind.NativeSigned;
+			}
+
+			if (existing == AxisDecoderKind.NativeSigned && rawValue > range.Max)
+			{
+				_AxisDecoderKinds[axis] = AxisDecoderKind.UnsignedCentered;
+				return AxisDecoderKind.UnsignedCentered;
+			}
+
+			return existing;
+		}
+
+		var detected = DetectSignedDecoder(rawValue, range);
+		if (detected is AxisDecoderKind.NativeSigned or AxisDecoderKind.UnsignedCentered)
+		{
+			_AxisDecoderKinds[axis] = detected;
+		}
+
+		return detected;
+	}
+
+	private static AxisDecoderKind DetectSignedDecoder(int rawValue, AxisRange range)
+	{
+		if (rawValue < 0)
+		{
+			return AxisDecoderKind.NativeSigned;
+		}
+
+		if (rawValue > range.Max)
+		{
+			return AxisDecoderKind.UnsignedCentered;
+		}
+
+		var unsignedCenteredMidpoint = GetUnsignedCenteredMax(range) / 2.0;
+		var nativeDistanceFromCenter = Math.Abs(rawValue);
+		var unsignedCenteredDistanceFromCenter = Math.Abs(rawValue - unsignedCenteredMidpoint);
+
+		if (unsignedCenteredDistanceFromCenter < nativeDistanceFromCenter)
+		{
+			return AxisDecoderKind.UnsignedCentered;
+		}
+
+		if (nativeDistanceFromCenter < unsignedCenteredDistanceFromCenter)
+		{
+			return AxisDecoderKind.NativeSigned;
+		}
+
+		return AxisDecoderKind.Unknown;
+	}
+
+	private static double NormalizeSignedFromNativeRange(int rawValue, AxisRange range)
+	{
+		return (NormalizeUnsigned(rawValue, range.Min, range.Max) * 2.0) - 1.0;
+	}
+
+	private static double NormalizeSignedFromUnsignedCenteredRange(int rawValue, AxisRange range)
+	{
+		return (NormalizeUnsigned(rawValue, 0, GetUnsignedCenteredMax(range)) * 2.0) - 1.0;
+	}
+
+	private static int GetUnsignedCenteredMax(AxisRange range)
+	{
+		return checked((Math.Max(Math.Abs(range.Min), Math.Abs(range.Max)) * 2) + 1);
 	}
 
 	private static double ApplySignedDeadzone(double value, double deadzone)

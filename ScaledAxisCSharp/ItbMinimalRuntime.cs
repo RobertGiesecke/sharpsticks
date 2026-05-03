@@ -220,6 +220,8 @@ internal sealed class ItbMinimalRuntime
 			debugLines.Append(modifierSample.RangeMin);
 			debugLines.Append("..");
 			debugLines.Append(modifierSample.RangeMax);
+			debugLines.Append(" decoder=");
+			debugLines.Append(modifierSample.DecoderKind);
 			debugLines.Append(" norm=");
 			debugLines.Append(FormatDouble(modifierValue));
 			debugLines.Append(" precision=");
@@ -237,6 +239,8 @@ internal sealed class ItbMinimalRuntime
 				debugLines.Append(axis5Sample.RangeMin);
 				debugLines.Append("..");
 				debugLines.Append(axis5Sample.RangeMax);
+				debugLines.Append(" decoder=");
+				debugLines.Append(axis5Sample.DecoderKind);
 				debugLines.Append(" norm=");
 				debugLines.Append(FormatDouble(axis5Sample.NormalizedValue));
 				debugLines.Append(" active=");
@@ -373,6 +377,8 @@ internal sealed class ItbMinimalRuntime
 		debugLines.Append(sample.RangeMin);
 		debugLines.Append("..");
 		debugLines.Append(sample.RangeMax);
+		debugLines.Append(" decoder=");
+		debugLines.Append(sample.DecoderKind);
 		debugLines.Append(" norm=");
 		debugLines.Append(FormatDouble(sample.NormalizedValue));
 		debugLines.Append(" out=");
