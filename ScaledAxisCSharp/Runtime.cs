@@ -1,19 +1,26 @@
 using System.Text;
+using Collections.Pooled;
 
 namespace ScaledAxisCSharp;
 
-internal sealed class Runtime
+internal sealed class Runtime: IDisposable
 {
 	private readonly IReadOnlyList<AxisRoute> _AxisRoutes;
-	private readonly IReadOnlyList<ButtonRoute> _ButtonRoutes;
-	private readonly IReadOnlyDictionary<int, JoystickDevice> _Devices;
+	private readonly PooledList<VJoyButtonWithBindings> _ButtonRoutes = new();
+	private readonly PooledDictionary<int, JoystickDevice> _Devices;
 	private readonly int _PollIntervalMs;
 	private readonly IReadOnlyList<ScaledAxisRoute> _ScaledAxisRoutes;
 	private readonly VJoyDevice _VJoyDevice;
 
-	private Runtime(
+	private sealed class VJoyButtonWithBindings
+	{
+		public required int TargetButton { get; init; }
+		public required PooledList<ButtonBinding> Bindings { get; init; }
+	}
+
+	public Runtime(
 		int pollIntervalMs,
-		IReadOnlyDictionary<int, JoystickDevice> devices,
+		PooledDictionary<int, JoystickDevice> devices,
 		IReadOnlyList<ButtonRoute> buttonRoutes,
 		IReadOnlyList<AxisRoute> axisRoutes,
 		IReadOnlyList<ScaledAxisRoute> scaledAxisRoutes,
@@ -21,7 +28,15 @@ internal sealed class Runtime
 	{
 		_PollIntervalMs = pollIntervalMs;
 		_Devices = devices;
-		_ButtonRoutes = buttonRoutes;
+		_ButtonRoutes = buttonRoutes.GroupBy(t => t.TargetButton)
+			.Select(group => new VJoyButtonWithBindings
+			{
+				TargetButton = group.Key,
+				Bindings = group.Select(t => t.Binding)
+					.Distinct()
+					.ToPooledList(),
+			})
+			.ToPooledList();
 		_AxisRoutes = axisRoutes;
 		_ScaledAxisRoutes = scaledAxisRoutes;
 		_VJoyDevice = vJoyDevice;
@@ -34,7 +49,10 @@ internal sealed class Runtime
 			throw new InvalidOperationException("PollIntervalMs must be at least 1.");
 		}
 
-		var connectedDevices = JoystickDevice.EnumerateConnected().ToDictionary(device => device.DeviceId);
+
+		using var connectedDevices = JoystickDevice.EnumerateConnected();
+		using var connectedDevicesById = connectedDevices
+			.ToPooledDictionary(device => device.DeviceId);
 		var referencedDeviceIds = new HashSet<int>();
 		var buttonRoutes = new List<ButtonRoute>();
 		var axisRoutes = new List<AxisRoute>();
@@ -43,7 +61,7 @@ internal sealed class Runtime
 
 		foreach (var mapping in config.ButtonMappings)
 		{
-			if (mapping.SourceButton < 1)
+			if (mapping.SourceBinding.ButtonNumber < 1)
 			{
 				throw new InvalidOperationException("Source buttons are 1-based.");
 			}
@@ -53,8 +71,8 @@ internal sealed class Runtime
 				throw new InvalidOperationException("Target buttons are 1-based.");
 			}
 
-			referencedDeviceIds.Add(mapping.SourceDeviceId);
-			buttonRoutes.Add(new ButtonRoute(mapping.SourceDeviceId, mapping.SourceButton, mapping.TargetButton));
+			referencedDeviceIds.Add(mapping.SourceBinding.DeviceId);
+			buttonRoutes.Add(new ButtonRoute(mapping.SourceBinding, mapping.TargetButton));
 		}
 
 		foreach (var mapping in config.AxisMappings)
@@ -68,7 +86,14 @@ internal sealed class Runtime
 			}
 
 			referencedDeviceIds.Add(source.DeviceId);
-			axisRoutes.Add(new AxisRoute(source, targetAxis, mapping.Scale, mapping.Offset));
+			axisRoutes.Add(new AxisRoute()
+			{
+				Source = source,
+				TargetAxis = targetAxis,
+				Scale = mapping.Scale,
+				Offset = mapping.Offset,
+				Modifier = mapping.AxisModifier
+			});
 		}
 
 		foreach (var mapping in config.ScaledAxisMappings)
@@ -94,35 +119,54 @@ internal sealed class Runtime
 				mapping.OutputOffset));
 		}
 
-		var devices = new Dictionary<int, JoystickDevice>();
-		foreach (var deviceId in referencedDeviceIds)
+		var devices = new PooledDictionary<int, JoystickDevice>();
+		try
 		{
-			if (!connectedDevices.TryGetValue(deviceId, out var device))
+			foreach (var deviceId in referencedDeviceIds)
 			{
-				throw new InvalidOperationException(
-					$"Configured joystick {deviceId} is not available via DirectInput.");
+				if (!connectedDevicesById.TryGetValue(deviceId, out var device))
+				{
+					throw new InvalidOperationException(
+						$"Configured joystick {deviceId} is not available via DirectInput.");
+				}
+
+				devices.Add(deviceId, device);
 			}
 
-			devices.Add(deviceId, device);
+			var vJoyDevice = VJoyDevice.Open(config.VJoyDeviceId, buttonRoutes, axisRoutes, scaledAxisRoutes);
+			try
+			{
+				return new Runtime(config.PollIntervalMs, devices, buttonRoutes, axisRoutes, scaledAxisRoutes,
+					vJoyDevice);
+			}
+			catch
+			{
+				vJoyDevice.Dispose();
+				throw;
+			}
 		}
-
-		var vJoyDevice = VJoyDevice.Open(config.VJoyDeviceId, buttonRoutes, axisRoutes, scaledAxisRoutes);
-		return new Runtime(config.PollIntervalMs, devices, buttonRoutes, axisRoutes, scaledAxisRoutes, vJoyDevice);
+		catch
+		{
+			devices.Dispose();
+			throw;
+		}
 	}
 
 	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
 		using (_VJoyDevice)
 		{
-			var currentStates = new Dictionary<int, JoystickState>(_Devices.Count);
-			var lastReportedReadFailure = new HashSet<int>();
+			using var currentStates = new PooledDictionary<int, JoystickState>(_Devices.Count);
+			using var lastReportedReadFailure = new PooledSet<int>();
 			LogStartup(debugLogger);
 
+			StringBuilder? debugLines = null;
 			while (!cancellationToken.IsCancellationRequested)
 			{
 				currentStates.Clear();
 
 				foreach (var (deviceId, device) in _Devices)
+				{
 					if (device.TryRead(out var state, out var error))
 					{
 						currentStates[deviceId] = state;
@@ -132,12 +176,18 @@ internal sealed class Runtime
 					{
 						Console.Error.WriteLine(error);
 					}
+				}
 
-				var debugLines = debugLogger?.ShouldLogNow() == true ? new StringBuilder() : null;
+				var shouldLog = debugLogger?.ShouldLogNow() is true;
+				if (shouldLog)
+				{
+					debugLines ??= new StringBuilder();
+				}
+
 				ApplyButtons(currentStates, debugLines);
 				ApplyAxes(currentStates, debugLines);
 
-				if (debugLogger is not null && debugLines is not null)
+				if (shouldLog && debugLogger is not null && debugLines is not null)
 				{
 					debugLogger.WriteBlock(debugLines);
 				}
@@ -150,44 +200,46 @@ internal sealed class Runtime
 		}
 	}
 
-	private void ApplyButtons(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
+	private void ApplyButtons(PooledDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
-		var aggregatedTargets = new Dictionary<int, bool>();
-
 		foreach (var route in _ButtonRoutes)
 		{
-			if (!states.TryGetValue(route.SourceDeviceId, out var state))
+			bool? current = null;
+			foreach (var buttonBinding in route.Bindings)
 			{
-				continue;
-			}
+				if (!states.TryGetValue(buttonBinding.DeviceId, out var state))
+				{
+					continue;
+				}
+				
+				if (current is null)
+				{
+					current = state.IsButtonPressed(buttonBinding.ButtonNumber);
+				}
+				else
+				{
+					current = current.Value || state.IsButtonPressed(buttonBinding.ButtonNumber);
+				}
 
-			var pressed = state.IsButtonPressed(route.SourceButton);
-			if (!aggregatedTargets.TryGetValue(route.TargetButton, out var current))
-			{
-				aggregatedTargets[route.TargetButton] = pressed;
-			}
-			else
-			{
-				aggregatedTargets[route.TargetButton] = current || pressed;
-			}
+				var isPressed = current is true;
+				_VJoyDevice.SetButton(route.TargetButton, isPressed);
 
-			if (debugLines is not null)
-			{
-				debugLines.Append("button ");
-				debugLines.Append(route.SourceDeviceId);
-				debugLines.Append(':');
-				debugLines.Append(route.SourceButton);
-				debugLines.Append(" -> ");
-				debugLines.Append(route.TargetButton);
-				debugLines.Append(" = ");
-				debugLines.AppendLine(pressed ? "down" : "up");
+				if (debugLines is not null)
+				{
+					debugLines.Append("button ");
+					debugLines.Append(buttonBinding.DeviceId);
+					debugLines.Append(':');
+					debugLines.Append(buttonBinding.ButtonNumber);
+					debugLines.Append(" -> ");
+					debugLines.Append(route.TargetButton);
+					debugLines.Append(" = ");
+					debugLines.AppendLine(isPressed ? "down" : "up");
+				}
 			}
 		}
-
-		foreach (var (button, isPressed) in aggregatedTargets) _VJoyDevice.SetButton(button, isPressed);
 	}
 
-	private void ApplyAxes(IReadOnlyDictionary<int, JoystickState> states, StringBuilder? debugLines)
+	private void ApplyAxes(PooledDictionary<int, JoystickState> states, StringBuilder? debugLines)
 	{
 		foreach (var route in _AxisRoutes)
 		{
@@ -282,8 +334,10 @@ internal sealed class Runtime
 		}
 
 		foreach (var device in _Devices.Values.OrderBy(device => device.DeviceId))
+		{
 			debugLogger.WriteLine(
 				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");
+		}
 	}
 
 	private static void AppendAxisDebugLine(
@@ -317,5 +371,12 @@ internal sealed class Runtime
 	private static string FormatDouble(double value)
 	{
 		return value.ToString("0.0000");
+	}
+
+	public void Dispose()
+	{
+		_ButtonRoutes.Dispose();
+		_Devices.Dispose();
+		_VJoyDevice.Dispose();
 	}
 }

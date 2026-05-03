@@ -6,4 +6,5 @@ public sealed class AxisMapping
 	public string TargetAxis { get; set; } = "x";
 	public double Scale { get; set; } = 1.0;
 	public double Offset { get; set; }
+	public IAxisModifier? AxisModifier { get; set; }
 }

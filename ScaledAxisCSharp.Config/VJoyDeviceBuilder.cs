@@ -73,12 +73,14 @@ public static class VJoyDeviceBuilder
 
 			var buttonCount = VJoyNative.GetVJDButtonNumber(deviceIdUInt);
 			foreach (var targetButton in buttonRoutes.Select(route => route.TargetButton).Distinct())
+			{
 				if (targetButton > buttonCount)
 				{
 					VJoyNative.RelinquishVJD(deviceIdUInt);
 					throw new InvalidOperationException(
 						$"Button {targetButton} is not enabled on vJoy device {deviceId}. Device exposes {buttonCount} buttons.");
 				}
+			}
 
 			return new VJoyDevice(deviceIdUInt, axisLimits);
 		}

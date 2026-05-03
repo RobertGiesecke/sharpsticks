@@ -5,6 +5,48 @@ namespace ScaledAxisCSharp;
 
 internal static class Program
 {
+	static void Abc()
+	{
+		using var connectedDevices = JoystickDevice.EnumerateConnected();
+
+		var devices = new
+		{
+			left = connectedDevices.ResolveDevice("LEFT VPC Stick WarBRD"),
+			right = connectedDevices.ResolveDevice("RIGHT VPC Stick WarBRD"),
+		};
+
+		var sourceAxes = new
+		{
+			X = devices.right.BindAxis(PhysicalAxis.X),
+			Y = devices.right.BindAxis(PhysicalAxis.Y),
+			Z = devices.right.BindAxis(PhysicalAxis.Z),
+			modifier = devices.left.BindAxis(PhysicalAxis.Slider1),
+		};
+
+		var sourceButtons = new
+		{
+			rightPrimaryFireButton = devices.right.BindButton(1),
+			leftPrimaryFireButton = devices.left.BindButton(1),
+			leftAuxButton = devices.left.BindButton(11),
+			secondaryFireButton = devices.right.BindButton(18),
+		};
+
+		var vJoyDevice = VJoyDevice.Open(
+			1,
+			[
+				sourceButtons.rightPrimaryFireButton.RouteButton(1),
+				sourceButtons.leftPrimaryFireButton.RouteButton(40),
+				sourceButtons.leftAuxButton.RouteButton(79),
+				sourceButtons.secondaryFireButton.RouteButton(22),
+			],
+			[
+				sourceAxes.X.RouteAxis(VJoyAxis.X, 1.0, 0.0),
+				sourceAxes.X.RouteAxis(VJoyAxis.Y, 1.0, 0.0),
+				sourceAxes.X.RouteAxis(VJoyAxis.Z, 1.0, 0.0),
+			],
+			[]);
+	}
+
 	private static int Main(string[] args)
 	{
 		if (!OperatingSystem.IsWindows())
@@ -172,7 +214,7 @@ internal static class Program
 
 	private static int ListDevices()
 	{
-		var devices = JoystickDevice.EnumerateConnected();
+		using var devices = JoystickDevice.EnumerateConnected();
 		if (devices.Count == 0)
 		{
 			Console.WriteLine("No DirectInput joystick devices found.");

@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using Collections.Pooled;
+
 namespace ScaledAxisCSharp.DirectInput;
 
 public sealed unsafe class JoystickDevice
@@ -104,10 +107,10 @@ public sealed unsafe class JoystickDevice
 		return new AxisRange(AxisRangeMin, AxisRangeMax);
 	}
 
-	public static IReadOnlyList<JoystickDevice> EnumerateConnected()
+	public static PooledList<JoystickDevice> EnumerateConnected()
 	{
 		var directInput = DirectInputContext.GetOrCreate();
-		var deviceInfos = new List<DirectInputDeviceInfo>();
+		using var deviceInfos = new PooledList<DirectInputDeviceInfo>();
 		var handle = GCHandle.Alloc(deviceInfos);
 
 		try
@@ -128,17 +131,25 @@ public sealed unsafe class JoystickDevice
 			handle.Free();
 		}
 
-		var devices = new List<JoystickDevice>();
-		for (var index = 0; index < deviceInfos.Count; index++)
+		var devices = new PooledList<JoystickDevice>(deviceInfos.Count);
+		try
 		{
-			var device = OpenDevice(directInput, deviceInfos[index], index);
-			if (device is not null)
+			for (var index = 0; index < deviceInfos.Count; index++)
 			{
-				devices.Add(device);
+				var device = OpenDevice(directInput, deviceInfos[index], index);
+				if (device is not null)
+				{
+					devices.Add(device);
+				}
 			}
-		}
 
-		return devices;
+			return devices;
+		}
+		catch
+		{
+			devices.Dispose();
+			throw;
+		}
 	}
 
 	private static JoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info, int deviceId)
@@ -253,6 +264,7 @@ public sealed unsafe class JoystickDevice
 		var objectFormats = new List<DirectInputObjectDataFormat>();
 
 		foreach (var axisEntry in axisEntries)
+		{
 			objectFormats.Add(new DirectInputObjectDataFormat
 			{
 				GuidPointer = 0,
@@ -260,6 +272,7 @@ public sealed unsafe class JoystickDevice
 				Type = axisEntry.Type,
 				Flags = 0,
 			});
+		}
 
 		foreach (var pov in objects.Where(objectInfo => objectInfo.TypeGuid == DirectInputNative.GuidPov)
 			         .OrderBy(objectInfo => DirectInputNative.GetInstance(objectInfo.Type))
@@ -562,7 +575,7 @@ public sealed unsafe class JoystickDevice
 	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
 	private static int EnumDevicesCallback(DirectInputDeviceInstanceNative* instance, nint referenceData)
 	{
-		var devices = (List<DirectInputDeviceInfo>)GCHandle.FromIntPtr(referenceData).Target!;
+		var devices = (PooledList<DirectInputDeviceInfo>)GCHandle.FromIntPtr(referenceData).Target!;
 		devices.Add(DirectInputDeviceInfo.FromNative(instance));
 		return DirectInputNative.DiEnumContinue;
 	}
@@ -648,7 +661,7 @@ public sealed unsafe class JoystickDevice
 
 	public static JoystickDevice ResolveDevice(string selector)
 	{
-		var devices = JoystickDevice.EnumerateConnected();
+		using var devices = EnumerateConnected();
 
 		if (int.TryParse(selector, out var deviceId))
 		{

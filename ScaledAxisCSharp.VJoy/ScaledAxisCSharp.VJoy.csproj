@@ -4,4 +4,8 @@
         <TargetFramework>net10.0-windows</TargetFramework>
     </PropertyGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" />
+    </ItemGroup>
+
 </Project>

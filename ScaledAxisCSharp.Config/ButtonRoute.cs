@@ -1,3 +1,3 @@
 namespace ScaledAxisCSharp.Config;
 
-public sealed record ButtonRoute(int SourceDeviceId, int SourceButton, int TargetButton);
+public sealed record ButtonRoute(ButtonBinding Binding, int TargetButton);

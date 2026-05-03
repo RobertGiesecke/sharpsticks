@@ -2,7 +2,7 @@ using System.Text;
 
 namespace ScaledAxisCSharp;
 
-internal sealed class ItbMinimalRuntime
+public sealed class ItbMinimalRuntime
 {
 	private readonly ItbMinimalConfig _Config;
 	private readonly IReadOnlyDictionary<int, JoystickDevice> _Devices;
@@ -65,45 +65,64 @@ internal sealed class ItbMinimalRuntime
 			throw new InvalidOperationException("PulseMs must be zero or greater.");
 		}
 
-		var connectedDevices = JoystickDevice.EnumerateConnected();
-		var xAxis = ResolveAxisBinding(connectedDevices, config.XAxis);
-		var yAxis = ResolveAxisBinding(connectedDevices, config.YAxis);
-		var zAxis = ResolveAxisBinding(connectedDevices, config.ZAxis);
-		var modifierAxis = ResolveAxisBinding(connectedDevices, config.ModifierAxis);
-		var primaryFireButton = ResolveButtonBinding(connectedDevices, config.PrimaryFireButton);
-		var leftPrimaryButton = ResolveButtonBinding(connectedDevices, config.LeftPrimaryButton);
-		var leftAuxButton = ResolveButtonBinding(connectedDevices, config.LeftAuxButton);
-		var secondaryFireButton = ResolveButtonBinding(connectedDevices, config.SecondaryFireButton);
+		using var connectedDevices = JoystickDevice.EnumerateConnected();
+		var xAxis = DeviceResolver.ResolveAxisBinding(connectedDevices, config.XAxis);
+		var yAxis = DeviceResolver.ResolveAxisBinding(connectedDevices, config.YAxis);
+		var zAxis = DeviceResolver.ResolveAxisBinding(connectedDevices, config.ZAxis);
+		var modifierAxis = DeviceResolver.ResolveAxisBinding(connectedDevices, config.ModifierAxis);
+		var primaryFireButton = DeviceResolver.ResolveButtonBinding(connectedDevices, config.PrimaryFireButton);
+		var leftPrimaryButton = DeviceResolver.ResolveButtonBinding(connectedDevices, config.LeftPrimaryButton);
+		var leftAuxButton = DeviceResolver.ResolveButtonBinding(connectedDevices, config.LeftAuxButton);
+		var secondaryFireButton = DeviceResolver.ResolveButtonBinding(connectedDevices, config.SecondaryFireButton);
 		var precisionButtons = config.PrecisionButtons
-			.Select(source => ResolveButtonBinding(connectedDevices, source))
+			.Select(source => DeviceResolver.ResolveButtonBinding(connectedDevices, source))
 			.ToArray();
 
-		var selectedDevices = CollectDevices(
-			connectedDevices,
-			[
-				xAxis.DeviceId,
-				yAxis.DeviceId,
-				zAxis.DeviceId,
-				modifierAxis.DeviceId,
-				primaryFireButton.DeviceId,
-				leftPrimaryButton.DeviceId,
-				leftAuxButton.DeviceId,
-				secondaryFireButton.DeviceId,
-				.. precisionButtons.Select(binding => binding.DeviceId),
-			]);
+		var selectedDevices = connectedDevices.CollectDevices([
+			xAxis.DeviceId,
+			yAxis.DeviceId,
+			zAxis.DeviceId,
+			modifierAxis.DeviceId,
+			primaryFireButton.DeviceId,
+			leftPrimaryButton.DeviceId,
+			leftAuxButton.DeviceId,
+			secondaryFireButton.DeviceId,
+			.. precisionButtons.Select(binding => binding.DeviceId),
+		]);
 
 		var vJoyDevice = VJoyDevice.Open(
 			config.VJoyDeviceId,
 			[
-				new ButtonRoute(primaryFireButton.DeviceId, primaryFireButton.ButtonNumber, 1),
-				new ButtonRoute(leftPrimaryButton.DeviceId, leftPrimaryButton.ButtonNumber, 40),
-				new ButtonRoute(leftAuxButton.DeviceId, leftAuxButton.ButtonNumber, 79),
-				new ButtonRoute(secondaryFireButton.DeviceId, secondaryFireButton.ButtonNumber, 22),
+				new ButtonRoute(primaryFireButton, 1),
+				new ButtonRoute(leftPrimaryButton, 40),
+				new ButtonRoute(leftAuxButton, 79),
+				new ButtonRoute(secondaryFireButton, 22),
 			],
 			[
-				new AxisRoute(xAxis, VJoyAxis.X, 1.0, 0.0),
-				new AxisRoute(yAxis, VJoyAxis.Y, 1.0, 0.0),
-				new AxisRoute(zAxis, VJoyAxis.Z, 1.0, 0.0),
+				new AxisRoute()
+				{
+					Source = xAxis,
+					TargetAxis = VJoyAxis.X,
+					Scale = 1.0,
+					Offset = 0.0,
+					Modifier = null
+				},
+				new AxisRoute()
+				{
+					Source = yAxis,
+					TargetAxis = VJoyAxis.Y,
+					Scale = 1.0,
+					Offset = 0.0,
+					Modifier = null
+				},
+				new AxisRoute()
+				{
+					Source = zAxis,
+					TargetAxis = VJoyAxis.Z,
+					Scale = 1.0,
+					Offset = 0.0,
+					Modifier = null
+				},
 			],
 			[]);
 
@@ -135,6 +154,7 @@ internal sealed class ItbMinimalRuntime
 				currentStates.Clear();
 
 				foreach (var (deviceId, device) in _Devices)
+				{
 					if (device.TryRead(out var state, out var error))
 					{
 						currentStates[deviceId] = state;
@@ -144,6 +164,7 @@ internal sealed class ItbMinimalRuntime
 					{
 						Console.Error.WriteLine(error);
 					}
+				}
 
 				var debugLines = debugLogger?.ShouldLogNow() == true ? new StringBuilder() : null;
 				ApplyAxes(currentStates, debugLines);
@@ -327,8 +348,10 @@ internal sealed class ItbMinimalRuntime
 		}
 
 		foreach (var device in _Devices.Values.OrderBy(device => device.DeviceId))
+		{
 			debugLogger.WriteLine(
 				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");
+		}
 	}
 
 	private static void AppendAxisDebugLine(StringBuilder debugLines, string label, AxisDebugSample sample,
@@ -353,83 +376,4 @@ internal sealed class ItbMinimalRuntime
 	{
 		return value.ToString("0.0000");
 	}
-
-	private static Dictionary<int, JoystickDevice> CollectDevices(IReadOnlyList<JoystickDevice> devices,
-		IEnumerable<int> deviceIds)
-	{
-		var byId = devices.ToDictionary(device => device.DeviceId);
-		var selected = new Dictionary<int, JoystickDevice>();
-
-		foreach (var deviceId in deviceIds.Distinct())
-		{
-			if (!byId.TryGetValue(deviceId, out var device))
-			{
-				throw new InvalidOperationException(
-					$"Configured joystick {deviceId} is not available via DirectInput.");
-			}
-
-			selected[deviceId] = device;
-		}
-
-		return selected;
-	}
-
-	private static AxisBinding ResolveAxisBinding(IReadOnlyList<JoystickDevice> devices, DeviceAxisSource source)
-	{
-		var device = ResolveDevice(devices, source.DeviceName);
-		return new AxisBinding(device.DeviceId, source.Axis, AxisMode.Signed, false, 0.0);
-	}
-
-	private static ButtonBinding ResolveButtonBinding(IReadOnlyList<JoystickDevice> devices, DeviceButtonSource source)
-	{
-		if (source.Button < 1)
-		{
-			throw new InvalidOperationException("ITB button sources are 1-based.");
-		}
-
-		var device = ResolveDevice(devices, source.DeviceName);
-		return new ButtonBinding(device.DeviceId, source.Button);
-	}
-
-	private static JoystickDevice ResolveDevice(IReadOnlyList<JoystickDevice> devices, string productName)
-	{
-		if (string.IsNullOrWhiteSpace(productName))
-		{
-			throw new InvalidOperationException("DeviceName is required.");
-		}
-
-		var exactMatches = devices
-			.Where(device => string.Equals(device.Name, productName, StringComparison.OrdinalIgnoreCase))
-			.ToArray();
-
-		if (exactMatches.Length == 1)
-		{
-			return exactMatches[0];
-		}
-
-		if (exactMatches.Length > 1)
-		{
-			throw new InvalidOperationException(
-				$"Multiple joystick devices match '{productName}'. Use a more specific device name.");
-		}
-
-		var partialMatches = devices
-			.Where(device => device.Name.Contains(productName, StringComparison.OrdinalIgnoreCase))
-			.ToArray();
-
-		if (partialMatches.Length == 1)
-		{
-			return partialMatches[0];
-		}
-
-		if (partialMatches.Length > 1)
-		{
-			throw new InvalidOperationException(
-				$"Multiple joystick devices partially match '{productName}'. Use the full product name from the 'list' command.");
-		}
-
-		throw new InvalidOperationException($"No joystick device matched '{productName}'.");
-	}
-
-	private readonly record struct ButtonBinding(int DeviceId, int ButtonNumber);
 }

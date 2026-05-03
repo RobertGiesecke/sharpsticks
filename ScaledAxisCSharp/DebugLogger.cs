@@ -3,7 +3,7 @@ using System.Text;
 
 namespace ScaledAxisCSharp;
 
-internal sealed class DebugLogger
+public sealed class DebugLogger
 {
 	private readonly Stopwatch _Stopwatch = Stopwatch.StartNew();
 	private long _NextLogAtMs;
@@ -45,6 +45,9 @@ internal sealed class DebugLogger
 		}
 
 		var lines = builder.ToString().TrimEnd().Split(Environment.NewLine);
-		foreach (var line in lines) WriteLine(line);
+		foreach (var line in lines)
+		{
+			WriteLine(line);
+		}
 	}
 }

@@ -1,8 +1,7 @@
 ﻿namespace ScaledAxisCSharp.Config;
 
-public sealed class ButtonMapping
+public sealed record ButtonMapping
 {
-	public int SourceDeviceId { get; set; }
-	public int SourceButton { get; set; }
-	public int TargetButton { get; set; }
+	public required ButtonBinding SourceBinding { get; init; }
+	public required int TargetButton { get; init; }
 }

@@ -9,4 +9,8 @@
         <ProjectReference Include="..\ScaledAxisCSharp.VJoy\ScaledAxisCSharp.VJoy.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" />
+    </ItemGroup>
+
 </Project>
