@@ -1,21 +1,22 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ScaledAxisCSharp;
 
-internal sealed class JoystickDevice
+internal sealed unsafe class JoystickDevice
 {
 	private const int AxisRangeMin = -32767;
 	private const int AxisRangeMax = 32767;
-	private readonly IDirectInputDevice8W _device;
+	private readonly nint _devicePointer;
 
-	private JoystickDevice(int deviceId, DirectInputDeviceInstanceW instance, DirectInputDeviceCaps caps, IDirectInputDevice8W device)
+	private JoystickDevice(int deviceId, DirectInputDeviceInfo info, DirectInputDeviceCaps caps, nint devicePointer)
 	{
 		DeviceId = deviceId;
-		InstanceGuid = instance.InstanceGuid;
-		Name = instance.ProductName;
-		InstanceName = instance.InstanceName;
+		InstanceGuid = info.InstanceGuid;
+		Name = info.ProductName;
+		InstanceName = info.InstanceName;
 		Caps = new JoystickCaps(caps.Axes, caps.Buttons, caps.Povs);
-		_device = device;
+		_devicePointer = devicePointer;
 	}
 
 	public int DeviceId { get; }
@@ -26,12 +27,10 @@ internal sealed class JoystickDevice
 
 	public bool TryRead(out JoystickState state, out string? error)
 	{
-		var rawState = DirectInputJoyState2.CreateEmpty();
-
-		var pollResult = _device.Poll();
+		var pollResult = DirectInputNative.Poll(_devicePointer);
 		if (!DirectInputNative.Succeeded(pollResult))
 		{
-			var acquireResult = _device.Acquire();
+			var acquireResult = DirectInputNative.Acquire(_devicePointer);
 			if (!DirectInputNative.Succeeded(acquireResult))
 			{
 				state = default;
@@ -39,16 +38,16 @@ internal sealed class JoystickDevice
 				return false;
 			}
 
-			pollResult = _device.Poll();
+			pollResult = DirectInputNative.Poll(_devicePointer);
 		}
 
-		var stateResult = _device.GetDeviceState(Marshal.SizeOf<DirectInputJoyState2>(), ref rawState);
+		var stateResult = DirectInputNative.GetDeviceState(_devicePointer, out var rawState);
 		if (!DirectInputNative.Succeeded(stateResult))
 		{
-			var acquireResult = _device.Acquire();
+			var acquireResult = DirectInputNative.Acquire(_devicePointer);
 			if (DirectInputNative.Succeeded(acquireResult))
 			{
-				stateResult = _device.GetDeviceState(Marshal.SizeOf<DirectInputJoyState2>(), ref rawState);
+				stateResult = DirectInputNative.GetDeviceState(_devicePointer, out rawState);
 			}
 
 			if (!DirectInputNative.Succeeded(stateResult))
@@ -59,7 +58,7 @@ internal sealed class JoystickDevice
 			}
 		}
 
-		state = new JoystickState(rawState);
+		state = JoystickState.FromNative(rawState);
 		error = null;
 		return true;
 	}
@@ -73,29 +72,31 @@ internal sealed class JoystickDevice
 	public static IReadOnlyList<JoystickDevice> EnumerateConnected()
 	{
 		var directInput = DirectInputContext.GetOrCreate();
-		var instances = new List<DirectInputDeviceInstanceW>();
-		var callback = new DirectInputEnumDevicesCallback((ref DirectInputDeviceInstanceW instance, IntPtr _) =>
-		{
-			instances.Add(instance);
-			return DirectInputNative.DiEnumContinue;
-		});
-		var callbackPointer = Marshal.GetFunctionPointerForDelegate(callback);
+		var deviceInfos = new List<DirectInputDeviceInfo>();
+		var handle = GCHandle.Alloc(deviceInfos);
 
-		var enumResult = directInput.EnumDevices(
-			DirectInputNative.Di8DevClassAll,
-			callbackPointer,
-			IntPtr.Zero,
-			DirectInputNative.DiEdFlAttachedOnly);
-
-		if (!DirectInputNative.Succeeded(enumResult))
+		try
 		{
-			throw new InvalidOperationException($"DirectInput enumeration failed with HRESULT 0x{enumResult:X8}.");
+			var enumResult = DirectInputNative.EnumDevices(
+				directInput,
+				&EnumDevicesCallback,
+				GCHandle.ToIntPtr(handle),
+				DirectInputNative.DiEdFlAttachedOnly);
+
+			if (!DirectInputNative.Succeeded(enumResult))
+			{
+				throw new InvalidOperationException($"DirectInput enumeration failed with HRESULT 0x{enumResult:X8}.");
+			}
+		}
+		finally
+		{
+			handle.Free();
 		}
 
 		var devices = new List<JoystickDevice>();
-		for (var index = 0; index < instances.Count; index++)
+		for (var index = 0; index < deviceInfos.Count; index++)
 		{
-			var device = OpenDevice(directInput, instances[index], index);
+			var device = OpenDevice(directInput, deviceInfos[index], index);
 			if (device is not null)
 			{
 				devices.Add(device);
@@ -105,10 +106,11 @@ internal sealed class JoystickDevice
 		return devices;
 	}
 
-	private static JoystickDevice? OpenDevice(IDirectInput8W directInput, DirectInputDeviceInstanceW instance, int deviceId)
+	private static JoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info, int deviceId)
 	{
-		var createResult = directInput.CreateDevice(instance.InstanceGuid, out var device, IntPtr.Zero);
-		if (!DirectInputNative.Succeeded(createResult))
+		var instanceGuid = info.InstanceGuid;
+		var createResult = DirectInputNative.CreateDevice(directInput, in instanceGuid, out var devicePointer);
+		if (!DirectInputNative.Succeeded(createResult) || devicePointer == 0)
 		{
 			return null;
 		}
@@ -119,66 +121,72 @@ internal sealed class JoystickDevice
 			windowHandle = DirectInputNative.GetDesktopWindow();
 		}
 
-		var cooperativeResult = device.SetCooperativeLevel(
-			windowHandle,
-			DirectInputNative.DiSclBackground | DirectInputNative.DiSclNonExclusive);
-		if (!DirectInputNative.Succeeded(cooperativeResult))
+		try
 		{
-			return null;
+			var cooperativeResult = DirectInputNative.SetCooperativeLevel(
+				devicePointer,
+				windowHandle,
+				DirectInputNative.DiSclBackground | DirectInputNative.DiSclNonExclusive);
+			if (!DirectInputNative.Succeeded(cooperativeResult))
+			{
+				return null;
+			}
+
+			var objectInfos = EnumerateObjects(devicePointer);
+			using var dataFormatScope = DataFormatScope.Create(BuildObjectFormats(objectInfos));
+			var dataFormat = dataFormatScope.DataFormat;
+
+			var setFormatResult = DirectInputNative.SetDataFormat(devicePointer, in dataFormat);
+			if (!DirectInputNative.Succeeded(setFormatResult))
+			{
+				return null;
+			}
+
+			ConfigureAxisRanges(devicePointer, objectInfos);
+
+			var capsResult = DirectInputNative.GetCapabilities(devicePointer, out var caps);
+			if (!DirectInputNative.Succeeded(capsResult))
+			{
+				return null;
+			}
+
+			var acquireResult = DirectInputNative.Acquire(devicePointer);
+			if (!DirectInputNative.Succeeded(acquireResult))
+			{
+				return null;
+			}
+
+			return new JoystickDevice(deviceId, info, caps, devicePointer);
 		}
-
-		var objects = EnumerateObjects(device);
-		using var dataFormatScope = DataFormatScope.Create(BuildObjectFormats(objects));
-		var dataFormat = dataFormatScope.DataFormat;
-
-		var setFormatResult = device.SetDataFormat(ref dataFormat);
-		if (!DirectInputNative.Succeeded(setFormatResult))
+		catch
 		{
-			return null;
+			DirectInputNative.Release(devicePointer);
+			throw;
 		}
-
-		ConfigureAxisRanges(device, objects);
-
-		var caps = new DirectInputDeviceCaps
-		{
-			Size = (uint)Marshal.SizeOf<DirectInputDeviceCaps>()
-		};
-
-		var capsResult = device.GetCapabilities(ref caps);
-		if (!DirectInputNative.Succeeded(capsResult))
-		{
-			return null;
-		}
-
-		var acquireResult = device.Acquire();
-		if (!DirectInputNative.Succeeded(acquireResult))
-		{
-			return null;
-		}
-
-		return new JoystickDevice(deviceId, instance, caps, device);
 	}
 
-	private static List<DirectInputDeviceObjectInstanceW> EnumerateObjects(IDirectInputDevice8W device)
+	private static List<DirectInputDeviceObjectInfo> EnumerateObjects(nint devicePointer)
 	{
-		var objects = new List<DirectInputDeviceObjectInstanceW>();
-		var callback = new DirectInputEnumDeviceObjectsCallback((ref DirectInputDeviceObjectInstanceW instance, IntPtr _) =>
-		{
-			objects.Add(instance);
-			return DirectInputNative.DiEnumContinue;
-		});
-		var callbackPointer = Marshal.GetFunctionPointerForDelegate(callback);
+		var objectInfos = new List<DirectInputDeviceObjectInfo>();
+		var handle = GCHandle.Alloc(objectInfos);
 
-		var enumResult = device.EnumObjects(callbackPointer, IntPtr.Zero, 0);
-		if (!DirectInputNative.Succeeded(enumResult))
+		try
 		{
-			throw new InvalidOperationException($"DirectInput object enumeration failed with HRESULT 0x{enumResult:X8}.");
+			var enumResult = DirectInputNative.EnumObjects(devicePointer, &EnumObjectsCallback, GCHandle.ToIntPtr(handle), 0);
+			if (!DirectInputNative.Succeeded(enumResult))
+			{
+				throw new InvalidOperationException($"DirectInput object enumeration failed with HRESULT 0x{enumResult:X8}.");
+			}
+		}
+		finally
+		{
+			handle.Free();
 		}
 
-		return objects;
+		return objectInfos;
 	}
 
-	private static List<DirectInputObjectDataFormat> BuildObjectFormats(IReadOnlyList<DirectInputDeviceObjectInstanceW> objects)
+	private static List<DirectInputObjectDataFormat> BuildObjectFormats(IReadOnlyList<DirectInputDeviceObjectInfo> objects)
 	{
 		var objectFormats = new List<DirectInputObjectDataFormat>();
 		var sliderIndex = 0;
@@ -193,36 +201,36 @@ internal sealed class JoystickDevice
 
 			objectFormats.Add(new DirectInputObjectDataFormat
 			{
-				GuidPointer = IntPtr.Zero,
-				Offset = (uint)offset.Value,
+				GuidPointer = 0,
+				Offset = offset.Value,
 				Type = axis.Type,
 				Flags = 0,
 			});
 		}
 
-		foreach (var pov in objects.Where(objectInstance => objectInstance.TypeGuid == DirectInputNative.GuidPov)
-			         .OrderBy(objectInstance => DirectInputNative.GetInstance(objectInstance.Type))
+		foreach (var pov in objects.Where(objectInfo => objectInfo.TypeGuid == DirectInputNative.GuidPov)
+			         .OrderBy(objectInfo => DirectInputNative.GetInstance(objectInfo.Type))
 			         .Take(4))
 		{
 			var index = DirectInputNative.GetInstance(pov.Type);
 			objectFormats.Add(new DirectInputObjectDataFormat
 			{
-				GuidPointer = IntPtr.Zero,
-				Offset = (uint)(Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Povs)).ToInt32() + (index * sizeof(uint))),
+				GuidPointer = 0,
+				Offset = DirectInputNative.GetPovOffset(index),
 				Type = pov.Type,
 				Flags = 0,
 			});
 		}
 
-		foreach (var button in objects.Where(objectInstance => objectInstance.TypeGuid == DirectInputNative.GuidButton)
-			         .OrderBy(objectInstance => DirectInputNative.GetInstance(objectInstance.Type))
+		foreach (var button in objects.Where(objectInfo => objectInfo.TypeGuid == DirectInputNative.GuidButton)
+			         .OrderBy(objectInfo => DirectInputNative.GetInstance(objectInfo.Type))
 			         .Take(128))
 		{
 			var index = DirectInputNative.GetInstance(button.Type);
 			objectFormats.Add(new DirectInputObjectDataFormat
 			{
-				GuidPointer = IntPtr.Zero,
-				Offset = (uint)(Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Buttons)).ToInt32() + index),
+				GuidPointer = 0,
+				Offset = DirectInputNative.GetButtonOffset(index),
 				Type = button.Type,
 				Flags = 0,
 			});
@@ -231,61 +239,48 @@ internal sealed class JoystickDevice
 		return objectFormats;
 	}
 
-	private static void ConfigureAxisRanges(IDirectInputDevice8W device, IReadOnlyList<DirectInputDeviceObjectInstanceW> objects)
+	private static void ConfigureAxisRanges(nint devicePointer, IReadOnlyList<DirectInputDeviceObjectInfo> objects)
 	{
 		foreach (var axis in objects.Where(IsAxisObject))
 		{
-			var range = new DirectInputPropertyRange
-			{
-				Header = new DirectInputPropertyHeader
-				{
-					Size = (uint)Marshal.SizeOf<DirectInputPropertyRange>(),
-					HeaderSize = (uint)Marshal.SizeOf<DirectInputPropertyHeader>(),
-					Object = axis.Offset,
-					How = DirectInputNative.DiPhByOffset,
-				},
-				Min = AxisRangeMin,
-				Max = AxisRangeMax,
-			};
-
-			device.SetProperty(in DirectInputNative.DiPropRange, ref range);
+			DirectInputNative.SetRangeProperty(devicePointer, axis.Offset, AxisRangeMin, AxisRangeMax);
 		}
 	}
 
-	private static bool IsAxisObject(DirectInputDeviceObjectInstanceW objectInstance)
+	private static bool IsAxisObject(DirectInputDeviceObjectInfo objectInfo)
 	{
-		return objectInstance.TypeGuid == DirectInputNative.GuidXAxis ||
-		       objectInstance.TypeGuid == DirectInputNative.GuidYAxis ||
-		       objectInstance.TypeGuid == DirectInputNative.GuidZAxis ||
-		       objectInstance.TypeGuid == DirectInputNative.GuidRxAxis ||
-		       objectInstance.TypeGuid == DirectInputNative.GuidRyAxis ||
-		       objectInstance.TypeGuid == DirectInputNative.GuidRzAxis ||
-		       objectInstance.TypeGuid == DirectInputNative.GuidSlider;
+		return objectInfo.TypeGuid == DirectInputNative.GuidXAxis ||
+		       objectInfo.TypeGuid == DirectInputNative.GuidYAxis ||
+		       objectInfo.TypeGuid == DirectInputNative.GuidZAxis ||
+		       objectInfo.TypeGuid == DirectInputNative.GuidRxAxis ||
+		       objectInfo.TypeGuid == DirectInputNative.GuidRyAxis ||
+		       objectInfo.TypeGuid == DirectInputNative.GuidRzAxis ||
+		       objectInfo.TypeGuid == DirectInputNative.GuidSlider;
 	}
 
-	private static int GetAxisSortKey(DirectInputDeviceObjectInstanceW objectInstance)
+	private static int GetAxisSortKey(DirectInputDeviceObjectInfo objectInfo)
 	{
-		if (objectInstance.TypeGuid == DirectInputNative.GuidXAxis) return 0;
-		if (objectInstance.TypeGuid == DirectInputNative.GuidYAxis) return 1;
-		if (objectInstance.TypeGuid == DirectInputNative.GuidZAxis) return 2;
-		if (objectInstance.TypeGuid == DirectInputNative.GuidRxAxis) return 3;
-		if (objectInstance.TypeGuid == DirectInputNative.GuidRyAxis) return 4;
-		if (objectInstance.TypeGuid == DirectInputNative.GuidRzAxis) return 5;
-		if (objectInstance.TypeGuid == DirectInputNative.GuidSlider) return 6 + DirectInputNative.GetInstance(objectInstance.Type);
+		if (objectInfo.TypeGuid == DirectInputNative.GuidXAxis) return 0;
+		if (objectInfo.TypeGuid == DirectInputNative.GuidYAxis) return 1;
+		if (objectInfo.TypeGuid == DirectInputNative.GuidZAxis) return 2;
+		if (objectInfo.TypeGuid == DirectInputNative.GuidRxAxis) return 3;
+		if (objectInfo.TypeGuid == DirectInputNative.GuidRyAxis) return 4;
+		if (objectInfo.TypeGuid == DirectInputNative.GuidRzAxis) return 5;
+		if (objectInfo.TypeGuid == DirectInputNative.GuidSlider) return 6 + DirectInputNative.GetInstance(objectInfo.Type);
 		return int.MaxValue;
 	}
 
-	private static int? GetAxisOffset(Guid axisGuid, ref int sliderIndex)
+	private static uint? GetAxisOffset(Guid axisGuid, ref int sliderIndex)
 	{
-		if (axisGuid == DirectInputNative.GuidXAxis) return Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.X)).ToInt32();
-		if (axisGuid == DirectInputNative.GuidYAxis) return Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Y)).ToInt32();
-		if (axisGuid == DirectInputNative.GuidZAxis) return Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Z)).ToInt32();
-		if (axisGuid == DirectInputNative.GuidRxAxis) return Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Rx)).ToInt32();
-		if (axisGuid == DirectInputNative.GuidRyAxis) return Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Ry)).ToInt32();
-		if (axisGuid == DirectInputNative.GuidRzAxis) return Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Rz)).ToInt32();
+		if (axisGuid == DirectInputNative.GuidXAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.X);
+		if (axisGuid == DirectInputNative.GuidYAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Y);
+		if (axisGuid == DirectInputNative.GuidZAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Z);
+		if (axisGuid == DirectInputNative.GuidRxAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Rx);
+		if (axisGuid == DirectInputNative.GuidRyAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Ry);
+		if (axisGuid == DirectInputNative.GuidRzAxis) return DirectInputNative.GetAxisOffset(PhysicalAxis.Rz);
 		if (axisGuid == DirectInputNative.GuidSlider && sliderIndex < 2)
 		{
-			var offset = Marshal.OffsetOf<DirectInputJoyState2>(nameof(DirectInputJoyState2.Sliders)).ToInt32() + (sliderIndex * sizeof(int));
+			var offset = DirectInputNative.GetAxisOffset(sliderIndex == 0 ? PhysicalAxis.Slider1 : PhysicalAxis.Slider2);
 			sliderIndex++;
 			return offset;
 		}
@@ -346,11 +341,27 @@ internal sealed class JoystickDevice
 		return (value - deadzone) / (1.0 - deadzone);
 	}
 
+	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
+	private static int EnumDevicesCallback(DirectInputDeviceInstanceNative* instance, nint referenceData)
+	{
+		var devices = (List<DirectInputDeviceInfo>)GCHandle.FromIntPtr(referenceData).Target!;
+		devices.Add(DirectInputDeviceInfo.FromNative(instance));
+		return DirectInputNative.DiEnumContinue;
+	}
+
+	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
+	private static int EnumObjectsCallback(DirectInputDeviceObjectInstanceNative* instance, nint referenceData)
+	{
+		var objects = (List<DirectInputDeviceObjectInfo>)GCHandle.FromIntPtr(referenceData).Target!;
+		objects.Add(DirectInputDeviceObjectInfo.FromNative(instance));
+		return DirectInputNative.DiEnumContinue;
+	}
+
 	private sealed class DataFormatScope : IDisposable
 	{
-		private readonly IntPtr _objectBuffer;
+		private readonly nint _objectBuffer;
 
-		private DataFormatScope(IntPtr objectBuffer, DirectInputDataFormat dataFormat)
+		private DataFormatScope(nint objectBuffer, DirectInputDataFormat dataFormat)
 		{
 			_objectBuffer = objectBuffer;
 			DataFormat = dataFormat;
@@ -374,7 +385,7 @@ internal sealed class JoystickDevice
 				Size = (uint)Marshal.SizeOf<DirectInputDataFormat>(),
 				ObjectSize = (uint)objectSize,
 				Flags = DirectInputNative.DiDfAbsAxis,
-				DataSize = (uint)Marshal.SizeOf<DirectInputJoyState2>(),
+				DataSize = DirectInputNative.GetStateSize(),
 				ObjectCount = (uint)objectFormats.Count,
 				ObjectDataFormats = buffer,
 			};
@@ -390,11 +401,11 @@ internal sealed class JoystickDevice
 
 	private static class DirectInputContext
 	{
-		private static IDirectInput8W? _directInput;
+		private static nint _directInput;
 
-		public static IDirectInput8W GetOrCreate()
+		public static nint GetOrCreate()
 		{
-			if (_directInput is not null)
+			if (_directInput != 0)
 			{
 				return _directInput;
 			}
@@ -412,15 +423,8 @@ internal sealed class JoystickDevice
 				throw new InvalidOperationException($"DirectInput8Create failed with HRESULT 0x{result:X8}.");
 			}
 
-			try
-			{
-				_directInput = (IDirectInput8W)Marshal.GetObjectForIUnknown(directInputPointer);
-				return _directInput;
-			}
-			finally
-			{
-				Marshal.Release(directInputPointer);
-			}
+			_directInput = directInputPointer;
+			return _directInput;
 		}
 	}
 }
@@ -439,8 +443,28 @@ internal readonly record struct JoystickState(
 	ulong ButtonBitsLow,
 	ulong ButtonBitsHigh)
 {
-	public JoystickState(DirectInputJoyState2 state)
-		: this(
+	public static unsafe JoystickState FromNative(DirectInputJoyState2 state)
+	{
+		ulong buttonBitsLow = 0;
+		ulong buttonBitsHigh = 0;
+
+		for (var index = 0; index < 64; index++)
+		{
+			if ((state.Buttons[index] & 0x80) != 0)
+			{
+				buttonBitsLow |= 1UL << index;
+			}
+		}
+
+		for (var index = 0; index < 64; index++)
+		{
+			if ((state.Buttons[index + 64] & 0x80) != 0)
+			{
+				buttonBitsHigh |= 1UL << index;
+			}
+		}
+
+		return new JoystickState(
 			state.X,
 			state.Y,
 			state.Z,
@@ -449,9 +473,8 @@ internal readonly record struct JoystickState(
 			state.Rz,
 			state.Sliders[0],
 			state.Sliders[1],
-			PackButtons(state.Buttons, 0),
-			PackButtons(state.Buttons, 64))
-	{
+			buttonBitsLow,
+			buttonBitsHigh);
 	}
 
 	public int GetAxisValue(PhysicalAxis axis)
@@ -485,19 +508,34 @@ internal readonly record struct JoystickState(
 
 		return ((ButtonBitsHigh >> (zeroBasedIndex - 64)) & 1UL) != 0;
 	}
+}
 
-	private static ulong PackButtons(IReadOnlyList<byte> buttons, int startIndex)
+internal readonly record struct DirectInputDeviceInfo(Guid InstanceGuid, string ProductName, string InstanceName)
+{
+	public static unsafe DirectInputDeviceInfo FromNative(DirectInputDeviceInstanceNative* native)
 	{
-		ulong bits = 0;
+		return new DirectInputDeviceInfo(
+			native->InstanceGuid,
+			ReadNullTerminatedString(native->ProductName, 260),
+			ReadNullTerminatedString(native->InstanceName, 260));
+	}
 
-		for (var bit = 0; bit < 64 && startIndex + bit < buttons.Count; bit++)
+	private static unsafe string ReadNullTerminatedString(char* buffer, int capacity)
+	{
+		var length = 0;
+		while (length < capacity && buffer[length] != '\0')
 		{
-			if ((buttons[startIndex + bit] & 0x80) != 0)
-			{
-				bits |= 1UL << bit;
-			}
+			length++;
 		}
 
-		return bits;
+		return new string(buffer, 0, length);
+	}
+}
+
+internal readonly record struct DirectInputDeviceObjectInfo(Guid TypeGuid, uint Offset, uint Type)
+{
+	public static unsafe DirectInputDeviceObjectInfo FromNative(DirectInputDeviceObjectInstanceNative* native)
+	{
+		return new DirectInputDeviceObjectInfo(native->TypeGuid, native->Offset, native->Type);
 	}
 }

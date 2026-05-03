@@ -60,7 +60,7 @@ internal static class VJoyNative
 		}
 	}
 
-	[DllImport("vJoyInterface.dll")]
+	[DllImport("vJoyInterface.dll", EntryPoint = "vJoyEnabled")]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	public static extern bool VJoyEnabled();
 

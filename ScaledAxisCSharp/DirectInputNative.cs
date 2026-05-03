@@ -1,11 +1,12 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ScaledAxisCSharp;
 
-internal static class DirectInputNative
+internal static unsafe class DirectInputNative
 {
 	public const uint DirectInputVersion = 0x0800;
-	public const uint Di8DevClassAll = 0;
+	public const uint Di8DevClassGameCtrl = 4;
 	public const uint DiEdFlAttachedOnly = 0x00000001;
 	public const uint DiDfAbsAxis = 0x00000001;
 	public const uint DiPhByOffset = 1;
@@ -45,72 +46,190 @@ internal static class DirectInputNative
 	public static bool Succeeded(int hresult) => hresult >= 0;
 
 	public static int GetInstance(uint type) => (int)((type & 0x00FFFF00) >> 8);
+
+	public static uint GetAxisOffset(PhysicalAxis axis) => axis switch
+	{
+		PhysicalAxis.X => 0,
+		PhysicalAxis.Y => 4,
+		PhysicalAxis.Z => 8,
+		PhysicalAxis.Rx => 12,
+		PhysicalAxis.Ry => 16,
+		PhysicalAxis.Rz => 20,
+		PhysicalAxis.Slider1 => 24,
+		PhysicalAxis.Slider2 => 28,
+		_ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
+	};
+
+	public static uint GetButtonOffset(int zeroBasedButton) => 48u + (uint)zeroBasedButton;
+
+	public static uint GetPovOffset(int zeroBasedPov) => 32u + ((uint)zeroBasedPov * 4u);
+
+	public static uint GetStateSize() => 272;
+
+	public static int Release(nint comObject)
+	{
+		if (comObject == 0)
+		{
+			return 0;
+		}
+
+		var vtable = *(IUnknownVTable**)comObject;
+		return (int)vtable->Release(comObject);
+	}
+
+	public static int CreateDevice(nint directInput, in Guid instanceGuid, out nint devicePointer)
+	{
+		var vtable = *(DirectInput8VTable**)directInput;
+		fixed (Guid* guidPointer = &instanceGuid)
+		fixed (nint* devicePointerTarget = &devicePointer)
+		{
+			return vtable->CreateDevice(directInput, guidPointer, devicePointerTarget, 0);
+		}
+	}
+
+	public static int EnumDevices(
+		nint directInput,
+		delegate* unmanaged[Stdcall]<DirectInputDeviceInstanceNative*, nint, int> callback,
+		nint referenceData,
+		uint flags)
+	{
+		var vtable = *(DirectInput8VTable**)directInput;
+		return vtable->EnumDevices(directInput, Di8DevClassGameCtrl, callback, referenceData, flags);
+	}
+
+	public static int SetCooperativeLevel(nint device, nint windowHandle, uint flags)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		return vtable->SetCooperativeLevel(device, windowHandle, flags);
+	}
+
+	public static int SetDataFormat(nint device, in DirectInputDataFormat dataFormat)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		fixed (DirectInputDataFormat* dataFormatPointer = &dataFormat)
+		{
+			return vtable->SetDataFormat(device, dataFormatPointer);
+		}
+	}
+
+	public static int EnumObjects(
+		nint device,
+		delegate* unmanaged[Stdcall]<DirectInputDeviceObjectInstanceNative*, nint, int> callback,
+		nint referenceData,
+		uint flags)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		return vtable->EnumObjects(device, callback, referenceData, flags);
+	}
+
+	public static int SetRangeProperty(nint device, uint offset, int min, int max)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		var range = new DirectInputPropertyRange
+		{
+			Header = new DirectInputPropertyHeader
+			{
+				Size = (uint)sizeof(DirectInputPropertyRange),
+				HeaderSize = (uint)sizeof(DirectInputPropertyHeader),
+				Object = offset,
+				How = DiPhByOffset,
+			},
+			Min = min,
+			Max = max,
+		};
+
+		var propertyGuid = DiPropRange;
+		return vtable->SetProperty(device, &propertyGuid, &range);
+	}
+
+	public static int GetCapabilities(nint device, out DirectInputDeviceCaps caps)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		caps = new DirectInputDeviceCaps
+		{
+			Size = (uint)sizeof(DirectInputDeviceCaps)
+		};
+
+		fixed (DirectInputDeviceCaps* capsPointer = &caps)
+		{
+			return vtable->GetCapabilities(device, capsPointer);
+		}
+	}
+
+	public static int Acquire(nint device)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		return vtable->Acquire(device);
+	}
+
+	public static int Poll(nint device)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		return vtable->Poll(device);
+	}
+
+	public static int GetDeviceState(nint device, out DirectInputJoyState2 state)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		state = default;
+
+		fixed (DirectInputJoyState2* statePointer = &state)
+		{
+			return vtable->GetDeviceState(device, (int)GetStateSize(), statePointer);
+		}
+	}
 }
 
-[ComImport]
-[Guid("BF798031-483A-4DA2-AA99-5D64ED369700")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IDirectInput8W
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct IUnknownVTable
 {
-	void QueryInterface(in Guid riid, out IntPtr ppvObject);
-	uint AddRef();
-	uint Release();
-	int CreateDevice(in Guid rguid, [MarshalAs(UnmanagedType.Interface)] out IDirectInputDevice8W directInputDevice, IntPtr unknownOuter);
-	int EnumDevices(uint devType, IntPtr callback, IntPtr referenceData, uint flags);
-	int GetDeviceStatus(in Guid rguidInstance);
-	int RunControlPanel(IntPtr hwndOwner, uint flags);
-	int Initialize(IntPtr hinstance, uint version);
-	int FindDevice(in Guid rguidClass, [MarshalAs(UnmanagedType.LPWStr)] string name, out Guid instanceGuid);
-	int EnumDevicesBySemantics(IntPtr userName, IntPtr actionFormat, IntPtr callback, IntPtr referenceData, uint flags);
-	int ConfigureDevices(IntPtr callback, IntPtr parameters, uint flags, IntPtr referenceData);
+	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, int> QueryInterface;
+	public delegate* unmanaged[Stdcall]<nint, uint> AddRef;
+	public delegate* unmanaged[Stdcall]<nint, uint> Release;
 }
 
-[ComImport]
-[Guid("54D41081-DC15-4833-A41B-748F73A38179")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IDirectInputDevice8W
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct DirectInput8VTable
 {
-	void QueryInterface(in Guid riid, out IntPtr ppvObject);
-	uint AddRef();
-	uint Release();
-	int GetCapabilities(ref DirectInputDeviceCaps caps);
-	int EnumObjects(IntPtr callback, IntPtr referenceData, uint flags);
-	int GetProperty(in Guid propertyGuid, ref DirectInputPropertyHeader header);
-	int SetProperty(in Guid propertyGuid, ref DirectInputPropertyRange range);
-	int Acquire();
-	int Unacquire();
-	int GetDeviceState(int cbData, ref DirectInputJoyState2 data);
-	int GetDeviceData(int cbObjectData, IntPtr objectData, ref uint entries, uint flags);
-	int SetDataFormat(ref DirectInputDataFormat dataFormat);
-	int SetEventNotification(IntPtr eventHandle);
-	int SetCooperativeLevel(IntPtr hwnd, uint flags);
-	int GetObjectInfo(ref DirectInputDeviceObjectInstanceW objectInstance, uint objectId, uint how);
-	int GetDeviceInfo(ref DirectInputDeviceInstanceW instance);
-	int RunControlPanel(IntPtr hwndOwner, uint flags);
-	int Initialize(IntPtr hinstance, uint version, in Guid rguid);
-	int CreateEffect(IntPtr rguid, IntPtr effect, IntPtr directInputEffect, IntPtr unknownOuter);
-	int EnumEffects(IntPtr callback, IntPtr referenceData, uint effectType);
-	int GetEffectInfo(IntPtr effectInfo, IntPtr rguid);
-	int GetForceFeedbackState(out uint outState);
-	int SendForceFeedbackCommand(uint flags);
-	int EnumCreatedEffectObjects(IntPtr callback, IntPtr referenceData, uint flags);
-	int Escape(IntPtr escape);
-	int Poll();
-	int SendDeviceData(uint cbObjectData, IntPtr objectData, ref uint entries, uint flags);
-	int EnumEffectsInFile([MarshalAs(UnmanagedType.LPWStr)] string fileName, IntPtr callback, IntPtr referenceData, uint flags);
-	int WriteEffectToFile([MarshalAs(UnmanagedType.LPWStr)] string fileName, uint entries, IntPtr fileEffects, uint flags);
-	int BuildActionMap(IntPtr actionFormat, [MarshalAs(UnmanagedType.LPWStr)] string userName, uint flags);
-	int SetActionMap(IntPtr actionFormat, [MarshalAs(UnmanagedType.LPWStr)] string userName, uint flags);
-	int GetImageInfo(IntPtr deviceImageInfoHeader);
+	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, int> QueryInterface;
+	public delegate* unmanaged[Stdcall]<nint, uint> AddRef;
+	public delegate* unmanaged[Stdcall]<nint, uint> Release;
+	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, nint, int> CreateDevice;
+	public delegate* unmanaged[Stdcall]<nint, uint, delegate* unmanaged[Stdcall]<DirectInputDeviceInstanceNative*, nint, int>, nint, uint, int> EnumDevices;
 }
 
-[UnmanagedFunctionPointer(CallingConvention.StdCall)]
-internal delegate int DirectInputEnumDevicesCallback(ref DirectInputDeviceInstanceW instance, IntPtr referenceData);
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct DirectInputDevice8VTable
+{
+	public delegate* unmanaged[Stdcall]<nint, Guid*, nint*, int> QueryInterface;
+	public delegate* unmanaged[Stdcall]<nint, uint> AddRef;
+	public delegate* unmanaged[Stdcall]<nint, uint> Release;
+	public delegate* unmanaged[Stdcall]<nint, DirectInputDeviceCaps*, int> GetCapabilities;
+	public delegate* unmanaged[Stdcall]<nint, delegate* unmanaged[Stdcall]<DirectInputDeviceObjectInstanceNative*, nint, int>, nint, uint, int> EnumObjects;
+	public nint GetProperty;
+	public delegate* unmanaged[Stdcall]<nint, Guid*, DirectInputPropertyRange*, int> SetProperty;
+	public delegate* unmanaged[Stdcall]<nint, int> Acquire;
+	public nint Unacquire;
+	public delegate* unmanaged[Stdcall]<nint, int, DirectInputJoyState2*, int> GetDeviceState;
+	public nint GetDeviceData;
+	public delegate* unmanaged[Stdcall]<nint, DirectInputDataFormat*, int> SetDataFormat;
+	public nint SetEventNotification;
+	public delegate* unmanaged[Stdcall]<nint, nint, uint, int> SetCooperativeLevel;
+	public nint GetObjectInfo;
+	public nint GetDeviceInfo;
+	public nint RunControlPanel;
+	public nint Initialize;
+	public nint CreateEffect;
+	public nint EnumEffects;
+	public nint GetEffectInfo;
+	public nint GetForceFeedbackState;
+	public nint SendForceFeedbackCommand;
+	public nint EnumCreatedEffectObjects;
+	public nint Escape;
+	public delegate* unmanaged[Stdcall]<nint, int> Poll;
+}
 
-[UnmanagedFunctionPointer(CallingConvention.StdCall)]
-internal delegate int DirectInputEnumDeviceObjectsCallback(ref DirectInputDeviceObjectInstanceW objectInstance, IntPtr referenceData);
-
-[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+[StructLayout(LayoutKind.Sequential)]
 internal struct DirectInputDeviceCaps
 {
 	public uint Size;
@@ -127,36 +246,28 @@ internal struct DirectInputDeviceCaps
 }
 
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal struct DirectInputDeviceInstanceW
+internal unsafe struct DirectInputDeviceInstanceNative
 {
 	public uint Size;
 	public Guid InstanceGuid;
 	public Guid ProductGuid;
 	public uint DeviceType;
-
-	[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-	public string InstanceName;
-
-	[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-	public string ProductName;
-
+	public fixed char InstanceName[260];
+	public fixed char ProductName[260];
 	public Guid ForceFeedbackDriverGuid;
 	public ushort UsagePage;
 	public ushort Usage;
 }
 
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal struct DirectInputDeviceObjectInstanceW
+internal unsafe struct DirectInputDeviceObjectInstanceNative
 {
 	public uint Size;
 	public Guid TypeGuid;
 	public uint Offset;
 	public uint Type;
 	public uint Flags;
-
-	[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-	public string Name;
-
+	public fixed char Name[260];
 	public uint ForceFeedbackMaxForce;
 	public uint ForceFeedbackForceResolution;
 	public ushort CollectionNumber;
@@ -171,7 +282,7 @@ internal struct DirectInputDeviceObjectInstanceW
 [StructLayout(LayoutKind.Sequential)]
 internal struct DirectInputObjectDataFormat
 {
-	public IntPtr GuidPointer;
+	public nint GuidPointer;
 	public uint Offset;
 	public uint Type;
 	public uint Flags;
@@ -185,7 +296,7 @@ internal struct DirectInputDataFormat
 	public uint Flags;
 	public uint DataSize;
 	public uint ObjectCount;
-	public IntPtr ObjectDataFormats;
+	public nint ObjectDataFormats;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -206,7 +317,7 @@ internal struct DirectInputPropertyRange
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct DirectInputJoyState2
+internal unsafe struct DirectInputJoyState2
 {
 	public int X;
 	public int Y;
@@ -214,27 +325,8 @@ internal struct DirectInputJoyState2
 	public int Rx;
 	public int Ry;
 	public int Rz;
-
-	[MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
-	public int[] Sliders;
-
-	[MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-	public uint[] Povs;
-
-	[MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
-	public byte[] Buttons;
-
-	[MarshalAs(UnmanagedType.ByValArray, SizeConst = 24)]
-	public int[] ExtendedAxes;
-
-	public static DirectInputJoyState2 CreateEmpty()
-	{
-		return new DirectInputJoyState2
-		{
-			Sliders = new int[2],
-			Povs = new uint[4],
-			Buttons = new byte[128],
-			ExtendedAxes = new int[24],
-		};
-	}
+	public fixed int Sliders[2];
+	public fixed uint Povs[4];
+	public fixed byte Buttons[128];
+	public fixed int ExtendedAxes[24];
 }

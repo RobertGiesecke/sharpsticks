@@ -31,7 +31,7 @@ internal static class Program
 		}
 		catch (Exception ex)
 		{
-			Console.Error.WriteLine(ex);
+			Console.Error.WriteLine(ex.Message);
 			return 1;
 		}
 	}
