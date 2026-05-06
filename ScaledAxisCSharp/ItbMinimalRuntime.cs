@@ -99,32 +99,31 @@ public sealed class ItbMinimalRuntime
 				new ButtonRoute(secondaryFireButton, 22),
 			],
 			[
-				new AxisRoute()
+				new AxisRoute
 				{
 					Source = xAxis,
 					TargetAxis = VJoyAxis.X,
 					Scale = 1.0,
 					Offset = 0.0,
-					Modifier = null
+					Modifier = null,
 				},
-				new AxisRoute()
+				new AxisRoute
 				{
 					Source = yAxis,
 					TargetAxis = VJoyAxis.Y,
 					Scale = 1.0,
 					Offset = 0.0,
-					Modifier = null
+					Modifier = null,
 				},
-				new AxisRoute()
+				new AxisRoute
 				{
 					Source = zAxis,
 					TargetAxis = VJoyAxis.Z,
 					Scale = 1.0,
 					Offset = 0.0,
-					Modifier = null
+					Modifier = null,
 				},
-			],
-			[]);
+			]);
 
 		return new ItbMinimalRuntime(
 			config,
@@ -143,6 +142,7 @@ public sealed class ItbMinimalRuntime
 
 	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
+		using var debugLinesScope = SharedPools.StringBuilder.GetInstance();
 		using (_VJoyDevice)
 		{
 			var currentStates = new Dictionary<int, JoystickState>(_Devices.Count);
@@ -166,7 +166,9 @@ public sealed class ItbMinimalRuntime
 					}
 				}
 
-				var debugLines = debugLogger?.ShouldLogNow() == true ? new StringBuilder() : null;
+				var debugLines = debugLogger?.ShouldLogNow() is true ? debugLinesScope.Instance : null;
+				debugLines?.Clear();
+
 				ApplyAxes(currentStates, debugLines);
 				ApplyButtons(currentStates, debugLines);
 				AdvancePulses();

@@ -54,6 +54,13 @@ internal static unsafe class DirectInputNative
 	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 	public static extern IntPtr GetModuleHandle(string? lpModuleName);
 
+	[DllImport("kernel32.dll", SetLastError = true)]
+	public static extern nint CreateEventW(nint lpEventAttributes, bool bManualReset, bool bInitialState, nint lpName);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	public static extern bool CloseHandle(nint hObject);
+
 	[DllImport("kernel32.dll")]
 	public static extern IntPtr GetConsoleWindow();
 
@@ -216,6 +223,12 @@ internal static unsafe class DirectInputNative
 	{
 		var vtable = *(DirectInputDevice8VTable**)device;
 		return vtable->Acquire(device);
+	}
+
+	public static int SetEventNotification(nint device, nint eventHandle)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		return vtable->SetEventNotification(device, eventHandle);
 	}
 
 	public static int Poll(nint device)

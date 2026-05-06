@@ -13,14 +13,16 @@ public sealed class VJoyDevice : IDisposable
 {
 	private readonly Dictionary<VJoyAxis, AxisLimits> _AxisLimits;
 	private readonly uint _DeviceId;
-	private readonly Dictionary<VJoyAxis, int> _LastAxisValues = [];
-	private readonly Dictionary<int, bool> _LastButtonValues = [];
+	private readonly Dictionary<VJoyAxis, int> _LastAxisValues;
+	private readonly Dictionary<int, bool> _LastButtonValues;
 	private bool _Disposed;
 
 	public VJoyDevice(uint deviceId, Dictionary<VJoyAxis, AxisLimits> axisLimits)
 	{
 		_DeviceId = deviceId;
 		_AxisLimits = axisLimits;
+		_LastAxisValues = new Dictionary<VJoyAxis, int>(axisLimits.Count);
+		_LastButtonValues = new Dictionary<int, bool>(128);
 	}
 
 	public void Dispose()

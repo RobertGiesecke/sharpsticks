@@ -3,8 +3,8 @@
 public sealed class AxisMapping
 {
 	public AxisInput Source { get; set; } = new();
-	public string TargetAxis { get; set; } = "x";
+	public required string TargetAxis { get; set; }
 	public double Scale { get; set; } = 1.0;
 	public double Offset { get; set; }
-	public IAxisModifier? AxisModifier { get; set; }
+	public IAxisModifier? Modifier { get; set; }
 }

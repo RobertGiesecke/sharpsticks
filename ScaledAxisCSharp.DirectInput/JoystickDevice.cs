@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Collections.Pooled;
+using Microsoft.Win32.SafeHandles;
 
 namespace ScaledAxisCSharp.DirectInput;
 
@@ -18,7 +19,8 @@ public sealed unsafe class JoystickDevice
 		DirectInputDeviceInfo info,
 		DirectInputDeviceCaps caps,
 		nint devicePointer,
-		IReadOnlyDictionary<PhysicalAxis, AxisRange> axisRanges)
+		IReadOnlyDictionary<PhysicalAxis, AxisRange> axisRanges,
+		WaitHandle dataAvailable)
 	{
 		DeviceId = deviceId;
 		InstanceGuid = info.InstanceGuid;
@@ -27,6 +29,7 @@ public sealed unsafe class JoystickDevice
 		Caps = new JoystickCaps(caps.Axes, caps.Buttons, caps.Povs);
 		_DevicePointer = devicePointer;
 		_AxisRanges = axisRanges;
+		DataAvailable = dataAvailable;
 	}
 
 	public int DeviceId { get; }
@@ -34,6 +37,7 @@ public sealed unsafe class JoystickDevice
 	public string Name { get; }
 	public string InstanceName { get; }
 	public JoystickCaps Caps { get; }
+	public WaitHandle DataAvailable { get; }
 
 	public bool TryRead(out JoystickState state, out string? error)
 	{
@@ -189,6 +193,22 @@ public sealed unsafe class JoystickDevice
 				return null;
 			}
 
+			var eventHandle = DirectInputNative.CreateEventW(0, false, false, 0);
+			if (eventHandle == 0)
+			{
+				return null;
+			}
+
+			var setEventResult = DirectInputNative.SetEventNotification(devicePointer, eventHandle);
+			if (!DirectInputNative.Succeeded(setEventResult))
+			{
+				DirectInputNative.CloseHandle(eventHandle);
+				return null;
+			}
+
+			var dataAvailable = new AutoResetEvent(false);
+			dataAvailable.SafeWaitHandle = new SafeWaitHandle(eventHandle, ownsHandle: true);
+
 			var axisRanges = ConfigureAxisRanges(devicePointer, axisEntries);
 
 			var capsResult = DirectInputNative.GetCapabilities(devicePointer, out var caps);
@@ -203,7 +223,7 @@ public sealed unsafe class JoystickDevice
 				return null;
 			}
 
-			return new JoystickDevice(deviceId, info, caps, devicePointer, axisRanges);
+			return new JoystickDevice(deviceId, info, caps, devicePointer, axisRanges, dataAvailable);
 		}
 		catch
 		{

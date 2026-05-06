@@ -18,7 +18,7 @@ internal unsafe struct DirectInputDevice8VTable
 	public delegate* unmanaged[Stdcall]<nint, int, DirectInputJoyState2*, int> GetDeviceState;
 	public nint GetDeviceData;
 	public delegate* unmanaged[Stdcall]<nint, DirectInputDataFormat*, int> SetDataFormat;
-	public nint SetEventNotification;
+	public delegate* unmanaged[Stdcall]<nint, nint, int> SetEventNotification;
 	public delegate* unmanaged[Stdcall]<nint, nint, uint, int> SetCooperativeLevel;
 	public nint GetObjectInfo;
 	public nint GetDeviceInfo;

@@ -1,15 +1,15 @@
+using System.Collections.Immutable;
 using System.Text;
 using Collections.Pooled;
 
-namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.Config;
 
-internal sealed class Runtime: IDisposable
+public sealed class Runtime : IDisposable
 {
-	private readonly IReadOnlyList<AxisRoute> _AxisRoutes;
-	private readonly PooledList<VJoyButtonWithBindings> _ButtonRoutes = new();
+	private readonly ImmutableArray<AxisRoute> _AxisRoutes;
+	private readonly PooledList<VJoyButtonWithBindings> _ButtonRoutes;
 	private readonly PooledDictionary<int, JoystickDevice> _Devices;
 	private readonly int _PollIntervalMs;
-	private readonly IReadOnlyList<ScaledAxisRoute> _ScaledAxisRoutes;
 	private readonly VJoyDevice _VJoyDevice;
 
 	private sealed class VJoyButtonWithBindings
@@ -21,9 +21,9 @@ internal sealed class Runtime: IDisposable
 	public Runtime(
 		int pollIntervalMs,
 		PooledDictionary<int, JoystickDevice> devices,
-		IReadOnlyList<ButtonRoute> buttonRoutes,
-		IReadOnlyList<AxisRoute> axisRoutes,
-		IReadOnlyList<ScaledAxisRoute> scaledAxisRoutes,
+		ImmutableArray<ButtonRoute> buttonRoutes,
+		ImmutableArray<AxisRoute> axisRoutes,
+		//IReadOnlyList<ScaledAxisRoute> scaledAxisRoutes,
 		VJoyDevice vJoyDevice)
 	{
 		_PollIntervalMs = pollIntervalMs;
@@ -38,30 +38,36 @@ internal sealed class Runtime: IDisposable
 			})
 			.ToPooledList();
 		_AxisRoutes = axisRoutes;
-		_ScaledAxisRoutes = scaledAxisRoutes;
 		_VJoyDevice = vJoyDevice;
 	}
 
-	public static Runtime Build(AppConfig config)
+	public readonly record struct BuildOptions
 	{
-		if (config.PollIntervalMs < 1)
+		public required int PollIntervalMs { get; init; }
+		public required int VJoyDeviceId { get; init; }
+		public required ImmutableArray<JoystickDevice> ConnectedDevices { get; init; }
+		public required ImmutableArray<ButtonRoute> ButtonRoutes { get; init; }
+		public required ImmutableArray<AxisRoute> AxisRoutes { get; init; }
+	}
+
+	public static Runtime Build(BuildOptions options)
+	{
+		if (options.PollIntervalMs < 1)
 		{
 			throw new InvalidOperationException("PollIntervalMs must be at least 1.");
 		}
 
 
-		using var connectedDevices = JoystickDevice.EnumerateConnected();
-		using var connectedDevicesById = connectedDevices
+		using var connectedDevicesById = options.ConnectedDevices
 			.ToPooledDictionary(device => device.DeviceId);
 		var referencedDeviceIds = new HashSet<int>();
-		var buttonRoutes = new List<ButtonRoute>();
-		var axisRoutes = new List<AxisRoute>();
-		var scaledAxisRoutes = new List<ScaledAxisRoute>();
+		var buttonRoutes = options.ButtonRoutes;
+		var axisRoutes = options.AxisRoutes;
 		var claimedAxes = new HashSet<VJoyAxis>();
 
-		foreach (var mapping in config.ButtonMappings)
+		foreach (var mapping in buttonRoutes)
 		{
-			if (mapping.SourceBinding.ButtonNumber < 1)
+			if (mapping.Binding.ButtonNumber < 1)
 			{
 				throw new InvalidOperationException("Source buttons are 1-based.");
 			}
@@ -71,53 +77,19 @@ internal sealed class Runtime: IDisposable
 				throw new InvalidOperationException("Target buttons are 1-based.");
 			}
 
-			referencedDeviceIds.Add(mapping.SourceBinding.DeviceId);
-			buttonRoutes.Add(new ButtonRoute(mapping.SourceBinding, mapping.TargetButton));
+			referencedDeviceIds.Add(mapping.Binding.DeviceId);
 		}
 
-		foreach (var mapping in config.AxisMappings)
+		foreach (var mapping in axisRoutes)
 		{
-			var source = AxisBinding.Parse(mapping.Source);
-			var targetAxis = VJoyAxis.Parse(mapping.TargetAxis);
-
-			if (!claimedAxes.Add(targetAxis))
+			if (!claimedAxes.Add(mapping.TargetAxis))
 			{
 				throw new InvalidOperationException($"Target axis '{mapping.TargetAxis}' is mapped more than once.");
 			}
 
-			referencedDeviceIds.Add(source.DeviceId);
-			axisRoutes.Add(new AxisRoute()
-			{
-				Source = source,
-				TargetAxis = targetAxis,
-				Scale = mapping.Scale,
-				Offset = mapping.Offset,
-				Modifier = mapping.AxisModifier
-			});
+			referencedDeviceIds.Add(mapping.Source.DeviceId);
 		}
 
-		foreach (var mapping in config.ScaledAxisMappings)
-		{
-			var valueSource = AxisBinding.Parse(mapping.ValueSource);
-			var factorSource = AxisBinding.Parse(mapping.FactorSource);
-			var targetAxis = VJoyAxis.Parse(mapping.TargetAxis);
-
-			if (!claimedAxes.Add(targetAxis))
-			{
-				throw new InvalidOperationException($"Target axis '{mapping.TargetAxis}' is mapped more than once.");
-			}
-
-			referencedDeviceIds.Add(valueSource.DeviceId);
-			referencedDeviceIds.Add(factorSource.DeviceId);
-			scaledAxisRoutes.Add(new ScaledAxisRoute(
-				valueSource,
-				factorSource,
-				targetAxis,
-				mapping.FactorLow,
-				mapping.FactorHigh,
-				mapping.OutputScale,
-				mapping.OutputOffset));
-		}
 
 		var devices = new PooledDictionary<int, JoystickDevice>();
 		try
@@ -133,10 +105,10 @@ internal sealed class Runtime: IDisposable
 				devices.Add(deviceId, device);
 			}
 
-			var vJoyDevice = VJoyDevice.Open(config.VJoyDeviceId, buttonRoutes, axisRoutes, scaledAxisRoutes);
+			var vJoyDevice = VJoyDevice.Open(options.VJoyDeviceId, buttonRoutes, axisRoutes);
 			try
 			{
-				return new Runtime(config.PollIntervalMs, devices, buttonRoutes, axisRoutes, scaledAxisRoutes,
+				return new Runtime(options.PollIntervalMs, devices, buttonRoutes, axisRoutes,
 					vJoyDevice);
 			}
 			catch
@@ -152,17 +124,88 @@ internal sealed class Runtime: IDisposable
 		}
 	}
 
+	public static Runtime BuildFromConfig(AppConfig config)
+	{
+		if (config.PollIntervalMs < 1)
+		{
+			throw new InvalidOperationException("PollIntervalMs must be at least 1.");
+		}
+
+		var buildOptions = GetBuildOptionsFromConfig(config);
+		return Build(buildOptions);
+	}
+
+	private static BuildOptions GetBuildOptionsFromConfig(AppConfig config)
+	{
+		using var connectedDevices = JoystickDevice.EnumerateConnected();
+		using var connectedDevicesById = connectedDevices
+			.ToPooledDictionary(device => device.DeviceId);
+		var buttonRoutes = new List<ButtonRoute>();
+		var axisRoutes = new List<AxisRoute>();
+
+		foreach (var mapping in config.ButtonMappings)
+		{
+			if (mapping.SourceBinding.ButtonNumber < 1)
+			{
+				throw new InvalidOperationException("Source buttons are 1-based.");
+			}
+
+			if (mapping.TargetButton < 1)
+			{
+				throw new InvalidOperationException("Target buttons are 1-based.");
+			}
+
+			buttonRoutes.Add(new ButtonRoute(mapping.SourceBinding, mapping.TargetButton));
+		}
+
+		foreach (var mapping in config.AxisMappings)
+		{
+			var source = AxisBinding.Parse(mapping.Source);
+			var targetAxis = VJoyAxis.Parse(mapping.TargetAxis);
+
+			axisRoutes.Add(new AxisRoute
+			{
+				Source = source,
+				TargetAxis = targetAxis,
+				Scale = mapping.Scale,
+				Offset = mapping.Offset,
+				Modifier = mapping.Modifier,
+			});
+		}
+
+		var buildOptions = new BuildOptions
+		{
+			PollIntervalMs = config.PollIntervalMs,
+			VJoyDeviceId = config.VJoyDeviceId,
+			ConnectedDevices = [..connectedDevices],
+			ButtonRoutes = [..buttonRoutes],
+			AxisRoutes = [..axisRoutes],
+		};
+		return buildOptions;
+	}
+
 	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
+		using var debugLinesScope = SharedPools.StringBuilder.GetInstance();
 		using (_VJoyDevice)
 		{
 			using var currentStates = new PooledDictionary<int, JoystickState>(_Devices.Count);
 			using var lastReportedReadFailure = new PooledSet<int>();
 			LogStartup(debugLogger);
 
-			StringBuilder? debugLines = null;
-			while (!cancellationToken.IsCancellationRequested)
+			var waitHandles = _Devices.Values
+				.Select(d => d.DataAvailable)
+				.Append(cancellationToken.WaitHandle)
+				.ToArray();
+			var cancelIndex = waitHandles.Length - 1;
+
+			while (true)
 			{
+				if (WaitHandle.WaitAny(waitHandles) == cancelIndex)
+				{
+					break;
+				}
+
 				currentStates.Clear();
 
 				foreach (var (deviceId, device) in _Devices)
@@ -179,10 +222,8 @@ internal sealed class Runtime: IDisposable
 				}
 
 				var shouldLog = debugLogger?.ShouldLogNow() is true;
-				if (shouldLog)
-				{
-					debugLines ??= new StringBuilder();
-				}
+				var debugLines = shouldLog ? debugLinesScope.Instance : null;
+				debugLines?.Clear();
 
 				ApplyButtons(currentStates, debugLines);
 				ApplyAxes(currentStates, debugLines);
@@ -190,11 +231,6 @@ internal sealed class Runtime: IDisposable
 				if (shouldLog && debugLogger is not null && debugLines is not null)
 				{
 					debugLogger.WriteBlock(debugLines);
-				}
-
-				if (cancellationToken.WaitHandle.WaitOne(_PollIntervalMs))
-				{
-					break;
 				}
 			}
 		}
@@ -211,7 +247,7 @@ internal sealed class Runtime: IDisposable
 				{
 					continue;
 				}
-				
+
 				if (current is null)
 				{
 					current = state.IsButtonPressed(buttonBinding.ButtonNumber);
@@ -251,77 +287,17 @@ internal sealed class Runtime: IDisposable
 
 			var sample = device.ReadAxisDebugSample(state, route.Source);
 			var output = sample.NormalizedValue * route.Scale + route.Offset;
+			if (route.Modifier is { } m)
+			{
+				output = m.Apply(output, states, _Devices);
+			}
+
 			_VJoyDevice.SetAxis(route.TargetAxis, output);
 
 			if (debugLines is not null)
 			{
 				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis, route.TargetAxis, sample,
 					output);
-			}
-		}
-
-		foreach (var route in _ScaledAxisRoutes)
-		{
-			if (!states.TryGetValue(route.ValueSource.DeviceId, out var valueState) ||
-			    !_Devices.TryGetValue(route.ValueSource.DeviceId, out var valueDevice))
-			{
-				continue;
-			}
-
-			if (!states.TryGetValue(route.FactorSource.DeviceId, out var factorState) ||
-			    !_Devices.TryGetValue(route.FactorSource.DeviceId, out var factorDevice))
-			{
-				continue;
-			}
-
-			var valueSample = valueDevice.ReadAxisDebugSample(valueState, route.ValueSource);
-			var factorSample = factorDevice.ReadAxisDebugSample(factorState, route.FactorSource);
-			var sourceValue = valueSample.NormalizedValue;
-			var factorValue = factorSample.NormalizedValue;
-			var factorT = route.FactorSource.Mode == AxisMode.Signed
-				? Math.Clamp((factorValue + 1.0) * 0.5, 0.0, 1.0)
-				: Math.Clamp(factorValue, 0.0, 1.0);
-
-			var blendedFactor = route.FactorLow + (route.FactorHigh - route.FactorLow) * factorT;
-			var output = sourceValue * blendedFactor * route.OutputScale + route.OutputOffset;
-			_VJoyDevice.SetAxis(route.TargetAxis, output);
-
-			if (debugLines is not null)
-			{
-				debugLines.Append("scaled-axis ");
-				debugLines.Append(route.TargetAxis);
-				debugLines.Append(" value dev ");
-				debugLines.Append(route.ValueSource.DeviceId);
-				debugLines.Append('/');
-				debugLines.Append(route.ValueSource.Axis);
-				debugLines.Append(" raw=");
-				debugLines.Append(valueSample.RawValue);
-				debugLines.Append(" range=");
-				debugLines.Append(valueSample.RangeMin);
-				debugLines.Append("..");
-				debugLines.Append(valueSample.RangeMax);
-				debugLines.Append(" decoder=");
-				debugLines.Append(valueSample.DecoderKind);
-				debugLines.Append(" norm=");
-				debugLines.Append(FormatDouble(valueSample.NormalizedValue));
-				debugLines.Append(" factor dev ");
-				debugLines.Append(route.FactorSource.DeviceId);
-				debugLines.Append('/');
-				debugLines.Append(route.FactorSource.Axis);
-				debugLines.Append(" raw=");
-				debugLines.Append(factorSample.RawValue);
-				debugLines.Append(" range=");
-				debugLines.Append(factorSample.RangeMin);
-				debugLines.Append("..");
-				debugLines.Append(factorSample.RangeMax);
-				debugLines.Append(" decoder=");
-				debugLines.Append(factorSample.DecoderKind);
-				debugLines.Append(" norm=");
-				debugLines.Append(FormatDouble(factorSample.NormalizedValue));
-				debugLines.Append(" blend=");
-				debugLines.Append(FormatDouble(blendedFactor));
-				debugLines.Append(" out=");
-				debugLines.AppendLine(FormatDouble(output));
 			}
 		}
 	}

@@ -43,8 +43,7 @@ internal static class Program
 				sourceAxes.X.RouteAxis(VJoyAxis.X, 1.0, 0.0),
 				sourceAxes.X.RouteAxis(VJoyAxis.Y, 1.0, 0.0),
 				sourceAxes.X.RouteAxis(VJoyAxis.Z, 1.0, 0.0),
-			],
-			[]);
+			]);
 	}
 
 	private static int Main(string[] args)
@@ -290,7 +289,7 @@ internal static class Program
 	{
 		configPath = Path.GetFullPath(configPath);
 		var config = LoadConfig(configPath);
-		var runtime = Runtime.Build(config);
+		var runtime = Runtime.BuildFromConfig(config);
 
 		using var cts = new CancellationTokenSource();
 		Console.CancelKeyPress += (_, eventArgs) =>

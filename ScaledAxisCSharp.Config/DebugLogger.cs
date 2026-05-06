@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using System.Text;
+using Collections.Pooled;
 
-namespace ScaledAxisCSharp;
+namespace ScaledAxisCSharp.Config;
 
 public sealed class DebugLogger
 {
 	private readonly Stopwatch _Stopwatch = Stopwatch.StartNew();
 	private long _NextLogAtMs;
+	PooledQueue<StringBuilder> _StringBuilderPool = new();
 
 	public DebugLogger(int intervalMs)
 	{

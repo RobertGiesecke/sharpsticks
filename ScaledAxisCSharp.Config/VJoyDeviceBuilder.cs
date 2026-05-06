@@ -7,8 +7,7 @@ public static class VJoyDeviceBuilder
 		public static VJoyDevice Open(
 			int deviceId,
 			IReadOnlyList<ButtonRoute> buttonRoutes,
-			IReadOnlyList<AxisRoute> axisRoutes,
-			IReadOnlyList<ScaledAxisRoute> scaledAxisRoutes)
+			IReadOnlyList<AxisRoute> axisRoutes)
 		{
 			if (deviceId < 1)
 			{
@@ -49,7 +48,6 @@ public static class VJoyDeviceBuilder
 
 			var axisLimits = new Dictionary<VJoyAxis, AxisLimits>();
 			foreach (var axis in axisRoutes.Select(route => route.TargetAxis)
-				         .Concat(scaledAxisRoutes.Select(route => route.TargetAxis))
 				         .Distinct())
 			{
 				var hidUsage = (uint)axis;
