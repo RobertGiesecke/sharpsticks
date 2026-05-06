@@ -19,12 +19,7 @@ var holdPrecisionCurve = new AxisCurve { Max = 0.5d };
 
 var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 {
-	Buttons =
-	[
-		leftStick.BindButton(2),
-		rightStick.BindButton(2),
-		rightStick.BindButton(16),
-	],
+	Buttons = [leftStick.BindButton(2)],
 	WhenPressed = holdPrecisionCurve,
 	WhenNotPressed = modifierBlendCurve,
 };
