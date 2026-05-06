@@ -3,20 +3,19 @@ using var connectedDevices = JoystickDevice.EnumerateConnected();
 var rightStick = connectedDevices.ResolveDevice("RIGHT VPC Stick WarBRD");
 var leftStick = connectedDevices.ResolveDevice("LEFT VPC Stick WarBRD");
 
-var xAxis = new AxisBinding(rightStick.DeviceId, PhysicalAxis.X, AxisMode.Signed, false, 0.0);
-var yAxis = new AxisBinding(rightStick.DeviceId, PhysicalAxis.Y, AxisMode.Signed, false, 0.0);
-var zAxis = new AxisBinding(rightStick.DeviceId, PhysicalAxis.Z, AxisMode.Signed, false, 0.0);
-var modifierAxis = new AxisBinding(leftStick.DeviceId, PhysicalAxis.Slider1, AxisMode.Signed, false, 0.0);
+var xAxis = new AxisBinding(rightStick.DeviceId, PhysicalAxis.X, AxisMode.Signed);
+var yAxis = new AxisBinding(rightStick.DeviceId, PhysicalAxis.Y, AxisMode.Signed);
+var zAxis = new AxisBinding(rightStick.DeviceId, PhysicalAxis.Z, AxisMode.Signed);
+var modifierAxis = new AxisBinding(leftStick.DeviceId, PhysicalAxis.Slider1, AxisMode.Signed);
 
-var holdPrecisionCurve = new AxisCurve { Max = 0.508 };
-var normalCurve = new AxisCurve { Max = 1.0 };
-var precisionCurve = new AxisCurve { Max = 0.184 };
 var modifierBlendCurve = new BlendedAxisCurve
 {
-	NormalCurve = normalCurve,
-	PrecisionCurve = precisionCurve,
+	NormalCurve = new AxisCurve { Max = 1.0d },
+	PrecisionCurve = new AxisCurve { Max = 0.184d },
 	ModifierAxis = modifierAxis,
 };
+
+var holdPrecisionCurve = new AxisCurve { Max = 0.5d };
 
 var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 {

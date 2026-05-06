@@ -4,5 +4,5 @@ public sealed record AxisBinding(
 	int DeviceId,
 	PhysicalAxis Axis,
 	AxisMode Mode,
-	bool Invert,
-	double Deadzone);
+	bool Invert = false,
+	double Deadzone = 0.0);
