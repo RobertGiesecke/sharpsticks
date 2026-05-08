@@ -1,6 +1,6 @@
 ﻿namespace ScaledAxisCSharp.InputAbstractions;
 
-public abstract class JoystickDevice
+public abstract class JoystickDevice : IDisposable
 {
 	public required int DeviceId { get; init; }
 	public required string Name { get; init; }
@@ -10,4 +10,8 @@ public abstract class JoystickDevice
 	public abstract bool TryRead(out JoystickState state, out string? error);
 	public abstract double ReadNormalizedAxis(in JoystickState state, AxisBinding binding);
 	public abstract AxisDebugSample ReadAxisDebugSample(in JoystickState state, AxisBinding binding);
+
+	public virtual void Dispose()
+	{
+	}
 }

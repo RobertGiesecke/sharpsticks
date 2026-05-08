@@ -225,6 +225,13 @@ internal static unsafe class DirectInputNative
 		return vtable->Acquire(device);
 	}
 
+	public static int Unacquire(nint device)
+	{
+		var vtable = *(DirectInputDevice8VTable**)device;
+		var unacquire = (delegate* unmanaged[Stdcall]<nint, int>)vtable->Unacquire;
+		return unacquire(device);
+	}
+
 	public static int SetEventNotification(nint device, nint eventHandle)
 	{
 		var vtable = *(DirectInputDevice8VTable**)device;

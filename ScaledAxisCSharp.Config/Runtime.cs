@@ -87,6 +87,14 @@ public sealed class Runtime : IDisposable
 		var devices = new PooledDictionary<int, JoystickDevice>();
 		try
 		{
+			foreach (var device in options.ConnectedDevices)
+			{
+				if (!referencedDeviceIds.Contains(device.DeviceId))
+				{
+					device.Dispose();
+				}
+			}
+
 			foreach (var deviceId in referencedDeviceIds)
 			{
 				if (!connectedDevicesById.TryGetValue(deviceId, out var device))
@@ -116,6 +124,15 @@ public sealed class Runtime : IDisposable
 		}
 		catch
 		{
+			DisposeDevices(devices.Values);
+			foreach (var device in options.ConnectedDevices)
+			{
+				if (!devices.TryGetValue(device.DeviceId, out var selected) || !ReferenceEquals(selected, device))
+				{
+					device.Dispose();
+				}
+			}
+
 			devices.Dispose();
 			throw;
 		}
@@ -343,8 +360,15 @@ public sealed class Runtime : IDisposable
 
 	public void Dispose()
 	{
-		_ButtonRoutes.Dispose();
-		_Devices.Dispose();
+		DisposeDevices(_Devices.Values);
 		_VJoyDevice.Dispose();
+	}
+
+	private static void DisposeDevices(IEnumerable<JoystickDevice> devices)
+	{
+		foreach (var device in devices)
+		{
+			device.Dispose();
+		}
 	}
 }

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Collections.Pooled;
 using Microsoft.Win32.SafeHandles;
@@ -14,6 +13,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	private readonly Dictionary<PhysicalAxis, AxisDecoderKind> _AxisDecoderKinds = [];
 	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _AxisRanges;
 	private readonly nint _DevicePointer;
+	private bool _Disposed;
 
 	[SetsRequiredMembers]
 	private DirectInputJoystickDevice(
@@ -35,6 +35,20 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	}
 
 	public Guid InstanceGuid { get; }
+
+	public override void Dispose()
+	{
+		if (_Disposed)
+		{
+			return;
+		}
+
+		_Disposed = true;
+		DirectInputNative.SetEventNotification(_DevicePointer, 0);
+		DataAvailable.Dispose();
+		DirectInputNative.Unacquire(_DevicePointer);
+		DirectInputNative.Release(_DevicePointer);
+	}
 
 	public override bool TryRead(out JoystickState state, out string? error)
 	{
@@ -148,6 +162,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 		catch
 		{
+			DisposeAll(devices);
 			devices.Dispose();
 			throw;
 		}
@@ -168,6 +183,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			windowHandle = DirectInputNative.GetDesktopWindow();
 		}
 
+		AutoResetEvent? dataAvailable = null;
+		var success = false;
 		try
 		{
 			var cooperativeResult = DirectInputNative.SetCooperativeLevel(
@@ -203,7 +220,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				return null;
 			}
 
-			var dataAvailable = new AutoResetEvent(false);
+			dataAvailable = new AutoResetEvent(false);
 			dataAvailable.SafeWaitHandle = new SafeWaitHandle(eventHandle, ownsHandle: true);
 
 			var axisRanges = ConfigureAxisRanges(devicePointer, axisEntries);
@@ -220,12 +237,18 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				return null;
 			}
 
+			success = true;
 			return new DirectInputJoystickDevice(deviceId, info, caps, devicePointer, axisRanges, dataAvailable);
 		}
-		catch
+		finally
 		{
-			DirectInputNative.Release(devicePointer);
-			throw;
+			if (!success)
+			{
+				DirectInputNative.SetEventNotification(devicePointer, 0);
+				dataAvailable?.Dispose();
+				DirectInputNative.Unacquire(devicePointer);
+				DirectInputNative.Release(devicePointer);
+			}
 		}
 	}
 
@@ -679,46 +702,72 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	public static DirectInputJoystickDevice ResolveDevice(string selector)
 	{
 		using var devices = EnumerateConnected();
-
-		if (int.TryParse(selector, out var deviceId))
+		DirectInputJoystickDevice? selected = null;
+		try
 		{
-			var byId = devices.FirstOrDefault(device => device.DeviceId == deviceId);
-			if (byId is not null)
+			if (int.TryParse(selector, out var deviceId))
 			{
-				return byId;
+				selected = devices.FirstOrDefault(device => device.DeviceId == deviceId);
+				if (selected is not null)
+				{
+					return selected;
+				}
+			}
+
+			var exactMatches = devices
+				.Where(device => string.Equals(device.Name, selector, StringComparison.OrdinalIgnoreCase))
+				.ToArray();
+
+			if (exactMatches.Length == 1)
+			{
+				selected = exactMatches[0];
+				return selected;
+			}
+
+			if (exactMatches.Length > 1)
+			{
+				throw new InvalidOperationException(
+					$"Multiple joystick devices match '{selector}'. Use the numeric id from the list command.");
+			}
+
+			var partialMatches = devices
+				.Where(device => device.Name.Contains(selector, StringComparison.OrdinalIgnoreCase))
+				.ToArray();
+
+			if (partialMatches.Length == 1)
+			{
+				selected = partialMatches[0];
+				return selected;
+			}
+
+			if (partialMatches.Length > 1)
+			{
+				throw new InvalidOperationException(
+					$"Multiple joystick devices partially match '{selector}'. Use the full name or numeric id from the list command.");
+			}
+
+			throw new InvalidOperationException($"No DirectInput device matched '{selector}'.");
+		}
+		catch
+		{
+			DisposeAll(devices);
+			throw;
+		}
+		finally
+		{
+			DisposeAll(devices, except: selected);
+		}
+	}
+
+	private static void DisposeAll(IEnumerable<DirectInputJoystickDevice> devices,
+		DirectInputJoystickDevice? except = null)
+	{
+		foreach (var device in devices)
+		{
+			if (!ReferenceEquals(device, except))
+			{
+				device.Dispose();
 			}
 		}
-
-		var exactMatches = devices
-			.Where(device => string.Equals(device.Name, selector, StringComparison.OrdinalIgnoreCase))
-			.ToArray();
-
-		if (exactMatches.Length == 1)
-		{
-			return exactMatches[0];
-		}
-
-		if (exactMatches.Length > 1)
-		{
-			throw new InvalidOperationException(
-				$"Multiple joystick devices match '{selector}'. Use the numeric id from the list command.");
-		}
-
-		var partialMatches = devices
-			.Where(device => device.Name.Contains(selector, StringComparison.OrdinalIgnoreCase))
-			.ToArray();
-
-		if (partialMatches.Length == 1)
-		{
-			return partialMatches[0];
-		}
-
-		if (partialMatches.Length > 1)
-		{
-			throw new InvalidOperationException(
-				$"Multiple joystick devices partially match '{selector}'. Use the full name or numeric id from the list command.");
-		}
-
-		throw new InvalidOperationException($"No DirectInput device matched '{selector}'.");
 	}
 }
