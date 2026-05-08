@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Text;
 using Collections.Pooled;
@@ -8,8 +9,8 @@ public sealed class Runtime : IDisposable
 {
 	public string Name { get; }
 	private readonly ImmutableArray<AxisRoute> _AxisRoutes;
-	private readonly PooledList<VJoyButtonWithBindings> _ButtonRoutes;
-	private readonly PooledDictionary<int, JoystickDevice> _Devices;
+	private readonly ImmutableArray<VJoyButtonWithBindings> _ButtonRoutes;
+	private readonly FrozenDictionary<int, JoystickDevice> _Devices;
 	private readonly VJoyDevice _VJoyDevice;
 
 	private sealed class VJoyButtonWithBindings
@@ -26,16 +27,18 @@ public sealed class Runtime : IDisposable
 		VJoyDevice vJoyDevice)
 	{
 		Name = name;
-		_Devices = devices;
-		_ButtonRoutes = buttonRoutes.GroupBy(t => t.TargetButton)
-			.Select(group => new VJoyButtonWithBindings
-			{
-				TargetButton = group.Key,
-				Bindings = group.Select(t => t.Binding)
-					.Distinct()
-					.ToPooledList(),
-			})
-			.ToPooledList();
+		_Devices = devices.ToFrozenDictionary();
+		_ButtonRoutes =
+		[
+			..buttonRoutes.GroupBy(t => t.TargetButton)
+				.Select(group => new VJoyButtonWithBindings
+				{
+					TargetButton = group.Key,
+					Bindings = group.Select(t => t.Binding)
+						.Distinct()
+						.ToPooledList(),
+				})
+		];
 		_AxisRoutes = axisRoutes;
 		_VJoyDevice = vJoyDevice;
 	}
