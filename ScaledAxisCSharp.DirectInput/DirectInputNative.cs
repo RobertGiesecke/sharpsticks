@@ -1,3 +1,5 @@
+using ScaledAxisCSharp.InputAbstractions;
+
 namespace ScaledAxisCSharp.DirectInput;
 
 internal static unsafe class DirectInputNative

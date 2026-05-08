@@ -1,20 +1,23 @@
 ﻿using Collections.Pooled;
 
-namespace ScaledAxisCSharp.DirectInput;
+namespace ScaledAxisCSharp.InputAbstractions;
 
 public static class DeviceExtensions
 {
-	public static AxisBinding BindAxis(this JoystickDevice device, PhysicalAxis physicalAxis)
+	public static AxisBinding BindAxis<T>(this T device, PhysicalAxis physicalAxis)
+		where T : JoystickDevice
 	{
 		return new AxisBinding(device.DeviceId, physicalAxis, AxisMode.Signed, false, 0.0);
 	}
 
-	public static ButtonBinding BindButton(this JoystickDevice device, int sourceButton)
+	public static ButtonBinding BindButton<T>(this T device, int sourceButton)
+		where T : JoystickDevice
 	{
 		return new ButtonBinding(device.DeviceId, sourceButton);
 	}
-	
-	public static JoystickDevice ResolveDevice(this IReadOnlyList<JoystickDevice> devices, string productName)
+
+	public static T ResolveDevice<T>(this IReadOnlyList<T> devices, string productName)
+		where T : JoystickDevice
 	{
 		if (string.IsNullOrWhiteSpace(productName))
 		{
@@ -54,11 +57,13 @@ public static class DeviceExtensions
 		throw new InvalidOperationException($"No joystick device matched '{productName}'.");
 	}
 
-	public static Dictionary<int, JoystickDevice> CollectDevices(this IReadOnlyList<JoystickDevice> devices,
+	public static Dictionary<int, T> CollectDevices<T>(
+		this IReadOnlyList<T> devices,
 		IEnumerable<int> deviceIds)
+		where T : JoystickDevice
 	{
 		using var byId = devices.ToPooledDictionary(device => device.DeviceId);
-		var selected = new Dictionary<int, JoystickDevice>();
+		var selected = new Dictionary<int, T>();
 
 		foreach (var deviceId in deviceIds.Distinct())
 		{

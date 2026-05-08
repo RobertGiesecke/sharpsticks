@@ -1,16 +1,19 @@
+using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.Text;
+using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp;
 
 public sealed class ItbMinimalRuntime
 {
 	private readonly ItbMinimalConfig _Config;
-	private readonly IReadOnlyDictionary<int, JoystickDevice> _Devices;
+	private readonly FrozenDictionary<int, JoystickDevice> _Devices;
 	private readonly ButtonBinding _LeftAuxButton;
 	private readonly ButtonBinding _LeftPrimaryButton;
 	private readonly AxisBinding _ModifierAxis;
 	private readonly int _PollIntervalMs;
-	private readonly IReadOnlyList<ButtonBinding> _PrecisionButtons;
+	private readonly ImmutableArray<ButtonBinding> _PrecisionButtons;
 	private readonly ButtonBinding _PrimaryFireButton;
 	private readonly ButtonBinding _SecondaryFireButton;
 	private readonly VJoyDevice _VJoyDevice;
@@ -23,7 +26,7 @@ public sealed class ItbMinimalRuntime
 
 	private ItbMinimalRuntime(
 		ItbMinimalConfig config,
-		IReadOnlyDictionary<int, JoystickDevice> devices,
+		FrozenDictionary<int, JoystickDevice> devices,
 		VJoyDevice vJoyDevice,
 		AxisBinding xAxis,
 		AxisBinding yAxis,
@@ -33,7 +36,7 @@ public sealed class ItbMinimalRuntime
 		ButtonBinding leftPrimaryButton,
 		ButtonBinding leftAuxButton,
 		ButtonBinding secondaryFireButton,
-		IReadOnlyList<ButtonBinding> precisionButtons)
+		ImmutableArray<ButtonBinding> precisionButtons)
 	{
 		_Config = config;
 		_Devices = devices;
@@ -65,7 +68,7 @@ public sealed class ItbMinimalRuntime
 			throw new InvalidOperationException("PulseMs must be zero or greater.");
 		}
 
-		using var connectedDevices = JoystickDevice.EnumerateConnected();
+		using var connectedDevices = DirectInputJoystickDevice.EnumerateConnected();
 		var xAxis = DeviceResolver.ResolveAxisBinding(connectedDevices, config.XAxis);
 		var yAxis = DeviceResolver.ResolveAxisBinding(connectedDevices, config.YAxis);
 		var zAxis = DeviceResolver.ResolveAxisBinding(connectedDevices, config.ZAxis);
@@ -75,8 +78,9 @@ public sealed class ItbMinimalRuntime
 		var leftAuxButton = DeviceResolver.ResolveButtonBinding(connectedDevices, config.LeftAuxButton);
 		var secondaryFireButton = DeviceResolver.ResolveButtonBinding(connectedDevices, config.SecondaryFireButton);
 		var precisionButtons = config.PrecisionButtons
+			// ReSharper disable once AccessToDisposedClosure
 			.Select(source => DeviceResolver.ResolveButtonBinding(connectedDevices, source))
-			.ToArray();
+			.ToImmutableArray();
 
 		var selectedDevices = connectedDevices.CollectDevices([
 			xAxis.DeviceId,
@@ -102,7 +106,7 @@ public sealed class ItbMinimalRuntime
 				new AxisRoute
 				{
 					Source = xAxis,
-					TargetAxis = VJoyAxis.X,
+					VJoyAxis = PhysicalAxis.X,
 					Scale = 1.0,
 					Offset = 0.0,
 					Modifier = null,
@@ -110,7 +114,7 @@ public sealed class ItbMinimalRuntime
 				new AxisRoute
 				{
 					Source = yAxis,
-					TargetAxis = VJoyAxis.Y,
+					VJoyAxis = PhysicalAxis.Y,
 					Scale = 1.0,
 					Offset = 0.0,
 					Modifier = null,
@@ -118,7 +122,7 @@ public sealed class ItbMinimalRuntime
 				new AxisRoute
 				{
 					Source = zAxis,
-					TargetAxis = VJoyAxis.Z,
+					VJoyAxis = PhysicalAxis.Z,
 					Scale = 1.0,
 					Offset = 0.0,
 					Modifier = null,
@@ -127,7 +131,13 @@ public sealed class ItbMinimalRuntime
 
 		return new ItbMinimalRuntime(
 			config,
-			selectedDevices,
+			selectedDevices.ToFrozenDictionary(
+				k => k.Key,
+				v =>
+				{
+					JoystickDevice d = v.Value;
+					return d;
+				}),
 			vJoyDevice,
 			xAxis,
 			yAxis,
@@ -211,9 +221,9 @@ public sealed class ItbMinimalRuntime
 			? ApplyPrecisionCurve(rightZ)
 			: ApplyModifierCurve(rightZ, modifierValue);
 
-		_VJoyDevice.SetAxis(VJoyAxis.X, outputX);
-		_VJoyDevice.SetAxis(VJoyAxis.Y, outputY);
-		_VJoyDevice.SetAxis(VJoyAxis.Z, outputZ);
+		_VJoyDevice.SetAxis(PhysicalAxis.X, outputX);
+		_VJoyDevice.SetAxis(PhysicalAxis.Y, outputY);
+		_VJoyDevice.SetAxis(PhysicalAxis.Z, outputZ);
 
 		if (debugLines is not null)
 		{

@@ -1,4 +1,6 @@
-﻿namespace ScaledAxisCSharp.Config;
+﻿using ScaledAxisCSharp.InputAbstractions;
+
+namespace ScaledAxisCSharp.Config;
 
 public sealed class AxisMapping
 {

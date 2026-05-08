@@ -1,4 +1,6 @@
-﻿namespace ScaledAxisCSharp.Config;
+﻿using ScaledAxisCSharp.InputAbstractions;
+
+namespace ScaledAxisCSharp.Config;
 
 public static class VJoyDeviceBuilder
 {
@@ -46,11 +48,11 @@ public static class VJoyDeviceBuilder
 				throw new InvalidOperationException($"Failed to reset vJoy device {deviceId}.");
 			}
 
-			var axisLimits = new Dictionary<VJoyAxis, AxisLimits>();
-			foreach (var axis in axisRoutes.Select(route => route.TargetAxis)
+			var axisLimits = new Dictionary<PhysicalAxis, AxisLimits>();
+			foreach (var axis in axisRoutes.Select(route => route.VJoyAxis)
 				         .Distinct())
 			{
-				var hidUsage = (uint)axis;
+				var hidUsage = axis.GetVJoyAxisId();
 				if (!VJoyNative.GetVJDAxisExist(deviceIdUInt, hidUsage))
 				{
 					VJoyNative.RelinquishVJD(deviceIdUInt);

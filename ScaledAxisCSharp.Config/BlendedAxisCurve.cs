@@ -1,3 +1,5 @@
+using ScaledAxisCSharp.InputAbstractions;
+
 namespace ScaledAxisCSharp.Config;
 
 public sealed record BlendedAxisCurve : IAxisModifier

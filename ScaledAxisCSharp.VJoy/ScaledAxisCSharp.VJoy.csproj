@@ -8,4 +8,8 @@
       <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj" />
+    </ItemGroup>
+
 </Project>

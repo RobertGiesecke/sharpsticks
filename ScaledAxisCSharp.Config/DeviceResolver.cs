@@ -1,4 +1,6 @@
-﻿namespace ScaledAxisCSharp;
+﻿using ScaledAxisCSharp.InputAbstractions;
+
+namespace ScaledAxisCSharp.Config;
 
 public static class DeviceResolver
 {
@@ -6,18 +8,6 @@ public static class DeviceResolver
 	{
 		var device = devices.ResolveDevice(source.DeviceName);
 		return device.BindAxis(source.Axis);
-	}
-
-	public static AxisRoute RouteAxis(this AxisBinding binding, VJoyAxis targetAxis, double scale, double offset, IAxisModifier? modifier = null)
-	{
-		return new AxisRoute
-		{
-			Source = binding,
-			TargetAxis = targetAxis,
-			Scale = scale,
-			Offset = offset,
-			Modifier = modifier,
-		};
 	}
 
 	public static ButtonBinding ResolveButtonBinding(IReadOnlyList<JoystickDevice> devices, DeviceButtonSource source)
@@ -29,10 +19,5 @@ public static class DeviceResolver
 
 		var device = devices.ResolveDevice(source.DeviceName);
 		return device.BindButton(source.Button);
-	}
-
-	public static ButtonRoute RouteButton(this ButtonBinding binding, int targetButton)
-	{
-		return new ButtonRoute(binding, targetButton);
 	}
 }

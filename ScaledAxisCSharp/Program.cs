@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp;
 
@@ -7,7 +8,7 @@ internal static class Program
 {
 	static void Abc()
 	{
-		using var connectedDevices = JoystickDevice.EnumerateConnected();
+		using var connectedDevices = DirectInputJoystickDevice.EnumerateConnected();
 
 		var devices = new
 		{
@@ -40,9 +41,9 @@ internal static class Program
 				sourceButtons.secondaryFireButton.RouteButton(22),
 			],
 			[
-				sourceAxes.X.RouteAxis(VJoyAxis.X, 1.0, 0.0),
-				sourceAxes.X.RouteAxis(VJoyAxis.Y, 1.0, 0.0),
-				sourceAxes.X.RouteAxis(VJoyAxis.Z, 1.0, 0.0),
+				sourceAxes.X.RouteToSameAxisOnVJoy(),
+				sourceAxes.X.RouteToSameAxisOnVJoy(),
+				sourceAxes.X.RouteToSameAxisOnVJoy(),
 			]);
 	}
 
@@ -213,7 +214,7 @@ internal static class Program
 
 	private static int ListDevices()
 	{
-		using var devices = JoystickDevice.EnumerateConnected();
+		using var devices = DirectInputJoystickDevice.EnumerateConnected();
 		if (devices.Count == 0)
 		{
 			Console.WriteLine("No DirectInput joystick devices found.");
@@ -241,7 +242,7 @@ internal static class Program
 		var pollIntervalMs = intervalMs ?? 100;
 		var mode = string.IsNullOrWhiteSpace(modeValue) ? AxisMode.Signed : AxisMode.Parse(modeValue);
 		var axes = PhysicalAxis.ParseList(axisList);
-		var device = JoystickDevice.ResolveDevice(deviceSelector);
+		var device = DirectInputJoystickDevice.ResolveDevice(deviceSelector);
 
 		using var cts = new CancellationTokenSource();
 		Console.CancelKeyPress += (_, eventArgs) =>
@@ -264,7 +265,7 @@ internal static class Program
 					axes.Select(axis =>
 					{
 						var sample = device.ReadAxisDebugSample(state,
-							new AxisBinding(device.DeviceId, axis, mode, false, 0.0));
+							new AxisBinding(device.DeviceId, axis, mode));
 						return
 							$"{FormatAxisName(axis)} raw={sample.RawValue} range={sample.RangeMin}..{sample.RangeMax} decoder={FormatDecoderKind(sample.DecoderKind)} norm={sample.NormalizedValue:0.0000}";
 					}));

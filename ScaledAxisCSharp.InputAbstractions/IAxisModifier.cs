@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Config;
+namespace ScaledAxisCSharp.InputAbstractions;
 
 public interface IAxisModifier
 {

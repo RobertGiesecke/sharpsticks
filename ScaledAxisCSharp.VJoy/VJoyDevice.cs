@@ -1,3 +1,7 @@
+using System.Collections.Frozen;
+using System.Runtime.CompilerServices;
+using ScaledAxisCSharp.InputAbstractions;
+
 namespace ScaledAxisCSharp.VJoy;
 
 public readonly record struct AxisLimits(int Min, int Max)
@@ -11,18 +15,24 @@ public readonly record struct AxisLimits(int Min, int Max)
 
 public sealed class VJoyDevice : IDisposable
 {
-	private readonly Dictionary<VJoyAxis, AxisLimits> _AxisLimits;
+	private readonly FrozenDictionary<PhysicalAxis, AxisLimits> _AxisLimits;
 	private readonly uint _DeviceId;
-	private readonly Dictionary<VJoyAxis, int> _LastAxisValues;
+	private readonly Dictionary<PhysicalAxis, int> _LastAxisValues;
 	private readonly Dictionary<int, bool> _LastButtonValues;
 	private bool _Disposed;
+	private bool _Frozen;
 
-	public VJoyDevice(uint deviceId, Dictionary<VJoyAxis, AxisLimits> axisLimits)
+	public VJoyDevice(uint deviceId, Dictionary<PhysicalAxis, AxisLimits> axisLimits)
 	{
 		_DeviceId = deviceId;
-		_AxisLimits = axisLimits;
-		_LastAxisValues = new Dictionary<VJoyAxis, int>(axisLimits.Count);
+		_AxisLimits = axisLimits.ToFrozenDictionary();
+		_LastAxisValues = new Dictionary<PhysicalAxis, int>(axisLimits.Count);
 		_LastButtonValues = new Dictionary<int, bool>(128);
+	}
+
+	public void Freeze()
+	{
+		_Frozen = true;
 	}
 
 	public void Dispose()
@@ -37,9 +47,10 @@ public sealed class VJoyDevice : IDisposable
 	}
 
 
-	public void SetAxis(VJoyAxis axis, double normalizedValue)
+	public void SetAxis(PhysicalAxis axis, double normalizedValue)
 	{
 		ThrowIfDisposed();
+		ThrowIfFrozen();
 
 		if (!_AxisLimits.TryGetValue(axis, out var limits))
 		{
@@ -54,7 +65,7 @@ public sealed class VJoyDevice : IDisposable
 			return;
 		}
 
-		if (!VJoyNative.SetAxis(translated, _DeviceId, (uint)axis))
+		if (!VJoyNative.SetAxis(translated, _DeviceId, axis.GetVJoyAxisId()))
 		{
 			throw new InvalidOperationException($"Failed writing axis '{axis}' to vJoy device {_DeviceId}.");
 		}
@@ -65,6 +76,7 @@ public sealed class VJoyDevice : IDisposable
 	public void SetButton(int buttonNumber, bool pressed)
 	{
 		ThrowIfDisposed();
+		ThrowIfFrozen();
 
 		if (_LastButtonValues.TryGetValue(buttonNumber, out var lastState) && lastState == pressed)
 		{
@@ -82,5 +94,15 @@ public sealed class VJoyDevice : IDisposable
 	private void ThrowIfDisposed()
 	{
 		ObjectDisposedException.ThrowIf(_Disposed, this);
+	}
+
+	private void ThrowIfFrozen([CallerMemberName] string? memberName = null)
+	{
+		if (!_Frozen)
+		{
+			return;
+		}
+
+		throw new InvalidOperationException($"Cannot modify {memberName} of vJoy device after it has been frozen.");
 	}
 }

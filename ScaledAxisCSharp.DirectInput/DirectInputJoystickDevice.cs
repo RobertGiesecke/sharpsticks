@@ -1,10 +1,12 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Collections.Pooled;
 using Microsoft.Win32.SafeHandles;
+using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp.DirectInput;
 
-public sealed unsafe class JoystickDevice
+public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 {
 	private const int AxisRangeMin = -32767;
 	private const int AxisRangeMax = 32767;
@@ -14,7 +16,8 @@ public sealed unsafe class JoystickDevice
 	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _AxisRanges;
 	private readonly nint _DevicePointer;
 
-	private JoystickDevice(
+	[SetsRequiredMembers]
+	private DirectInputJoystickDevice(
 		int deviceId,
 		DirectInputDeviceInfo info,
 		DirectInputDeviceCaps caps,
@@ -32,14 +35,9 @@ public sealed unsafe class JoystickDevice
 		DataAvailable = dataAvailable;
 	}
 
-	public int DeviceId { get; }
 	public Guid InstanceGuid { get; }
-	public string Name { get; }
-	public string InstanceName { get; }
-	public JoystickCaps Caps { get; }
-	public WaitHandle DataAvailable { get; }
 
-	public bool TryRead(out JoystickState state, out string? error)
+	public override bool TryRead(out JoystickState state, out string? error)
 	{
 		var pollResult = DirectInputNative.Poll(_DevicePointer);
 		if (!DirectInputNative.Succeeded(pollResult))
@@ -77,12 +75,12 @@ public sealed unsafe class JoystickDevice
 		return true;
 	}
 
-	public double ReadNormalizedAxis(in JoystickState state, AxisBinding binding)
+	public override double ReadNormalizedAxis(in JoystickState state, AxisBinding binding)
 	{
 		return ReadAxisDebugSample(state, binding).NormalizedValue;
 	}
 
-	public AxisDebugSample ReadAxisDebugSample(in JoystickState state, AxisBinding binding)
+	public override AxisDebugSample ReadAxisDebugSample(in JoystickState state, AxisBinding binding)
 	{
 		var rawValue = state.GetAxisValue(binding.Axis);
 		if (!_AxisRanges.TryGetValue(binding.Axis, out var range))
@@ -111,7 +109,7 @@ public sealed unsafe class JoystickDevice
 		return new AxisRange(AxisRangeMin, AxisRangeMax);
 	}
 
-	public static PooledList<JoystickDevice> EnumerateConnected()
+	public static PooledList<DirectInputJoystickDevice> EnumerateConnected()
 	{
 		var directInput = DirectInputContext.GetOrCreate();
 		using var deviceInfos = new PooledList<DirectInputDeviceInfo>();
@@ -135,7 +133,7 @@ public sealed unsafe class JoystickDevice
 			handle.Free();
 		}
 
-		var devices = new PooledList<JoystickDevice>(deviceInfos.Count);
+		var devices = new PooledList<DirectInputJoystickDevice>(deviceInfos.Count);
 		try
 		{
 			for (var index = 0; index < deviceInfos.Count; index++)
@@ -156,7 +154,7 @@ public sealed unsafe class JoystickDevice
 		}
 	}
 
-	private static JoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info, int deviceId)
+	private static DirectInputJoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info, int deviceId)
 	{
 		var instanceGuid = info.InstanceGuid;
 		var createResult = DirectInputNative.CreateDevice(directInput, in instanceGuid, out var devicePointer);
@@ -223,7 +221,7 @@ public sealed unsafe class JoystickDevice
 				return null;
 			}
 
-			return new JoystickDevice(deviceId, info, caps, devicePointer, axisRanges, dataAvailable);
+			return new DirectInputJoystickDevice(deviceId, info, caps, devicePointer, axisRanges, dataAvailable);
 		}
 		catch
 		{
@@ -679,7 +677,7 @@ public sealed unsafe class JoystickDevice
 		}
 	}
 
-	public static JoystickDevice ResolveDevice(string selector)
+	public static DirectInputJoystickDevice ResolveDevice(string selector)
 	{
 		using var devices = EnumerateConnected();
 

@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.DirectInput;
+namespace ScaledAxisCSharp.InputAbstractions;
 
 public enum AxisDecoderKind
 {
