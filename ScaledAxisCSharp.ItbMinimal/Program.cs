@@ -1,3 +1,8 @@
+using ScaledAxisCSharp.Config;
+using ScaledAxisCSharp.Console;
+using ScaledAxisCSharp.DirectInput;
+using ScaledAxisCSharp.InputAbstractions;
+
 using var connectedDevices = DirectInputJoystickDevice.EnumerateConnected();
 
 var rightStick = connectedDevices.ResolveDevice("RIGHT VPC Stick WarBRD");
@@ -10,6 +15,7 @@ var modifierBlendCurve = new BlendedAxisCurve
 	ModifierAxis = leftStick.BindAxis(PhysicalAxis.Slider1 /*brake lever*/),
 };
 
+// 50% when left 2nd stage trigger is pressed, blended otherwise
 var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 {
 	Buttons = [leftStick.BindButton(2 /*2nd stage trigger*/)],
@@ -19,7 +25,7 @@ var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 
 Runtime.BuildAndRunAsConsole(new()
 {
-	Name = "ITB Minimal",
+	Name = "ItB minimal + scaled rotations",
 	VJoyDeviceId = 1,
 	ConnectedDevices = [..connectedDevices],
 	ButtonRoutes =
