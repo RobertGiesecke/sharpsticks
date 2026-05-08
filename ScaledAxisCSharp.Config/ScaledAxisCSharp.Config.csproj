@@ -7,11 +7,16 @@
     <ItemGroup>
         <ProjectReference Include="..\ScaledAxisCSharp.DirectInput\ScaledAxisCSharp.DirectInput.csproj"/>
         <ProjectReference Include="..\ScaledAxisCSharp.VJoy\ScaledAxisCSharp.VJoy.csproj"/>
+        <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" />
       <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.7" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="GlobalUsings.cs" />
     </ItemGroup>
 
 </Project>

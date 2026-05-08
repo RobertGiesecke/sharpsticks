@@ -1,4 +1,6 @@
-﻿namespace ScaledAxisCSharp.Config;
+﻿using System.Text.Json.Serialization;
+
+namespace ScaledAxisCSharp.Config;
 
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(AppConfig))]
