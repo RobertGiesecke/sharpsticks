@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
-using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp.VJoy;
 

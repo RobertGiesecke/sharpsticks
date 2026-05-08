@@ -1,5 +1,3 @@
-using System.Runtime.Serialization;
-
 namespace ScaledAxisCSharp.Config;
 
 public sealed class AppConfig

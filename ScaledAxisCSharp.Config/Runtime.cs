@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
 using Collections.Pooled;
-using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp.Config;
 

@@ -1,6 +1,4 @@
-﻿using ScaledAxisCSharp.InputAbstractions;
-
-namespace ScaledAxisCSharp.DirectInput;
+﻿namespace ScaledAxisCSharp.DirectInput;
 
 public static class JoystickStateExtensions
 {

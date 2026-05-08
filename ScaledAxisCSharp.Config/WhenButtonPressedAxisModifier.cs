@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp.Config;
 

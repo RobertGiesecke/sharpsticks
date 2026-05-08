@@ -1,6 +1,4 @@
-﻿using ScaledAxisCSharp.InputAbstractions;
-
-namespace ScaledAxisCSharp.Config;
+﻿namespace ScaledAxisCSharp.Config;
 
 public sealed record DeviceAxisSource
 {

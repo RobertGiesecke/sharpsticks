@@ -1,7 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Text;
-using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp;
 

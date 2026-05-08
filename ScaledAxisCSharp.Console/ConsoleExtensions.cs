@@ -1,6 +1,4 @@
-﻿using ScaledAxisCSharp.Config;
-
-namespace ScaledAxisCSharp.Console;
+﻿namespace ScaledAxisCSharp.Console;
 
 public static class ConsoleExtensions
 {

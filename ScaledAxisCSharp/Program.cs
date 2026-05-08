@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.Text.Json;
-using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp;
 

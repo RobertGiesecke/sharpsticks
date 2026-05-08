@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Collections.Pooled;
 using Microsoft.Win32.SafeHandles;
-using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp.DirectInput;
 
