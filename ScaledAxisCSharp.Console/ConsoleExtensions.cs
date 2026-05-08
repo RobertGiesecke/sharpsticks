@@ -8,7 +8,7 @@ public static class ConsoleExtensions
 	{
 		public void RunAsConsole()
 		{
-			using var cts = new  CancellationTokenSource();
+			using var cts = new CancellationTokenSource();
 
 			System.Console.CancelKeyPress += (_, e) =>
 			{
@@ -20,6 +20,12 @@ public static class ConsoleExtensions
 			System.Console.WriteLine($"Running {runtime.Name} profile. Press Ctrl+C to stop.");
 
 			runtime.Run(cts.Token);
+		}
+
+		public static void BuildAndRunAsConsole(Runtime.BuildOptions buildOptions)
+		{
+			using var runtimeMapping = Runtime.Build(buildOptions);
+			runtimeMapping.RunAsConsole();
 		}
 	}
 }

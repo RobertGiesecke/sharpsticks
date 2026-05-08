@@ -17,7 +17,7 @@ var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 	WhenNotPressed = modifierBlendCurve,
 };
 
-using var runtimeMapping = Runtime.Build(new()
+Runtime.BuildAndRunAsConsole(new()
 {
 	Name = "ITB Minimal",
 	VJoyDeviceId = 1,
@@ -36,5 +36,3 @@ using var runtimeMapping = Runtime.Build(new()
 		rightStick.BindAxis(PhysicalAxis.Z).RouteToSameAxisOnVJoy(modifier: blendedCurveWithPrecisionHold),
 	],
 });
-
-runtimeMapping.RunAsConsole();
