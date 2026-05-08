@@ -1,0 +1,38 @@
+<Project>
+
+  <Target Name="GenerateBuildTransitiveProps"
+          BeforeTargets="Build;Pack"
+          Condition="'$(OutputType)' != 'Exe'">
+    <PropertyGroup>
+      <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
+      <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PropsFileLines Include="&lt;Project&gt;" />
+      <_PropsFileLines Include="  &lt;ItemGroup&gt;" />
+      <_PropsFileLines Include="    &lt;Using Include=&quot;$(RootNamespace)&quot; /&gt;" />
+      <_PropsFileLines Include="  &lt;/ItemGroup&gt;" />
+      <_PropsFileLines Include="&lt;/Project&gt;" />
+    </ItemGroup>
+    <MakeDir Directories="$(_BuildTransitiveDir)" />
+    <WriteLinesToFile File="$(_BuildTransitiveFile)" Lines="@(_PropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <None Include="$(_BuildTransitiveFile)" Pack="true" PackagePath="buildTransitive\" />
+    </ItemGroup>
+  </Target>
+
+
+  <Target Name="ImportProjectRefBuildTransitiveUsings"
+          BeforeTargets="GenerateGlobalUsings">
+    <ItemGroup>
+      <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
+                     Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')" />
+    </ItemGroup>
+    <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
+             Query="/Project/ItemGroup/Using/@Include"
+             Condition="'@(_ProjRefProps)' != ''">
+      <Output TaskParameter="Result" ItemName="Using" />
+    </XmlPeek>
+  </Target>
+
+</Project>

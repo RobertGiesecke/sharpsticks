@@ -1,8 +1,3 @@
-using ScaledAxisCSharp.Config;
-using ScaledAxisCSharp.Console;
-using ScaledAxisCSharp.DirectInput;
-using ScaledAxisCSharp.InputAbstractions;
-
 using var connectedDevices = DirectInputJoystickDevice.EnumerateConnected();
 
 var rightStick = connectedDevices.ResolveDevice("RIGHT VPC Stick WarBRD");

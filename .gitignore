@@ -1,5 +1,6 @@
 bin/
 obj/
+**/buildTransitive/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
