@@ -21,19 +21,18 @@ var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 Runtime.BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
-	VJoyDeviceId = 1,
 	ConnectedDevices = [..connectedDevices],
 	ButtonRoutes =
 	[
-		new(rightStick.BindButton(1 /*trigger*/), 1),
-		new(leftStick.BindButton(1 /*trigger*/), 40),
-		new(leftStick.BindButton(11 /*outer 2-way down*/), 79),
-		new(rightStick.BindButton(18) /*cm hat east*/, 22),
+		new(rightStick.BindButton(1 /*trigger*/), 1, 1),
+		new(leftStick.BindButton(1 /*trigger*/), 1, 40),
+		new(leftStick.BindButton(11 /*outer 2-way up*/), 1, 79),
+		new(rightStick.BindButton(18) /*cm hat east*/, 1, 22),
 	],
 	AxisRoutes =
 	[
-		rightStick.BindAxis(PhysicalAxis.X).RouteToSameAxisOnVJoy(modifier: blendedCurveWithPrecisionHold),
-		rightStick.BindAxis(PhysicalAxis.Y).RouteToSameAxisOnVJoy(modifier: blendedCurveWithPrecisionHold),
-		rightStick.BindAxis(PhysicalAxis.Z).RouteToSameAxisOnVJoy(modifier: blendedCurveWithPrecisionHold),
+		rightStick.BindAxis(PhysicalAxis.X).RouteToSameAxisOnVJoy(1, modifier: blendedCurveWithPrecisionHold),
+		rightStick.BindAxis(PhysicalAxis.Y).RouteToSameAxisOnVJoy(1, modifier: blendedCurveWithPrecisionHold),
+		rightStick.BindAxis(PhysicalAxis.Z).RouteToSameAxisOnVJoy(1, modifier: blendedCurveWithPrecisionHold),
 	],
 });

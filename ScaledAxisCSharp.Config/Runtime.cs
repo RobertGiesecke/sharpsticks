@@ -8,15 +8,26 @@ namespace ScaledAxisCSharp.Config;
 public sealed class Runtime : IDisposable
 {
 	public string Name { get; }
-	private readonly ImmutableArray<AxisRoute> _AxisRoutes;
+	private readonly ImmutableArray<VJoyAxisRoute> _AxisRoutes;
 	private readonly ImmutableArray<VJoyButtonWithBindings> _ButtonRoutes;
 	private readonly FrozenDictionary<int, JoystickDevice> _Devices;
-	private readonly VJoyDevice _VJoyDevice;
+	private readonly ImmutableArray<VJoyDevice> _VJoyDevices;
 
 	private sealed class VJoyButtonWithBindings
 	{
+		public required int VJoyDeviceIndex { get; init; }
 		public required int TargetButton { get; init; }
 		public required PooledList<ButtonBinding> Bindings { get; init; }
+	}
+
+	private sealed class VJoyAxisRoute
+	{
+		public required int VJoyDeviceIndex { get; init; }
+		public required AxisBinding Source { get; init; }
+		public required PhysicalAxis VJoyAxis { get; init; }
+		public required double Scale { get; init; }
+		public required double Offset { get; init; }
+		public required IAxisModifier? Modifier { get; init; }
 	}
 
 	public Runtime(
@@ -24,29 +35,43 @@ public sealed class Runtime : IDisposable
 		PooledDictionary<int, JoystickDevice> devices,
 		ImmutableArray<ButtonRoute> buttonRoutes,
 		ImmutableArray<AxisRoute> axisRoutes,
-		VJoyDevice vJoyDevice)
+		ImmutableArray<VJoyDevice> vJoyDevices)
 	{
 		Name = name;
 		_Devices = devices.ToFrozenDictionary();
+		var vJoyDeviceIndexes = vJoyDevices
+			.Select((device, index) => new { device.DeviceId, Index = index })
+			.ToDictionary(t => (int)t.DeviceId, t => t.Index);
 		_ButtonRoutes =
 		[
-			..buttonRoutes.GroupBy(t => t.TargetButton)
+			..buttonRoutes.GroupBy(t => (t.VJoyDeviceId, t.TargetButton))
 				.Select(group => new VJoyButtonWithBindings
 				{
-					TargetButton = group.Key,
+					VJoyDeviceIndex = vJoyDeviceIndexes[group.Key.VJoyDeviceId],
+					TargetButton = group.Key.TargetButton,
 					Bindings = group.Select(t => t.Binding)
 						.Distinct()
 						.ToPooledList(),
 				})
 		];
-		_AxisRoutes = axisRoutes;
-		_VJoyDevice = vJoyDevice;
+		_AxisRoutes =
+		[
+			..axisRoutes.Select(route => new VJoyAxisRoute
+			{
+				VJoyDeviceIndex = vJoyDeviceIndexes[route.VJoyDeviceId],
+				Source = route.Source,
+				VJoyAxis = route.VJoyAxis,
+				Scale = route.Scale,
+				Offset = route.Offset,
+				Modifier = route.Modifier,
+			})
+		];
+		_VJoyDevices = vJoyDevices;
 	}
 
 	public readonly record struct BuildOptions
 	{
 		public required string Name { get; init; }
-		public required int VJoyDeviceId { get; init; }
 		public required ImmutableArray<JoystickDevice> ConnectedDevices { get; init; }
 		public required ImmutableArray<ButtonRoute> ButtonRoutes { get; init; }
 		public required ImmutableArray<AxisRoute> AxisRoutes { get; init; }
@@ -59,7 +84,8 @@ public sealed class Runtime : IDisposable
 		var referencedDeviceIds = new HashSet<int>();
 		var buttonRoutes = options.ButtonRoutes;
 		var axisRoutes = options.AxisRoutes;
-		var claimedAxes = new HashSet<PhysicalAxis>();
+		var claimedAxes = new HashSet<(int VJoyDeviceId, PhysicalAxis Axis)>();
+		var referencedVJoyDeviceIds = new HashSet<int>();
 
 		foreach (var mapping in buttonRoutes)
 		{
@@ -73,17 +99,30 @@ public sealed class Runtime : IDisposable
 				throw new InvalidOperationException("Target buttons are 1-based.");
 			}
 
+			if (mapping.VJoyDeviceId < 1)
+			{
+				throw new InvalidOperationException("vJoy device ids are 1-based.");
+			}
+
 			referencedDeviceIds.Add(mapping.Binding.DeviceId);
+			referencedVJoyDeviceIds.Add(mapping.VJoyDeviceId);
 		}
 
 		foreach (var mapping in axisRoutes)
 		{
-			if (!claimedAxes.Add(mapping.VJoyAxis))
+			if (mapping.VJoyDeviceId < 1)
 			{
-				throw new InvalidOperationException($"Target axis '{mapping.VJoyAxis}' is mapped more than once.");
+				throw new InvalidOperationException("vJoy device ids are 1-based.");
+			}
+
+			if (!claimedAxes.Add((mapping.VJoyDeviceId, mapping.VJoyAxis)))
+			{
+				throw new InvalidOperationException(
+					$"Target axis '{mapping.VJoyAxis}' on vJoy device {mapping.VJoyDeviceId} is mapped more than once.");
 			}
 
 			referencedDeviceIds.Add(mapping.Source.DeviceId);
+			referencedVJoyDeviceIds.Add(mapping.VJoyDeviceId);
 		}
 
 
@@ -109,7 +148,13 @@ public sealed class Runtime : IDisposable
 				devices.Add(deviceId, device);
 			}
 
-			var vJoyDevice = VJoyDevice.Open(options.VJoyDeviceId, buttonRoutes, axisRoutes);
+			var vJoyDevices = referencedVJoyDeviceIds
+				.OrderBy(deviceId => deviceId)
+				.Select(deviceId => VJoyDevice.Open(
+					deviceId,
+					buttonRoutes.Where(route => route.VJoyDeviceId == deviceId).ToArray(),
+					axisRoutes.Where(route => route.VJoyDeviceId == deviceId).ToArray()))
+				.ToImmutableArray();
 			try
 			{
 				return new Runtime(
@@ -117,11 +162,15 @@ public sealed class Runtime : IDisposable
 					devices,
 					buttonRoutes,
 					axisRoutes,
-					vJoyDevice);
+					vJoyDevices);
 			}
 			catch
 			{
-				vJoyDevice.Dispose();
+				foreach (var vJoyDevice in vJoyDevices)
+				{
+					vJoyDevice.Dispose();
+				}
+
 				throw;
 			}
 		}
@@ -167,7 +216,8 @@ public sealed class Runtime : IDisposable
 				throw new InvalidOperationException("Target buttons are 1-based.");
 			}
 
-			buttonRoutes.Add(new ButtonRoute(mapping.SourceBinding, mapping.TargetButton));
+			buttonRoutes.Add(new ButtonRoute(mapping.SourceBinding, mapping.VJoyDeviceId ?? config.VJoyDeviceId,
+				mapping.TargetButton));
 		}
 
 		foreach (var mapping in config.AxisMappings)
@@ -178,6 +228,7 @@ public sealed class Runtime : IDisposable
 			axisRoutes.Add(new AxisRoute
 			{
 				Source = source,
+				VJoyDeviceId = mapping.VJoyDeviceId ?? config.VJoyDeviceId,
 				VJoyAxis = targetAxis,
 				Scale = mapping.Scale,
 				Offset = mapping.Offset,
@@ -188,7 +239,6 @@ public sealed class Runtime : IDisposable
 		var buildOptions = new BuildOptions
 		{
 			Name = "ITB Minimal",
-			VJoyDeviceId = config.VJoyDeviceId,
 			ConnectedDevices = [..connectedDevices],
 			ButtonRoutes = [..buttonRoutes],
 			AxisRoutes = [..axisRoutes],
@@ -199,7 +249,7 @@ public sealed class Runtime : IDisposable
 	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
 		using var debugLinesScope = SharedPools.StringBuilder.GetInstance();
-		using (_VJoyDevice)
+		try
 		{
 			using var currentStates = new PooledDictionary<int, JoystickState>(_Devices.Count);
 			using var lastReportedReadFailure = new PooledSet<int>();
@@ -246,6 +296,13 @@ public sealed class Runtime : IDisposable
 				}
 			}
 		}
+		finally
+		{
+			foreach (var vJoyDevice in _VJoyDevices)
+			{
+				vJoyDevice.Dispose();
+			}
+		}
 	}
 
 	private void ApplyButtons(PooledDictionary<int, JoystickState> states, StringBuilder? debugLines)
@@ -270,7 +327,7 @@ public sealed class Runtime : IDisposable
 				}
 
 				var isPressed = current is true;
-				_VJoyDevice.SetButton(route.TargetButton, isPressed);
+				_VJoyDevices[route.VJoyDeviceIndex].SetButton(route.TargetButton, isPressed);
 
 				if (debugLines is not null)
 				{
@@ -279,6 +336,9 @@ public sealed class Runtime : IDisposable
 					debugLines.Append(':');
 					debugLines.Append(buttonBinding.ButtonNumber);
 					debugLines.Append(" -> ");
+					debugLines.Append("vjoy");
+					debugLines.Append(_VJoyDevices[route.VJoyDeviceIndex].DeviceId);
+					debugLines.Append(':');
 					debugLines.Append(route.TargetButton);
 					debugLines.Append(" = ");
 					debugLines.AppendLine(isPressed ? "down" : "up");
@@ -304,12 +364,12 @@ public sealed class Runtime : IDisposable
 				output = m.Apply(output, states, _Devices);
 			}
 
-			_VJoyDevice.SetAxis(route.VJoyAxis, output);
+			_VJoyDevices[route.VJoyDeviceIndex].SetAxis(route.VJoyAxis, output);
 
 			if (debugLines is not null)
 			{
-				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis, route.VJoyAxis, sample,
-					output);
+				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis,
+					_VJoyDevices[route.VJoyDeviceIndex].DeviceId, route.VJoyAxis, sample, output);
 			}
 		}
 	}
@@ -332,6 +392,7 @@ public sealed class Runtime : IDisposable
 		StringBuilder debugLines,
 		int deviceId,
 		PhysicalAxis axis,
+		uint vJoyDeviceId,
 		PhysicalAxis vJoyAxis,
 		AxisDebugSample sample,
 		double output)
@@ -341,6 +402,9 @@ public sealed class Runtime : IDisposable
 		debugLines.Append('/');
 		debugLines.Append(axis);
 		debugLines.Append(" -> ");
+		debugLines.Append("vjoy");
+		debugLines.Append(vJoyDeviceId);
+		debugLines.Append('/');
 		debugLines.Append(vJoyAxis);
 		debugLines.Append(" raw=");
 		debugLines.Append(sample.RawValue);
@@ -363,8 +427,16 @@ public sealed class Runtime : IDisposable
 
 	public void Dispose()
 	{
+		foreach (var route in _ButtonRoutes)
+		{
+			route.Bindings.Dispose();
+		}
+
 		DisposeDevices(_Devices.Values);
-		_VJoyDevice.Dispose();
+		foreach (var vJoyDevice in _VJoyDevices)
+		{
+			vJoyDevice.Dispose();
+		}
 	}
 
 	private static void DisposeDevices(IEnumerable<JoystickDevice> devices)

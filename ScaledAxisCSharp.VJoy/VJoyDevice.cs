@@ -29,6 +29,8 @@ public sealed class VJoyDevice : IDisposable
 		_LastButtonValues = new Dictionary<int, bool>(128);
 	}
 
+	public uint DeviceId => _DeviceId;
+
 	public void Freeze()
 	{
 		_Frozen = true;
