@@ -28,7 +28,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		InstanceGuid = info.InstanceGuid;
 		Name = info.ProductName;
 		InstanceName = info.InstanceName;
-		Caps = new JoystickCaps(caps.Axes, caps.Buttons, caps.Povs);
+		Capabilities = new JoystickCapabilities(caps.Axes, caps.Buttons, caps.Povs);
 		_DevicePointer = devicePointer;
 		_AxisRanges = axisRanges;
 		DataAvailable = dataAvailable;

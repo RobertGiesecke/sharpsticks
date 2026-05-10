@@ -384,7 +384,7 @@ public sealed class Runtime : IDisposable
 		foreach (var device in _Devices.Values.OrderBy(device => device.DeviceId))
 		{
 			debugLogger.WriteLine(
-				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Caps.NumAxes}, buttons={device.Caps.NumButtons}, povs={device.Caps.NumPovs})");
+				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Capabilities.NumAxes}, buttons={device.Capabilities.NumButtons}, povs={device.Capabilities.NumPovs})");
 		}
 	}
 
