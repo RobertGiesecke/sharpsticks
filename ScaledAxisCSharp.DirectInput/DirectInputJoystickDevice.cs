@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Collections.Pooled;
 using Microsoft.Win32.SafeHandles;
@@ -21,6 +22,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		DirectInputDeviceInfo info,
 		DirectInputDeviceCaps caps,
 		nint devicePointer,
+		ImmutableArray<PhysicalAxis> physicalAxes,
 		IReadOnlyDictionary<PhysicalAxis, AxisRange> axisRanges,
 		WaitHandle dataAvailable)
 	{
@@ -29,6 +31,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		Name = info.ProductName;
 		InstanceName = info.InstanceName;
 		Capabilities = new JoystickCapabilities(caps.Axes, caps.Buttons, caps.Povs);
+		PhysicalAxes = physicalAxes;
 		_DevicePointer = devicePointer;
 		_AxisRanges = axisRanges;
 		DataAvailable = dataAvailable;
@@ -196,9 +199,15 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				return null;
 			}
 
-			var objectInfos = EnumerateObjects(devicePointer);
-			var axisEntries = BuildAxisFormatEntries(objectInfos);
-			using var dataFormatScope = DataFormatScope.Create(BuildObjectFormats(axisEntries, objectInfos));
+			using var objectInfos = new PooledList<DirectInputDeviceObjectInfo>();
+			EnumerateObjects(devicePointer, objectInfos);
+			using var axisEntries = new PooledList<AxisFormatEntry>(objectInfos.Count);
+			BuildAxisFormatEntries(objectInfos, axisEntries);
+
+			using var inputObjectDataFormats = new PooledList<DirectInputObjectDataFormat>(axisEntries.Count);
+			BuildObjectFormats(axisEntries, objectInfos, inputObjectDataFormats);
+
+			using var dataFormatScope = DataFormatScope.Create(inputObjectDataFormats);
 			var dataFormat = dataFormatScope.DataFormat;
 
 			var setFormatResult = DirectInputNative.SetDataFormat(devicePointer, in dataFormat);
@@ -223,6 +232,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			dataAvailable = new AutoResetEvent(false);
 			dataAvailable.SafeWaitHandle = new SafeWaitHandle(eventHandle, ownsHandle: true);
 
+			var physicalAxes = axisEntries.ConvertAll(entry => entry.Axis);
 			var axisRanges = ConfigureAxisRanges(devicePointer, axisEntries);
 
 			var capsResult = DirectInputNative.GetCapabilities(devicePointer, out var caps);
@@ -238,7 +248,14 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			}
 
 			success = true;
-			return new DirectInputJoystickDevice(deviceId, info, caps, devicePointer, axisRanges, dataAvailable);
+			return new DirectInputJoystickDevice(
+				deviceId,
+				info,
+				caps,
+				devicePointer,
+				[..physicalAxes],
+				axisRanges,
+				dataAvailable);
 		}
 		finally
 		{
@@ -252,9 +269,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 	}
 
-	private static List<DirectInputDeviceObjectInfo> EnumerateObjects(nint devicePointer)
+	private static void EnumerateObjects(nint devicePointer, ICollection<DirectInputDeviceObjectInfo> objectInfos)
 	{
-		var objectInfos = new List<DirectInputDeviceObjectInfo>();
 		var handle = GCHandle.Alloc(objectInfos);
 
 		try
@@ -271,13 +287,11 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		{
 			handle.Free();
 		}
-
-		return objectInfos;
 	}
 
-	private static List<AxisFormatEntry> BuildAxisFormatEntries(IReadOnlyList<DirectInputDeviceObjectInfo> objects)
+	private static void BuildAxisFormatEntries(IReadOnlyList<DirectInputDeviceObjectInfo> objects,
+		ICollection<AxisFormatEntry> axisEntries)
 	{
-		var axisEntries = new List<AxisFormatEntry>();
 		var sliderIndex = 0;
 
 		foreach (var axis in objects.Where(IsAxisObject).OrderBy(GetAxisSortKey))
@@ -293,16 +307,13 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				DirectInputNative.GetAxisOffset(physicalAxis.Value),
 				axis.Type));
 		}
-
-		return axisEntries;
 	}
 
-	private static List<DirectInputObjectDataFormat> BuildObjectFormats(
+	private static void BuildObjectFormats(
 		IReadOnlyList<AxisFormatEntry> axisEntries,
-		IReadOnlyList<DirectInputDeviceObjectInfo> objects)
+		IReadOnlyList<DirectInputDeviceObjectInfo> objects,
+		ICollection<DirectInputObjectDataFormat> objectFormats)
 	{
-		var objectFormats = new List<DirectInputObjectDataFormat>();
-
 		foreach (var axisEntry in axisEntries)
 		{
 			objectFormats.Add(new DirectInputObjectDataFormat
@@ -341,8 +352,6 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				Flags = 0,
 			});
 		}
-
-		return objectFormats;
 	}
 
 	private static Dictionary<PhysicalAxis, AxisRange> ConfigureAxisRanges(nint devicePointer,
@@ -623,7 +632,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
 	private static int EnumObjectsCallback(DirectInputDeviceObjectInstanceNative* instance, nint referenceData)
 	{
-		var objects = (List<DirectInputDeviceObjectInfo>)GCHandle.FromIntPtr(referenceData).Target!;
+		var objects = (PooledList<DirectInputDeviceObjectInfo>)GCHandle.FromIntPtr(referenceData).Target!;
 		objects.Add(DirectInputDeviceObjectInfo.FromNative(instance));
 		return DirectInputNative.DiEnumContinue;
 	}
