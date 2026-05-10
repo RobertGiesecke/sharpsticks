@@ -1,6 +1,4 @@
-﻿using Collections.Pooled;
-
-namespace ScaledAxisCSharp.InputAbstractions;
+﻿namespace ScaledAxisCSharp.InputAbstractions;
 
 public static class DeviceExtensions
 {
