@@ -5,7 +5,7 @@ public static class VJoyDeviceBuilder
 	extension(VJoyDevice)
 	{
 		public static VJoyDevice Open(
-			int deviceId,
+			uint deviceId,
 			IReadOnlyList<ButtonRoute> buttonRoutes,
 			IReadOnlyList<AxisRoute> axisRoutes)
 		{
@@ -22,8 +22,7 @@ public static class VJoyDeviceBuilder
 					"vJoy is not enabled. Install and configure the vJoy driver first.");
 			}
 
-			var deviceIdUInt = (uint)deviceId;
-			var status = VJoyNative.GetVJDStatus(deviceIdUInt);
+			var status = VJoyNative.GetVJDStatus(deviceId);
 			if (status == VjdStatus.Busy)
 			{
 				throw new InvalidOperationException($"vJoy device {deviceId} is already in use by another feeder.");
@@ -34,15 +33,15 @@ public static class VJoyDeviceBuilder
 				throw new InvalidOperationException($"vJoy device {deviceId} is not configured.");
 			}
 
-			if (!VJoyNative.AcquireVJD(deviceIdUInt))
+			if (!VJoyNative.AcquireVJD(deviceId))
 			{
 				throw new InvalidOperationException(
 					$"Failed to acquire vJoy device {deviceId}. Current status: {status}.");
 			}
 
-			if (!VJoyNative.ResetVJD(deviceIdUInt))
+			if (!VJoyNative.ResetVJD(deviceId))
 			{
-				VJoyNative.RelinquishVJD(deviceIdUInt);
+				VJoyNative.RelinquishVJD(deviceId);
 				throw new InvalidOperationException($"Failed to reset vJoy device {deviceId}.");
 			}
 
@@ -51,36 +50,36 @@ public static class VJoyDeviceBuilder
 				         .Distinct())
 			{
 				var hidUsage = axis.GetVJoyAxisId();
-				if (!VJoyNative.GetVJDAxisExist(deviceIdUInt, hidUsage))
+				if (!VJoyNative.GetVJDAxisExist(deviceId, hidUsage))
 				{
-					VJoyNative.RelinquishVJD(deviceIdUInt);
+					VJoyNative.RelinquishVJD(deviceId);
 					throw new InvalidOperationException($"Axis '{axis}' is not enabled on vJoy device {deviceId}.");
 				}
 
 				var min = 0;
 				var max = 0;
-				if (!VJoyNative.GetVJDAxisMin(deviceIdUInt, hidUsage, ref min) ||
-				    !VJoyNative.GetVJDAxisMax(deviceIdUInt, hidUsage, ref max))
+				if (!VJoyNative.GetVJDAxisMin(deviceId, hidUsage, ref min) ||
+				    !VJoyNative.GetVJDAxisMax(deviceId, hidUsage, ref max))
 				{
-					VJoyNative.RelinquishVJD(deviceIdUInt);
+					VJoyNative.RelinquishVJD(deviceId);
 					throw new InvalidOperationException($"Failed reading limits for vJoy axis '{axis}'.");
 				}
 
 				axisLimits.Add(axis, new AxisLimits(min, max));
 			}
 
-			var buttonCount = VJoyNative.GetVJDButtonNumber(deviceIdUInt);
+			var buttonCount = VJoyNative.GetVJDButtonNumber(deviceId);
 			foreach (var targetButton in buttonRoutes.Select(route => route.TargetButton).Distinct())
 			{
 				if (targetButton > buttonCount)
 				{
-					VJoyNative.RelinquishVJD(deviceIdUInt);
+					VJoyNative.RelinquishVJD(deviceId);
 					throw new InvalidOperationException(
 						$"Button {targetButton} is not enabled on vJoy device {deviceId}. Device exposes {buttonCount} buttons.");
 				}
 			}
 
-			return new VJoyDevice(deviceIdUInt, axisLimits);
+			return new VJoyDevice(deviceId, axisLimits);
 		}
 	}
 }

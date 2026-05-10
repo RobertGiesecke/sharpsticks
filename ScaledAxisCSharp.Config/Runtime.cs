@@ -84,8 +84,8 @@ public sealed class Runtime : IDisposable
 		var referencedDeviceIds = new HashSet<int>();
 		var buttonRoutes = options.ButtonRoutes;
 		var axisRoutes = options.AxisRoutes;
-		var claimedAxes = new HashSet<(int VJoyDeviceId, PhysicalAxis Axis)>();
-		var referencedVJoyDeviceIds = new HashSet<int>();
+		var claimedAxes = new HashSet<(uint VJoyDeviceId, PhysicalAxis Axis)>();
+		var referencedVJoyDeviceIds = new HashSet<uint>();
 
 		foreach (var mapping in buttonRoutes)
 		{

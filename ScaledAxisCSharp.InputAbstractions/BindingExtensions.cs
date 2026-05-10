@@ -4,7 +4,7 @@ public static class BindingExtensions
 {
 	public static AxisRoute RouteToSameAxisOnVJoy(
 		this AxisBinding binding,
-		int vJoyDeviceId,
+		uint vJoyDeviceId,
 		double scale = 1.0,
 		double offset = 0.0,
 		IAxisModifier? modifier = null) =>
@@ -12,7 +12,7 @@ public static class BindingExtensions
 
 	public static AxisRoute RouteAxis(
 		this AxisBinding binding,
-		int vJoyDeviceId,
+		uint vJoyDeviceId,
 		PhysicalAxis vJoyAxis,
 		double scale = 1.0,
 		double offset = 0.0,
