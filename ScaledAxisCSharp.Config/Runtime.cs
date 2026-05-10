@@ -15,14 +15,14 @@ public sealed class Runtime : IDisposable
 
 	private sealed class VJoyButtonWithBindings
 	{
-		public required int VJoyDeviceIndex { get; init; }
+		public required VJoyDevice VJoyDevice { get; init; }
 		public required int TargetButton { get; init; }
-		public required PooledList<ButtonBinding> Bindings { get; init; }
+		public required ImmutableArray<ButtonBinding> Bindings { get; init; }
 	}
 
 	private sealed class VJoyAxisRoute
 	{
-		public required int VJoyDeviceIndex { get; init; }
+		public required VJoyDevice VJoyDevice { get; init; }
 		public required AxisBinding Source { get; init; }
 		public required PhysicalAxis VJoyAxis { get; init; }
 		public required double Scale { get; init; }
@@ -39,26 +39,30 @@ public sealed class Runtime : IDisposable
 	{
 		Name = name;
 		_Devices = devices.ToFrozenDictionary();
-		var vJoyDeviceIndexes = vJoyDevices
+		using var vJoyDeviceIndexes = vJoyDevices
 			.Select((device, index) => new { device.DeviceId, Index = index })
-			.ToDictionary(t => (int)t.DeviceId, t => t.Index);
+			.ToPooledDictionary(t => t.DeviceId, t => t.Index);
 		_ButtonRoutes =
 		[
 			..buttonRoutes.GroupBy(t => (t.VJoyDeviceId, t.TargetButton))
 				.Select(group => new VJoyButtonWithBindings
 				{
-					VJoyDeviceIndex = vJoyDeviceIndexes[group.Key.VJoyDeviceId],
+					// ReSharper disable once AccessToDisposedClosure
+					VJoyDevice = vJoyDevices[vJoyDeviceIndexes[group.Key.VJoyDeviceId]],
 					TargetButton = group.Key.TargetButton,
-					Bindings = group.Select(t => t.Binding)
-						.Distinct()
-						.ToPooledList(),
+					Bindings =
+					[
+						..group.Select(t => t.Binding)
+							.Distinct(),
+					],
 				})
 		];
 		_AxisRoutes =
 		[
 			..axisRoutes.Select(route => new VJoyAxisRoute
 			{
-				VJoyDeviceIndex = vJoyDeviceIndexes[route.VJoyDeviceId],
+				// ReSharper disable once AccessToDisposedClosure
+				VJoyDevice = vJoyDevices[vJoyDeviceIndexes[route.VJoyDeviceId]],
 				Source = route.Source,
 				VJoyAxis = route.VJoyAxis,
 				Scale = route.Scale,
@@ -337,7 +341,7 @@ public sealed class Runtime : IDisposable
 					debugLines.Append(buttonBinding.ButtonNumber);
 					debugLines.Append(" -> ");
 					debugLines.Append("vjoy");
-					debugLines.Append(_VJoyDevices[route.VJoyDeviceIndex].DeviceId);
+					debugLines.Append(route.VJoyDevice.DeviceId);
 					debugLines.Append(':');
 					debugLines.Append(route.TargetButton);
 					debugLines.Append(" = ");
@@ -364,12 +368,12 @@ public sealed class Runtime : IDisposable
 				output = m.Apply(output, states, _Devices);
 			}
 
-			_VJoyDevices[route.VJoyDeviceIndex].SetAxis(route.VJoyAxis, output);
+			route.VJoyDevice.SetAxis(route.VJoyAxis, output);
 
 			if (debugLines is not null)
 			{
 				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis,
-					_VJoyDevices[route.VJoyDeviceIndex].DeviceId, route.VJoyAxis, sample, output);
+					route.VJoyDevice.DeviceId, route.VJoyAxis, sample, output);
 			}
 		}
 	}
@@ -427,11 +431,6 @@ public sealed class Runtime : IDisposable
 
 	public void Dispose()
 	{
-		foreach (var route in _ButtonRoutes)
-		{
-			route.Bindings.Dispose();
-		}
-
 		DisposeDevices(_Devices.Values);
 		foreach (var vJoyDevice in _VJoyDevices)
 		{
