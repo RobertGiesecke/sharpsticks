@@ -4,6 +4,6 @@ public interface IOutputDeviceFactory
 {
 	OutputDevice Open(
 		uint deviceId,
-		IReadOnlyList<ButtonRoute> buttonRoutes,
-		IReadOnlyList<AxisRoute> axisRoutes);
+		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<AxisRoute> axisRoutes);
 }

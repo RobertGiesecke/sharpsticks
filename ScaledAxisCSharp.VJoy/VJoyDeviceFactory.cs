@@ -4,11 +4,15 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 {
 	public static VJoyDeviceFactory Instance { get; } = new();
 
-	OutputDevice IOutputDeviceFactory.Open(uint deviceId, IReadOnlyList<ButtonRoute> buttonRoutes,
-		IReadOnlyList<AxisRoute> axisRoutes) => Open(deviceId, buttonRoutes, axisRoutes);
+	OutputDevice IOutputDeviceFactory.Open(
+		uint deviceId,
+		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<AxisRoute> axisRoutes) => Open(deviceId, buttonRoutes, axisRoutes);
 
-	public VJoyDevice Open(uint deviceId, IReadOnlyList<ButtonRoute> buttonRoutes,
-		IReadOnlyList<AxisRoute> axisRoutes)
+	public VJoyDevice Open(
+		uint deviceId,
+		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<AxisRoute> axisRoutes)
 	{
 		if (deviceId < 1)
 		{
