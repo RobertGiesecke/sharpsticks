@@ -1,5 +1,3 @@
-using System.Collections.Frozen;
-
 namespace ScaledAxisCSharp.VJoy;
 
 public sealed class VJoyDevice : OutputDevice

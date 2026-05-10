@@ -1,7 +1,4 @@
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using Collections.Pooled;
-using Microsoft.Win32.SafeHandles;
 
 namespace ScaledAxisCSharp.DirectInput;
 

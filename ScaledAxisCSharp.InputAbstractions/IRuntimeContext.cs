@@ -1,6 +1,4 @@
-﻿using System.Collections.Frozen;
-
-namespace ScaledAxisCSharp.InputAbstractions;
+﻿namespace ScaledAxisCSharp.InputAbstractions;
 
 public interface IRuntimeContext
 {

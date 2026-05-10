@@ -16,8 +16,4 @@
       <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.7" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Compile Remove="GlobalUsings.cs" />
-    </ItemGroup>
-
 </Project>

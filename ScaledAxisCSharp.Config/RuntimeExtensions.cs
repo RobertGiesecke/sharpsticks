@@ -1,6 +1,4 @@
-﻿using Collections.Pooled;
-
-namespace ScaledAxisCSharp.Config;
+﻿namespace ScaledAxisCSharp.Config;
 
 public static class RuntimeExtensions
 {

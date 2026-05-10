@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using Collections.Pooled;
 
 namespace ScaledAxisCSharp.Console;
 

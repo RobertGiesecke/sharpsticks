@@ -1,7 +1,4 @@
-﻿using System.Collections.Immutable;
-using Collections.Pooled;
-
-namespace ScaledAxisCSharp.OutputAbstractions;
+﻿namespace ScaledAxisCSharp.OutputAbstractions;
 
 public static class RuntimeBuilder
 {

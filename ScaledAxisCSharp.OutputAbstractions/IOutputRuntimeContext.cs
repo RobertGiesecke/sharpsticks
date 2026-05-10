@@ -1,6 +1,4 @@
-﻿using System.Collections.Immutable;
-
-namespace ScaledAxisCSharp.OutputAbstractions;
+﻿namespace ScaledAxisCSharp.OutputAbstractions;
 
 public interface IOutputRuntimeContext : IRuntimeContext, IDisposable
 {

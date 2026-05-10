@@ -1,6 +1,4 @@
-﻿using System.Collections.Immutable;
-
-namespace ScaledAxisCSharp.Config;
+﻿namespace ScaledAxisCSharp.Config;
 
 public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 {

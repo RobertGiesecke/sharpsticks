@@ -1,7 +1,4 @@
-using System.Collections.Frozen;
-using System.Collections.Immutable;
 using System.Text;
-using Collections.Pooled;
 
 namespace ScaledAxisCSharp.OutputAbstractions;
 
