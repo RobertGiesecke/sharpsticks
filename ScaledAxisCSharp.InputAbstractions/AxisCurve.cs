@@ -20,24 +20,77 @@ public sealed record AxisCurve : IAxisModifier
 	public bool IsLinear { get; private init; } = Math.Abs(InitialSteepness - 1.0) < Tolerance;
 	public bool IsFlat { get; private init; } = Math.Abs(InitialSteepness) < Tolerance;
 
-	public double Apply(double input)
+	public void FillDevices(ICollection<int> deviceIds)
 	{
-		if (IsFlat)
+	}
+
+	public IRuntimeAxisModifier CreateModifierRuntimeContext(IRuntimeContext context)
+	{
+		return this switch
+		{
+			{ IsFlat: true } => FlatRuntimeModifier.Instance,
+			{ IsLinear: true } => new LinearRuntimeModifier(this),
+			_ => new NonLinearRuntimeModifier(this)
+		};
+	}
+
+	private sealed record FlatRuntimeModifier : IRuntimeAxisModifier
+	{
+		public static FlatRuntimeModifier Instance { get; } = new();
+
+		private FlatRuntimeModifier()
+		{
+		}
+
+		public double Apply(double input, JoystickState?[] states)
 		{
 			return 0.0;
 		}
-
-		if (IsLinear)
-		{
-			return Max * input;
-		}
-
-		var exponent = Steepness < 1.0 ? 1.0 / Steepness : 2.0 - Steepness;
-		return Max * Math.Sign(input) * Math.Pow(Math.Abs(input), exponent);
 	}
 
-	double IAxisModifier.Apply(double input,
-		IReadOnlyDictionary<int, JoystickState> states,
-		IReadOnlyDictionary<int, JoystickDevice> devices)
-		=> Apply(input);
+	private sealed record NonLinearRuntimeModifier : IRuntimeAxisModifier
+	{
+		private readonly AxisCurve _Curve;
+
+		public NonLinearRuntimeModifier(AxisCurve axisCurve)
+		{
+			if (axisCurve.IsLinear)
+			{
+				throw new ArgumentException($"Axis curve must not be linear for {nameof(NonLinearRuntimeModifier)}",
+					nameof(axisCurve));
+			}
+
+			_Curve = axisCurve;
+		}
+
+		public double Apply(double input, JoystickState?[] states)
+		{
+			if (_Curve.IsLinear)
+			{
+				return _Curve.Max * input;
+			}
+
+			var steepness = _Curve.Steepness;
+			var exponent = steepness < 1.0 ? 1.0 / steepness : 2.0 - steepness;
+			return _Curve.Max * Math.Sign(input) * Math.Pow(Math.Abs(input), exponent);
+		}
+	}
+
+	private sealed record LinearRuntimeModifier : IRuntimeAxisModifier
+	{
+		private readonly double _Max;
+
+		public LinearRuntimeModifier(AxisCurve axisCurve)
+		{
+			if (!axisCurve.IsLinear)
+			{
+				throw new ArgumentException($"Axis curve must be linear for {nameof(LinearRuntimeModifier)}",
+					nameof(axisCurve));
+			}
+
+			_Max = axisCurve.Max;
+		}
+
+		public double Apply(double input, JoystickState?[] states) => _Max * input;
+	}
 }

@@ -8,9 +8,23 @@
       <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
     </PropertyGroup>
     <ItemGroup>
+      <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
+                     Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')" />
+      <_ExportedUsings Include="$(RootNamespace)"
+                       Condition="'$(RootNamespace)' != ''" />
+    </ItemGroup>
+    <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
+             Query="/Project/ItemGroup/Using/@Include"
+             Condition="'@(_ProjRefProps)' != ''">
+      <Output TaskParameter="Result" ItemName="_ExportedUsings" />
+    </XmlPeek>
+    <RemoveDuplicates Inputs="@(_ExportedUsings)">
+      <Output TaskParameter="Filtered" ItemName="_DistinctExportedUsings" />
+    </RemoveDuplicates>
+    <ItemGroup>
       <_PropsFileLines Include="&lt;Project&gt;" />
       <_PropsFileLines Include="  &lt;ItemGroup&gt;" />
-      <_PropsFileLines Include="    &lt;Using Include=&quot;$(RootNamespace)&quot; /&gt;" />
+      <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.Identity)&quot; /&gt;" />
       <_PropsFileLines Include="  &lt;/ItemGroup&gt;" />
       <_PropsFileLines Include="&lt;/Project&gt;" />
     </ItemGroup>

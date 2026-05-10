@@ -18,6 +18,11 @@ var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 	WhenNotPressed = modifierBlendCurve,
 };
 
+var axisOptions = new RouteAxisOptions
+{
+	Modifier = blendedCurveWithPrecisionHold,
+};
+
 Runtime.BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
@@ -31,8 +36,8 @@ Runtime.BuildAndRunAsConsole(new()
 	],
 	AxisRoutes =
 	[
-		rightStick.BindAxis(PhysicalAxis.X).RouteToSameAxisOnVJoy(1, modifier: blendedCurveWithPrecisionHold),
-		rightStick.BindAxis(PhysicalAxis.Y).RouteToSameAxisOnVJoy(1, modifier: blendedCurveWithPrecisionHold),
-		rightStick.BindAxis(PhysicalAxis.Z).RouteToSameAxisOnVJoy(1, modifier: blendedCurveWithPrecisionHold),
+		rightStick.BindAxis(PhysicalAxis.X).RouteToSameAxisOnVJoy(1, options: axisOptions),
+		rightStick.BindAxis(PhysicalAxis.Y).RouteToSameAxisOnVJoy(1, options: axisOptions),
+		rightStick.BindAxis(PhysicalAxis.Z).RouteToSameAxisOnVJoy(1, options: axisOptions),
 	],
 });
