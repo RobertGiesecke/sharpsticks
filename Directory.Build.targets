@@ -2,7 +2,7 @@
 
   <Target Name="GenerateBuildTransitiveProps"
           BeforeTargets="Build;Pack"
-          Condition="'$(OutputType)' != 'Exe'">
+          Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
     <PropertyGroup>
       <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
       <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>

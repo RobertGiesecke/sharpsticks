@@ -3,7 +3,7 @@
 public sealed class AxisMapping
 {
 	public AxisInput Source { get; set; } = new();
-	public uint? VJoyDeviceId { get; set; }
+	public uint? OutputDeviceId { get; set; }
 	public required string TargetAxis { get; set; }
 	public double Scale { get; set; } = 1.0;
 	public double Offset { get; set; }

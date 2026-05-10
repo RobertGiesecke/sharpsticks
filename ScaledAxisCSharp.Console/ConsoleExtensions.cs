@@ -1,9 +1,15 @@
-﻿namespace ScaledAxisCSharp.Console;
+﻿using System.Runtime.CompilerServices;
+using Collections.Pooled;
+
+namespace ScaledAxisCSharp.Console;
 
 public static class ConsoleExtensions
 {
-	extension(Runtime runtime)
+	extension(IOutputRuntimeContext runtime)
 	{
+		public static PooledList<DirectInputJoystickDevice> EnumerateConnectedDevices() =>
+			DirectInputJoystickDevice.EnumerateConnected();
+
 		public void RunAsConsole()
 		{
 			using var cts = new CancellationTokenSource();
@@ -20,10 +26,35 @@ public static class ConsoleExtensions
 			runtime.Run(cts.Token);
 		}
 
-		public static void BuildAndRunAsConsole(Runtime.BuildOptions buildOptions)
+		public static void BuildAndRunAsConsole(RuntimeBuilder.BuildOptions buildOptions)
 		{
-			using var runtimeMapping = Runtime.Build(buildOptions);
+			using var runtimeMapping = Build(buildOptions switch
+			{
+				{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = VJoyDeviceFactory.Instance },
+				_ => buildOptions,
+			});
 			runtimeMapping.RunAsConsole();
 		}
+
+		[OverloadResolutionPriority(2)]
+		public static IOutputRuntimeContext Build(RuntimeBuilder.BuildOptions buildOptions) =>
+			RuntimeBuilder.Build(EnsureOutputDeviceFactory(buildOptions));
+
+
+		[OverloadResolutionPriority(2)]
+		public static IOutputRuntimeContext BuildFromConfig(AppConfig config)
+		{
+			var buildOptions = Runtime.GetBuildOptionsFromConfig(config);
+			return Build(EnsureOutputDeviceFactory(buildOptions));
+		}
+	}
+
+	private static RuntimeBuilder.BuildOptions EnsureOutputDeviceFactory(RuntimeBuilder.BuildOptions buildOptions)
+	{
+		return buildOptions switch
+		{
+			{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = VJoyDeviceFactory.Instance },
+			_ => buildOptions,
+		};
 	}
 }

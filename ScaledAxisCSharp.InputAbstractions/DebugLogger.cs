@@ -1,8 +1,7 @@
 using System.Diagnostics;
 using System.Text;
-using Collections.Pooled;
 
-namespace ScaledAxisCSharp.Config;
+namespace ScaledAxisCSharp.InputAbstractions;
 
 public sealed class DebugLogger
 {

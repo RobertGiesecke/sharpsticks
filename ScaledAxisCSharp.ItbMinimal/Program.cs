@@ -26,18 +26,36 @@ var axisOptions = new RouteAxisOptions
 Runtime.BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
-	ConnectedDevices = [..connectedDevices],
+	ConnectedDevices =
+	[
+		..connectedDevices
+	],
 	ButtonRoutes =
 	[
-		new(rightStick.BindButton(1 /*trigger*/), 1, 1),
-		new(leftStick.BindButton(1 /*trigger*/), 1, 40),
-		new(leftStick.BindButton(11 /*outer 2-way up*/), 1, 79),
-		new(rightStick.BindButton(18) /*cm hat east*/, 1, 22),
+		new(rightStick.BindButton(1 /*trigger*/),
+			1,
+			1),
+		new(leftStick.BindButton(1 /*trigger*/),
+			1,
+			40),
+		new(leftStick.BindButton(11 /*outer 2-way up*/),
+			1,
+			79),
+		new(rightStick.BindButton(18) /*cm hat east*/,
+			1,
+			22),
 	],
 	AxisRoutes =
 	[
-		rightStick.BindAxis(PhysicalAxis.X).RouteToSameAxisOnVJoy(1, options: axisOptions),
-		rightStick.BindAxis(PhysicalAxis.Y).RouteToSameAxisOnVJoy(1, options: axisOptions),
-		rightStick.BindAxis(PhysicalAxis.Z).RouteToSameAxisOnVJoy(1, options: axisOptions),
+		rightStick.BindAxis(PhysicalAxis.X)
+			.RouteToSameAxisOnOutput(1,
+				options: axisOptions),
+		rightStick.BindAxis(PhysicalAxis.Y)
+			.RouteToSameAxisOnOutput(1,
+				options: axisOptions),
+		rightStick.BindAxis(PhysicalAxis.Z)
+			.RouteToSameAxisOnOutput(1,
+				options: axisOptions),
 	],
+	OutputDeviceFactory = VJoyDeviceFactory.Instance,
 });

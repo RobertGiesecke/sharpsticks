@@ -5,33 +5,33 @@ namespace ScaledAxisCSharp.InputAbstractions;
 public static class BindingExtensions
 {
 	[OverloadResolutionPriority(2)]
-	public static AxisRoute RouteToSameAxisOnVJoy(
+	public static AxisRoute RouteToSameAxisOnOutput(
 		this AxisBinding binding,
-		uint vJoyDeviceId,
+		uint outputDeviceId,
 		RouteAxisOptions? options = null) =>
-		binding.RouteAxis(vJoyDeviceId, binding.Axis, options);
+		binding.RouteAxis(outputDeviceId, binding.Axis, options);
 
-	public static AxisRoute RouteToSameAxisOnVJoy(
+	public static AxisRoute RouteToSameAxisOnOutput(
 		this AxisBinding binding,
-		uint vJoyDeviceId,
+		uint outputDeviceId,
 		double scale = 1.0,
 		double offset = 0.0,
 		IAxisModifier? modifier = null) =>
-		binding.RouteAxis(vJoyDeviceId, binding.Axis, scale, offset, modifier);
+		binding.RouteAxis(outputDeviceId, binding.Axis, scale, offset, modifier);
 
 	[OverloadResolutionPriority(1)]
 	public static AxisRoute RouteAxis(
 		this AxisBinding binding,
-		uint vJoyDeviceId,
-		PhysicalAxis vJoyAxis,
+		uint outputDeviceId,
+		PhysicalAxis outputAxis,
 		double scale = 1.0,
 		double offset = 0.0,
 		IAxisModifier? modifier = null) =>
 		new()
 		{
 			Source = binding,
-			VJoyDeviceId = vJoyDeviceId,
-			VJoyAxis = vJoyAxis,
+			OutputDeviceId = outputDeviceId,
+			OutputAxis = outputAxis,
 			Scale = scale,
 			Offset = offset,
 			Modifier = modifier,
@@ -40,25 +40,25 @@ public static class BindingExtensions
 	[OverloadResolutionPriority(2)]
 	public static AxisRoute RouteAxis(
 		this AxisBinding binding,
-		uint vJoyDeviceId,
-		PhysicalAxis vJoyAxis,
+		uint outputDeviceId,
+		PhysicalAxis outputAxis,
 		RouteAxisOptions? options = null) =>
 		new()
 		{
 			Source = binding,
-			VJoyDeviceId = vJoyDeviceId,
-			VJoyAxis = vJoyAxis,
+			OutputDeviceId = outputDeviceId,
+			OutputAxis = outputAxis,
 			Scale = options?.Scale ?? 1.0,
 			Offset = options?.Offset ?? 0.0,
 			Modifier = options?.Modifier,
 		};
 
-	public static ButtonRoute RouteButton(this ButtonBinding binding, uint vJoyDeviceId, int targetButton) =>
-		new(binding, vJoyDeviceId, targetButton);
+	public static ButtonRoute RouteButton(this ButtonBinding binding, uint outputDeviceId, int targetButton) =>
+		new(binding, outputDeviceId, targetButton);
 
-	public static IEnumerable<ButtonRoute> RouteButtonsToVJoy<TDevice>(
+	public static IEnumerable<ButtonRoute> RouteButtonsToOutput<TDevice>(
 		this TDevice device,
-		uint vJoyDeviceId,
+		uint outputDeviceId,
 		Func<TDevice, ButtonBinding, bool>? predicate = null)
 		where TDevice : JoystickDevice
 	{
@@ -71,12 +71,12 @@ public static class BindingExtensions
 				continue;
 			}
 
-			yield return binding.RouteButton(vJoyDeviceId, binding.ButtonNumber);
+			yield return binding.RouteButton(outputDeviceId, binding.ButtonNumber);
 		}
 	}
 
-	public static IEnumerable<AxisRoute> RouteAxesToVJoy<TDevice>(
-		this TDevice device, uint vJoyDeviceId,
+	public static IEnumerable<AxisRoute> RouteAxesToOutput<TDevice>(
+		this TDevice device, uint outputDeviceId,
 		Func<TDevice, AxisBinding, bool>? predicate = null,
 		Func<TDevice, AxisBinding, RouteAxisOptions?>? optionsCallback = null)
 		where TDevice : JoystickDevice
@@ -96,7 +96,7 @@ public static class BindingExtensions
 				options = new RouteAxisOptions();
 			}
 
-			yield return axisBinding.RouteToSameAxisOnVJoy(vJoyDeviceId, options);
+			yield return axisBinding.RouteToSameAxisOnOutput(outputDeviceId, options);
 		}
 	}
 }

@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using Microsoft.Extensions.ObjectPool;
 
-namespace ScaledAxisCSharp.Config;
+namespace ScaledAxisCSharp.InputAbstractions;
 
 public static class SharedPools
 {
