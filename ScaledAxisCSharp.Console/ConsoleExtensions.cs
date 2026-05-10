@@ -7,8 +7,11 @@ public static class ConsoleExtensions
 {
 	extension(IOutputRuntimeContext runtime)
 	{
-		public static PooledList<DirectInputJoystickDevice> EnumerateConnectedDevices() =>
-			DirectInputJoystickDevice.EnumerateConnected();
+		public static PooledList<JoystickDevice> EnumerateConnectedDevices()
+		{
+			using var list = DirectInputJoystickDevice.EnumerateConnected();
+			return list.ConvertAll<JoystickDevice>(t => t);
+		}
 
 		public void RunAsConsole()
 		{
