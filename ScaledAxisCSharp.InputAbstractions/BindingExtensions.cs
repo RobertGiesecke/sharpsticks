@@ -53,6 +53,41 @@ public static class BindingExtensions
 			Modifier = options?.Modifier,
 		};
 
+	public static ImmutableArray<AxisRoute> RouteAbsoluteRelative(
+		this AxisBinding binding,
+		AbsoluteRelativeAxisOptions options)
+	{
+		if (options.OutputDeviceId < 1)
+		{
+			throw new InvalidOperationException("Output device ids are 1-based.");
+		}
+
+		if (options.IncreaseAxis == options.DecreaseAxis)
+		{
+			throw new InvalidOperationException("IncreaseAxis and DecreaseAxis must be different.");
+		}
+
+		var sharedState = new AbsoluteRelativeAxisModifier.SharedState(options);
+		var increaseModifier = new AbsoluteRelativeAxisModifier(sharedState,
+			AbsoluteRelativeAxisModifier.RelativeDirection.Increase,
+			options.IncreaseRestPosition);
+		var decreaseModifier = new AbsoluteRelativeAxisModifier(sharedState,
+			AbsoluteRelativeAxisModifier.RelativeDirection.Decrease,
+			options.DecreaseRestPosition);
+
+		return
+		[
+			binding.RouteAxis(
+				options.OutputDeviceId,
+				options.IncreaseAxis,
+				modifier: increaseModifier),
+			binding.RouteAxis(
+				options.OutputDeviceId,
+				options.DecreaseAxis,
+				modifier: decreaseModifier),
+		];
+	}
+
 	public static ButtonRoute RouteButton(this ButtonBinding binding, uint outputDeviceId, int targetButton) =>
 		new(binding, outputDeviceId, targetButton);
 
