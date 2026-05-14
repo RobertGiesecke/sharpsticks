@@ -7,9 +7,33 @@ namespace ScaledAxisCSharp.Generators;
 
 internal static class DeviceSnapshots
 {
+	private static readonly Lazy<(bool Success, ImmutableArray<DirectInputDeviceSnapshot> Devices, string? Error)>
+		DirectInputResult = new(EnumerateDirectInputDevicesCore, isThreadSafe: true);
+
+	private static readonly Lazy<(bool Success, ImmutableArray<VJoyDeviceSnapshot> Devices, string? Error)>
+		OutputDevicesResult = new(EnumerateOutputDevicesCore, isThreadSafe: true);
+
 	public static bool TryEnumerateDirectInputDevices(
 		out ImmutableArray<DirectInputDeviceSnapshot> devices,
 		out string? error)
+	{
+		var (success, cachedDevices, cachedError) = DirectInputResult.Value;
+		devices = cachedDevices;
+		error = cachedError;
+		return success;
+	}
+
+	public static bool TryEnumerateOutputDevices(
+		out ImmutableArray<VJoyDeviceSnapshot> devices,
+		out string? error)
+	{
+		var (success, cachedDevices, cachedError) = OutputDevicesResult.Value;
+		devices = cachedDevices;
+		error = cachedError;
+		return success;
+	}
+
+	private static (bool, ImmutableArray<DirectInputDeviceSnapshot>, string?) EnumerateDirectInputDevicesCore()
 	{
 		try
 		{
@@ -23,30 +47,22 @@ internal static class DeviceSnapshots
 				builder.Add(new DirectInputDeviceSnapshot(device.DeviceId, device.ProductName, axes, buttonCount));
 			}
 
-			devices = builder.ToImmutable();
-			error = null;
-			return true;
+			return (true, builder.ToImmutable(), null);
 		}
 		catch (Exception exception) when (IsExpectedEnumerationFailure(exception))
 		{
-			devices = ImmutableArray<DirectInputDeviceSnapshot>.Empty;
-			error = GetMessage(exception);
-			return false;
+			return (false, ImmutableArray<DirectInputDeviceSnapshot>.Empty, GetMessage(exception));
 		}
 	}
 
-	public static bool TryEnumerateOutputDevices(
-		out ImmutableArray<VJoyDeviceSnapshot> devices,
-		out string? error)
+	private static (bool, ImmutableArray<VJoyDeviceSnapshot>, string?) EnumerateOutputDevicesCore()
 	{
 		try
 		{
 			VJoyNative.EnsureLoaded();
 			if (!VJoyNative.VJoyEnabled())
 			{
-				devices = ImmutableArray<VJoyDeviceSnapshot>.Empty;
-				error = "vJoy is not enabled.";
-				return false;
+				return (false, ImmutableArray<VJoyDeviceSnapshot>.Empty, "vJoy is not enabled.");
 			}
 
 			var builder = ImmutableArray.CreateBuilder<VJoyDeviceSnapshot>();
@@ -61,15 +77,11 @@ internal static class DeviceSnapshots
 				}
 			}
 
-			devices = builder.ToImmutable();
-			error = null;
-			return true;
+			return (true, builder.ToImmutable(), null);
 		}
 		catch (Exception exception) when (IsExpectedEnumerationFailure(exception))
 		{
-			devices = ImmutableArray<VJoyDeviceSnapshot>.Empty;
-			error = GetMessage(exception);
-			return false;
+			return (false, ImmutableArray<VJoyDeviceSnapshot>.Empty, GetMessage(exception));
 		}
 	}
 
