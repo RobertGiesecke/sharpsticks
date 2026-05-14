@@ -471,6 +471,14 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		if (mode == AxisMode.Unsigned)
 		{
 			decoderKind = AxisDecoderKind.Unsigned;
+			if (range is { Min: < 0, Max: > 0 })
+			{
+				// Some non-centering controls still report raw values in 0..65535 even after we set
+				// the DirectInput range to a centered signed interval. In unsigned mode we want the
+				// full physical travel, so reinterpret that centered range as 0..fullScale.
+				return NormalizeUnsigned(rawValue, 0, GetUnsignedCenteredMax(range));
+			}
+
 			return NormalizeUnsigned(rawValue, range.Min, range.Max);
 		}
 
