@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup>
+    <Using Include="static ScaledAxisCSharp.Console.ConsoleExtensions" />
+  </ItemGroup>
+</Project>

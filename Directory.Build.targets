@@ -6,6 +6,7 @@
     <PropertyGroup>
       <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
       <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
+      <_BuildTransitivePartialFile>$(_BuildTransitiveDir)$(MSBuildProjectName).partial.props</_BuildTransitivePartialFile>
     </PropertyGroup>
     <ItemGroup>
       <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
@@ -17,6 +18,11 @@
     <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
              Query="/Project/ItemGroup/Using/@Include"
              Condition="'@(_ProjRefProps)' != ''">
+      <Output TaskParameter="Result" ItemName="_ExportedUsings" />
+    </XmlPeek>
+    <XmlPeek XmlInputPath="$(_BuildTransitivePartialFile)"
+             Query="/Project/ItemGroup/Using/@Include"
+             Condition="Exists('$(_BuildTransitivePartialFile)')">
       <Output TaskParameter="Result" ItemName="_ExportedUsings" />
     </XmlPeek>
     <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"

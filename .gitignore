@@ -1,6 +1,7 @@
 bin/
 obj/
-**/buildTransitive/
+**/buildTransitive/*.props
+!**/buildTransitive/*.partial.props
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
