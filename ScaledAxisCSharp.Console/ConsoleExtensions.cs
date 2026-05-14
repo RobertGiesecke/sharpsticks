@@ -12,7 +12,7 @@ public static class ConsoleExtensions
 			return list.ConvertAll<JoystickDevice>(t => t);
 		}
 
-		public void RunAsConsole()
+		public void RunAsConsole(DebugLogger? debugLogger = null)
 		{
 			using var cts = new CancellationTokenSource();
 
@@ -25,17 +25,18 @@ public static class ConsoleExtensions
 
 			System.Console.WriteLine($"Running {runtime.Name} profile. Press Ctrl+C to stop.");
 
-			runtime.Run(cts.Token);
+			runtime.Run(cts.Token, debugLogger);
 		}
 
-		public static void BuildAndRunAsConsole(RuntimeBuilder.BuildOptions buildOptions)
+		public static void BuildAndRunAsConsole(RuntimeBuilder.BuildOptions buildOptions,
+			DebugLogger? debugLogger = null)
 		{
 			using var runtimeMapping = Build(buildOptions switch
 			{
 				{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = VJoyDeviceFactory.Instance },
 				_ => buildOptions,
 			});
-			runtimeMapping.RunAsConsole();
+			runtimeMapping.RunAsConsole(debugLogger);
 		}
 
 		[OverloadResolutionPriority(2)]

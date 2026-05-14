@@ -5,6 +5,7 @@ public static class RuntimeBuilder
 	public readonly record struct BuildOptions()
 	{
 		public required string Name { get; init; }
+		public DebugLogger? DebugLogger { get; init; }
 		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
 		public required ImmutableArray<JoystickDevice> ConnectedDevices { get; init; }
 		public ImmutableArray<ButtonRoute> ButtonRoutes { get; init; } = [];
@@ -103,6 +104,7 @@ public static class RuntimeBuilder
 				{
 					return new Runtime(
 						options.Name,
+						options.DebugLogger,
 						devices,
 						buttonRoutes,
 						axisRoutes,

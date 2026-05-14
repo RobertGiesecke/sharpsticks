@@ -5,6 +5,7 @@ namespace ScaledAxisCSharp.OutputAbstractions;
 public sealed class Runtime : IOutputRuntimeContext, IDisposable
 {
 	public string Name { get; }
+	private readonly DebugLogger? _DebugLogger;
 	private readonly ImmutableArray<OutputAxisRoute> _AxisRoutes;
 	private readonly ImmutableArray<OutputButtonWithBindings> _ButtonRoutes;
 	private readonly ImmutableArray<JoystickDevice> _Devices;
@@ -43,12 +44,14 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 	public Runtime(
 		string name,
+		DebugLogger? debugLogger,
 		PooledDictionary<int, JoystickDevice> devices,
 		ImmutableArray<ButtonRoute> buttonRoutes,
 		ImmutableArray<AxisRoute> axisRoutes,
 		ImmutableArray<OutputDevice> outputDevices)
 	{
 		Name = name;
+		_DebugLogger = debugLogger;
 		_Devices = [..devices.Values];
 		DevicesById = devices.ToFrozenDictionary();
 		{
@@ -106,6 +109,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
+		debugLogger ??= _DebugLogger;
 		using var debugLinesScope = SharedPools.StringBuilder.GetInstance();
 		try
 		{
@@ -242,6 +246,12 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			{
 				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis,
 					route.OutputDevice.DeviceId, route.OutputAxis, sample, output);
+				if (route.RuntimeModifier is IRuntimeAxisDebugView debugView &&
+				    debugView.GetDebugView() is { Length: > 0 } debugText)
+				{
+					debugLines.Append("  ");
+					debugLines.AppendLine(debugText);
+				}
 			}
 		}
 	}
