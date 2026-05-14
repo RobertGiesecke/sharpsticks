@@ -11,15 +11,14 @@
 
     <Choose>
         <When Condition="'$(UseGeneratorPackageReference)' == 'true'">
-            <ItemGroup Condition="'$(UseGeneratorPackageReference)' == 'true'">
-                <PackageReference Include="ScaledAxisCSharp.Generators"
-                                  Version="$(Version)"
+            <ItemGroup>
+                <ProjectReference Include="..\ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"
                                   IncludeAssets="analyzers;buildtransitive"
                                   PrivateAssets="contentfiles;build"/>
             </ItemGroup>
         </When>
         <Otherwise>
-            <ItemGroup Condition="'$(UseGeneratorPackageReference)' != 'true'">
+            <ItemGroup>
                 <ProjectReference Include="..\ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"
                                   OutputItemType="Analyzer"
                                   ReferenceOutputAssembly="false"
