@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -6,7 +5,7 @@ using ScaledAxisCSharp.InputAbstractions;
 
 namespace ScaledAxisCSharp.Generators;
 
-using ScaledAxisCSharp.DirectInput;
+using DirectInput;
 
 internal static unsafe class DeviceCapabilityHelper
 {
@@ -95,7 +94,7 @@ internal static unsafe class DeviceCapabilityHelper
 			         .Where(o => IsAxisGuid(o.TypeGuid))
 			         .OrderBy(o => GetAxisSortKey(o.TypeGuid, o.Type)))
 		{
-			var name =  PhysicalAxis.GetDirectInputPhysicalAxis(obj.TypeGuid, ref sliderCount);
+			var name = PhysicalAxis.GetDirectInputPhysicalAxis(obj.TypeGuid, ref sliderCount);
 			if (name is not null)
 			{
 				builder.Add(name.Value);
@@ -118,38 +117,21 @@ internal static unsafe class DeviceCapabilityHelper
 		guid == GuidRxAxis || guid == GuidRyAxis || guid == GuidRzAxis ||
 		guid == GuidSlider;
 
-	private static int GetAxisSortKey(Guid guid, uint type)
-	{
-		if (guid == GuidXAxis) return 0;
-		if (guid == GuidYAxis) return 1;
-		if (guid == GuidZAxis) return 2;
-		if (guid == GuidRxAxis) return 3;
-		if (guid == GuidRyAxis) return 4;
-		if (guid == GuidRzAxis) return 5;
-		if (guid == GuidSlider) return 6 + (int)((type & 0x00FFFF00) >> 8);
-		return int.MaxValue;
-	}
-
-	private static string? GetAxisName(Guid guid, ref int sliderCount)
-	{
-		if (guid == GuidXAxis) return "X";
-		if (guid == GuidYAxis) return "Y";
-		if (guid == GuidZAxis) return "Z";
-		if (guid == GuidRxAxis) return "Rx";
-		if (guid == GuidRyAxis) return "Ry";
-		if (guid == GuidRzAxis) return "Rz";
-		if (guid == GuidSlider && sliderCount < 2)
+	private static int GetAxisSortKey(Guid guid, uint type) =>
+		guid switch
 		{
-			var name = sliderCount == 0 ? "Slider1" : "Slider2";
-			sliderCount++;
-			return name;
-		}
-
-		return null;
-	}
+			_ when guid == GuidXAxis => 0,
+			_ when guid == GuidYAxis => 1,
+			_ when guid == GuidZAxis => 2,
+			_ when guid == GuidRxAxis => 3,
+			_ when guid == GuidRyAxis => 4,
+			_ when guid == GuidRzAxis => 5,
+			_ when guid == GuidSlider => 6 + (int)((type & 0x00FFFF00) >> 8),
+			_ => int.MaxValue,
+		};
 
 	[StructLayout(LayoutKind.Sequential)]
-	private unsafe struct DeviceCapVTable
+	private struct DeviceCapVTable
 	{
 		public nint QueryInterface;
 		public nint AddRef;

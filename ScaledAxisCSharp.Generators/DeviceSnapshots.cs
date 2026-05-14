@@ -76,14 +76,46 @@ internal static class DeviceSnapshots
 	private static ImmutableArray<PhysicalAxis> EnumerateVJoyAxes(uint deviceId)
 	{
 		var builder = ImmutableArray.CreateBuilder<PhysicalAxis>();
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x30)) builder.Add(PhysicalAxis.X);
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x31)) builder.Add(PhysicalAxis.Y);
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x32)) builder.Add(PhysicalAxis.Z);
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x33)) builder.Add(PhysicalAxis.Rx);
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x34)) builder.Add(PhysicalAxis.Ry);
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x35)) builder.Add(PhysicalAxis.Rz);
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x36)) builder.Add(PhysicalAxis.Slider1);
-		if (VJoyNative.GetVJDAxisExist(deviceId, 0x37)) builder.Add(PhysicalAxis.Slider2);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x30))
+		{
+			builder.Add(PhysicalAxis.X);
+		}
+
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x31))
+		{
+			builder.Add(PhysicalAxis.Y);
+		}
+
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x32))
+		{
+			builder.Add(PhysicalAxis.Z);
+		}
+
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x33))
+		{
+			builder.Add(PhysicalAxis.Rx);
+		}
+
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x34))
+		{
+			builder.Add(PhysicalAxis.Ry);
+		}
+
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x35))
+		{
+			builder.Add(PhysicalAxis.Rz);
+		}
+
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x36))
+		{
+			builder.Add(PhysicalAxis.Slider1);
+		}
+
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x37))
+		{
+			builder.Add(PhysicalAxis.Slider2);
+		}
+
 		return builder.ToImmutable();
 	}
 
