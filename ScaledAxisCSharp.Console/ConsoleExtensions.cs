@@ -1,9 +1,19 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 
 namespace ScaledAxisCSharp.Console;
 
 public static class ConsoleExtensions
 {
+	public readonly record struct BuildOptions()
+	{
+		public required string Name { get; init; }
+		public DebugLogger? DebugLogger { get; init; }
+		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
+		public ImmutableArray<JoystickDevice>? ConnectedDevices { get; init; }
+		public ImmutableArray<IRoute> Routes { get; init; } = [];
+	}
+
 	extension(IOutputRuntimeContext runtime)
 	{
 		public static PooledList<JoystickDevice> EnumerateConnectedDevices()
@@ -28,7 +38,7 @@ public static class ConsoleExtensions
 			runtime.Run(cts.Token, debugLogger);
 		}
 
-		public static void BuildAndRunAsConsole(RuntimeBuilder.BuildOptions buildOptions,
+		public static void BuildAndRunAsConsole(BuildOptions buildOptions,
 			DebugLogger? debugLogger = null)
 		{
 			using var runtimeMapping = Build(buildOptions switch
@@ -39,16 +49,45 @@ public static class ConsoleExtensions
 			runtimeMapping.RunAsConsole(debugLogger);
 		}
 
+
 		[OverloadResolutionPriority(2)]
-		public static IOutputRuntimeContext Build(RuntimeBuilder.BuildOptions buildOptions) =>
-			RuntimeBuilder.Build(EnsureOutputDeviceFactory(buildOptions));
+		public static IOutputRuntimeContext Build(BuildOptions buildOptions)
+		{
+			using var connectedDevices = buildOptions.ConnectedDevices is null
+				? EnumerateConnectedDevices()
+				: null;
+
+			return RuntimeBuilder.Build(
+				EnsureOutputDeviceFactory(
+					CopyOptions(
+						buildOptions,
+						connectedDevices)));
+		}
+
+		private static RuntimeBuilder.BuildOptions CopyOptions(
+			BuildOptions o,
+			PooledList<JoystickDevice>? joystickDevices) => new()
+		{
+			Name = o.Name,
+			DebugLogger = o.DebugLogger,
+			OutputDeviceFactory = o.OutputDeviceFactory,
+			ConnectedDevices = o.ConnectedDevices ?? [..joystickDevices!],
+			Routes = o.Routes,
+		};
 
 
 		[OverloadResolutionPriority(2)]
 		public static IOutputRuntimeContext BuildFromConfig(AppConfig config)
 		{
-			var buildOptions = Runtime.GetBuildOptionsFromConfig(config);
-			return Build(EnsureOutputDeviceFactory(buildOptions));
+			var buildOptions = EnsureOutputDeviceFactory(Runtime.GetBuildOptionsFromConfig(config));
+			return Build(new()
+			{
+				Name = buildOptions.Name,
+				DebugLogger = buildOptions.DebugLogger,
+				OutputDeviceFactory = buildOptions.OutputDeviceFactory,
+				ConnectedDevices = buildOptions.ConnectedDevices,
+				Routes = buildOptions.Routes,
+			});
 		}
 	}
 
