@@ -1,5 +1,5 @@
-//#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
-#:package ScaledAxisCSharp.Console@0.1.0-debug07
+#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
+//#:package ScaledAxisCSharp.Console@0.1.0-debug07
 using static Devices.Typed;
 using static Devices;
 

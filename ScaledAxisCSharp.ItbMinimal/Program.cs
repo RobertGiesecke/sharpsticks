@@ -1,4 +1,4 @@
-using static Devices.Typed;
+[assembly:GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
@@ -42,8 +42,6 @@ BuildAndRunAsConsole(new()
 	OutputDeviceFactory = VJoyDeviceFactory.Instance,
 });
 
-
-[GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 //
 [RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
 [RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]

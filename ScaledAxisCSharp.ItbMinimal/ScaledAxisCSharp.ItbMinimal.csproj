@@ -7,14 +7,14 @@
 
     <ItemGroup>
 <!--      <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj" />-->
-<!--      <ProjectReference Include="..\ScaledAxisCSharp.Console\ScaledAxisCSharp.Console.csproj" />-->
+      <ProjectReference Include="..\ScaledAxisCSharp.Console\ScaledAxisCSharp.Console.csproj" />
 <!--      <ProjectReference Include="..\ScaledAxisCSharp.DirectInput\ScaledAxisCSharp.DirectInput.csproj" />-->
 <!--      <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj" />-->
 <!--      <ProjectReference Include="..\ScaledAxisCSharp.VJoy\ScaledAxisCSharp.VJoy.csproj" />-->
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="ScaledAxisCSharp.Console" Version="0.1.0-debug07" />
+<!--      <PackageReference Include="ScaledAxisCSharp.Console" Version="0.1.0-debug07" />-->
     </ItemGroup>
 
 </Project>
