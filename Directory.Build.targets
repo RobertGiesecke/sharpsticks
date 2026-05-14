@@ -12,19 +12,30 @@
                      Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')" />
       <_ExportedUsings Include="$(RootNamespace)"
                        Condition="'$(RootNamespace)' != ''" />
+      <_ExportedAnalyzerProjects Include="@(ScaledAxisCSharpExportAnalyzerProject)" />
     </ItemGroup>
     <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
              Query="/Project/ItemGroup/Using/@Include"
              Condition="'@(_ProjRefProps)' != ''">
       <Output TaskParameter="Result" ItemName="_ExportedUsings" />
     </XmlPeek>
+    <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
+             Query="/Project/ItemGroup/ScaledAxisCSharpTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
+             Condition="'@(_ProjRefProps)' != ''">
+      <Output TaskParameter="Result" ItemName="_ExportedAnalyzerProjects" />
+    </XmlPeek>
     <RemoveDuplicates Inputs="@(_ExportedUsings)">
       <Output TaskParameter="Filtered" ItemName="_DistinctExportedUsings" />
+    </RemoveDuplicates>
+    <RemoveDuplicates Inputs="@(_ExportedAnalyzerProjects)">
+      <Output TaskParameter="Filtered" ItemName="_DistinctExportedAnalyzerProjects" />
     </RemoveDuplicates>
     <ItemGroup>
       <_PropsFileLines Include="&lt;Project&gt;" />
       <_PropsFileLines Include="  &lt;ItemGroup&gt;" />
       <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.Identity)&quot; /&gt;" />
+      <_PropsFileLines Include="    &lt;ScaledAxisCSharpTransitiveAnalyzerProject Include=&quot;%(_DistinctExportedAnalyzerProjects.Identity)&quot; /&gt;"
+                       Condition="'%(_DistinctExportedAnalyzerProjects.Identity)' != ''" />
       <_PropsFileLines Include="  &lt;/ItemGroup&gt;" />
       <_PropsFileLines Include="&lt;/Project&gt;" />
     </ItemGroup>
@@ -38,6 +49,12 @@
 
   <Target Name="ImportProjectRefBuildTransitiveUsings"
           BeforeTargets="GenerateGlobalUsings">
+    <MSBuild Projects="@(ProjectReference)"
+             Targets="GenerateBuildTransitiveProps"
+             Properties="Configuration=$(Configuration)"
+             BuildInParallel="$(BuildInParallel)"
+             ContinueOnError="WarnAndContinue"
+             Condition="'@(ProjectReference)' != ''" />
     <ItemGroup>
       <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                      Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')" />
@@ -47,6 +64,30 @@
              Condition="'@(_ProjRefProps)' != ''">
       <Output TaskParameter="Result" ItemName="Using" />
     </XmlPeek>
+  </Target>
+
+  <Target Name="ImportProjectRefBuildTransitiveAnalyzers"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="ImportProjectRefBuildTransitiveUsings">
+    <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
+             Query="/Project/ItemGroup/ScaledAxisCSharpTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
+             Condition="'@(_ProjRefProps)' != ''">
+      <Output TaskParameter="Result" ItemName="_ImportedTransitiveAnalyzerProjects" />
+    </XmlPeek>
+    <ItemGroup>
+      <_TransitiveAnalyzerProject Include="$(MSBuildThisFileDirectory)%(_ImportedTransitiveAnalyzerProjects.Identity)"
+                                  Condition="'@(_ImportedTransitiveAnalyzerProjects)' != '' and Exists('$(MSBuildThisFileDirectory)%(_ImportedTransitiveAnalyzerProjects.Identity)')" />
+    </ItemGroup>
+    <MSBuild Projects="@(_TransitiveAnalyzerProject)"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration)"
+             BuildInParallel="$(BuildInParallel)"
+             Condition="'@(_TransitiveAnalyzerProject)' != ''">
+      <Output TaskParameter="TargetOutputs" ItemName="_TransitiveAnalyzerOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <Analyzer Include="@(_TransitiveAnalyzerOutput)" />
+    </ItemGroup>
   </Target>
 
 </Project>
