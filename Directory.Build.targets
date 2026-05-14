@@ -7,6 +7,7 @@
       <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
       <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
       <_BuildTransitivePartialFile>$(_BuildTransitiveDir)$(MSBuildProjectName).partial.props</_BuildTransitivePartialFile>
+      <_BuildTransitivePackFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)pack-buildTransitive\$(MSBuildProjectName).props</_BuildTransitivePackFile>
     </PropertyGroup>
     <ItemGroup>
       <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
@@ -45,10 +46,18 @@
       <_PropsFileLines Include="  &lt;/ItemGroup&gt;" />
       <_PropsFileLines Include="&lt;/Project&gt;" />
     </ItemGroup>
-    <MakeDir Directories="$(_BuildTransitiveDir)" />
-    <WriteLinesToFile File="$(_BuildTransitiveFile)" Lines="@(_PropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <ItemGroup>
-      <None Include="$(_BuildTransitiveFile)" Pack="true" PackagePath="buildTransitive\" />
+      <_PackPropsFileLines Include="&lt;Project&gt;" />
+      <_PackPropsFileLines Include="  &lt;ItemGroup&gt;" />
+      <_PackPropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.Identity)&quot; /&gt;" />
+      <_PackPropsFileLines Include="  &lt;/ItemGroup&gt;" />
+      <_PackPropsFileLines Include="&lt;/Project&gt;" />
+    </ItemGroup>
+    <MakeDir Directories="$(_BuildTransitiveDir);$([System.IO.Path]::GetDirectoryName($(_BuildTransitivePackFile)))" />
+    <WriteLinesToFile File="$(_BuildTransitiveFile)" Lines="@(_PropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_BuildTransitivePackFile)" Lines="@(_PackPropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(MSBuildProjectName).props" />
     </ItemGroup>
   </Target>
 

@@ -5,23 +5,31 @@
         <UseGeneratorPackageReference Condition="'$(UseGeneratorPackageReference)' == ''">false</UseGeneratorPackageReference>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(UseGeneratorPackageReference)' != 'true'">
-      <ProjectReference Include="..\ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"
-                        OutputItemType="Analyzer"
-                        ReferenceOutputAssembly="false"
-                        PrivateAssets="all" />
-      <ScaledAxisCSharpExportAnalyzerProject Include="ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj" />
+    <ItemGroup>
+        <ScaledAxisCSharpExportAnalyzerProject Include="ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(UseGeneratorPackageReference)' == 'true'">
-      <PackageReference Include="ScaledAxisCSharp.Generators"
-                        Version="$(Version)"
-                        IncludeAssets="analyzers;buildtransitive"
-                        PrivateAssets="contentfiles;build" />
-    </ItemGroup>
+    <Choose>
+        <When Condition="'$(UseGeneratorPackageReference)' == 'true'">
+            <ItemGroup Condition="'$(UseGeneratorPackageReference)' == 'true'">
+                <PackageReference Include="ScaledAxisCSharp.Generators"
+                                  Version="$(Version)"
+                                  IncludeAssets="analyzers;buildtransitive"
+                                  PrivateAssets="contentfiles;build"/>
+            </ItemGroup>
+        </When>
+        <Otherwise>
+            <ItemGroup Condition="'$(UseGeneratorPackageReference)' != 'true'">
+                <ProjectReference Include="..\ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"
+                                  OutputItemType="Analyzer"
+                                  ReferenceOutputAssembly="false"
+                                  PrivateAssets="all"/>
+            </ItemGroup>
+        </Otherwise>
+    </Choose>
 
     <ItemGroup>
-      <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj" />
+        <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj"/>
     </ItemGroup>
 
 </Project>

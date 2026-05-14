@@ -2,7 +2,6 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <NoAutoProps>true</NoAutoProps>
     </PropertyGroup>
 
     <ItemGroup>
