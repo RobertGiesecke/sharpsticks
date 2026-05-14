@@ -2,21 +2,19 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj" />
+<!--      <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj" />-->
       <ProjectReference Include="..\ScaledAxisCSharp.Console\ScaledAxisCSharp.Console.csproj" />
-      <ProjectReference Include="..\ScaledAxisCSharp.DirectInput\ScaledAxisCSharp.DirectInput.csproj" />
-      <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj" />
-      <ProjectReference Include="..\ScaledAxisCSharp.VJoy\ScaledAxisCSharp.VJoy.csproj" />
+<!--      <ProjectReference Include="..\ScaledAxisCSharp.DirectInput\ScaledAxisCSharp.DirectInput.csproj" />-->
+<!--      <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj" />-->
+<!--      <ProjectReference Include="..\ScaledAxisCSharp.VJoy\ScaledAxisCSharp.VJoy.csproj" />-->
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="MinVer" Version="7.0.0">
-        <PrivateAssets>all</PrivateAssets>
-        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      </PackageReference>
+<!--      <PackageReference Include="ScaledAxisCSharp.Console" Version="0.1.0-debug04" />-->
     </ItemGroup>
 
 </Project>
