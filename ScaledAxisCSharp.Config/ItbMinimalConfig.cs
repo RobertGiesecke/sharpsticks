@@ -8,25 +8,25 @@ public sealed record ItbMinimalConfig
 	public DeviceAxisSource XAxis { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
-		Axis = PhysicalAxis.X,
+		Axis = Axis.X,
 	};
 
 	public DeviceAxisSource YAxis { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
-		Axis = PhysicalAxis.Y,
+		Axis = Axis.Y,
 	};
 
 	public DeviceAxisSource ZAxis { get; init; } = new()
 	{
 		DeviceName = "RIGHT VPC Stick WarBRD",
-		Axis = PhysicalAxis.Z,
+		Axis = Axis.Z,
 	};
 
 	public DeviceAxisSource ModifierAxis { get; init; } = new()
 	{
 		DeviceName = "LEFT VPC Stick WarBRD",
-		Axis = PhysicalAxis.Slider1,
+		Axis = Axis.Slider1,
 	};
 
 	public double ModifierMin { get; init; } = -1.0;

@@ -33,12 +33,12 @@ internal static unsafe class DeviceCapabilityHelper
 	internal static bool TryGetCapabilities(
 		nint directInput,
 		Guid instanceGuid,
-		out ImmutableArray<PhysicalAxis> axes,
+		out ImmutableArray<Axis> axes,
 		out uint buttonCount)
 	{
 		if (!TryCreateDevice(directInput, instanceGuid, out var devicePointer))
 		{
-			axes = ImmutableArray<PhysicalAxis>.Empty;
+			axes = ImmutableArray<Axis>.Empty;
 			buttonCount = 0;
 			return false;
 		}
@@ -72,7 +72,7 @@ internal static unsafe class DeviceCapabilityHelper
 		return DirectInputNative.Succeeded(result) ? caps.Buttons : 0;
 	}
 
-	private static ImmutableArray<PhysicalAxis> EnumerateAxes(nint devicePointer)
+	private static ImmutableArray<Axis> EnumerateAxes(nint devicePointer)
 	{
 		var objectInfos = new List<(Guid TypeGuid, uint Type)>();
 		var handle = GCHandle.Alloc(objectInfos);
@@ -87,14 +87,14 @@ internal static unsafe class DeviceCapabilityHelper
 			handle.Free();
 		}
 
-		var builder = ImmutableArray.CreateBuilder<PhysicalAxis>();
+		var builder = ImmutableArray.CreateBuilder<Axis>();
 		var sliderCount = 0;
 
 		foreach (var obj in objectInfos
 			         .Where(o => IsAxisGuid(o.TypeGuid))
 			         .OrderBy(o => GetAxisSortKey(o.TypeGuid, o.Type)))
 		{
-			var name = PhysicalAxis.GetDirectInputPhysicalAxis(obj.TypeGuid, ref sliderCount);
+			var name = Axis.GetDirectInputAxis(obj.TypeGuid, ref sliderCount);
 			if (name is not null)
 			{
 				builder.Add(name.Value);

@@ -455,7 +455,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		string deviceIdentifier,
 		string deviceOriginalName,
 		DirectInputDeviceSnapshot device,
-		Dictionary<PhysicalAxis, string> axisPropertyNames,
+		Dictionary<Axis, string> axisPropertyNames,
 		Dictionary<int, string> buttonPropertyNames,
 		string indent,
 		string memberIndent)
@@ -494,7 +494,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			builder.Append(innerMemberIndent)
 				.Append("public AxisBinding ")
 				.Append(propName)
-				.Append(" { get; } = new(DeviceId, PhysicalAxis.")
+				.Append(" { get; } = new(DeviceId, Axis.")
 				.Append(axisName)
 				.AppendLine(");");
 		}
@@ -511,12 +511,12 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		if (device.Axes.Length > 0)
 		{
 			builder.AppendLine();
-			builder.Append(innerMemberIndent).AppendLine("public AxisBinding this[PhysicalAxis axis] => axis switch");
+			builder.Append(innerMemberIndent).AppendLine("public AxisBinding this[Axis axis] => axis switch");
 			builder.Append(innerMemberIndent).AppendLine("{");
 			foreach (var axisName in device.Axes)
 			{
 				var propName = AxisPropertyName(axisName, axisPropertyNames);
-				builder.Append(innerMemberIndent).Append("\tPhysicalAxis.")
+				builder.Append(innerMemberIndent).Append("\tAxis.")
 					.Append(axisName).Append(" => ").Append(propName).AppendLine(",");
 			}
 
@@ -578,8 +578,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		StringBuilder builder,
 		string vjoyIdentifier,
 		string vjoyOriginalName,
-		ImmutableArray<PhysicalAxis> axes,
-		Dictionary<PhysicalAxis, string> axisPropertyNames,
+		ImmutableArray<Axis> axes,
+		Dictionary<Axis, string> axisPropertyNames,
 		uint buttonCount,
 		Dictionary<int, string> buttonPropertyNames,
 		string indent,
@@ -612,7 +612,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			builder.Append(innerMemberIndent)
 				.Append("public OutputAxisBinding ")
 				.Append(propName)
-				.Append(" { get; } = new(DeviceId, PhysicalAxis.")
+				.Append(" { get; } = new(DeviceId, Axis.")
 				.Append(axis)
 				.AppendLine(");");
 		}
@@ -629,11 +629,11 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		if (axes.Length > 0)
 		{
 			builder.AppendLine();
-			builder.Append(innerMemberIndent).AppendLine("public OutputAxisBinding this[PhysicalAxis axis] => axis switch");
+			builder.Append(innerMemberIndent).AppendLine("public OutputAxisBinding this[Axis axis] => axis switch");
 			builder.Append(innerMemberIndent).AppendLine("{");
 			foreach (var axis in axes)
 			{
-				builder.Append(innerMemberIndent).Append("\tPhysicalAxis.")
+				builder.Append(innerMemberIndent).Append("\tAxis.")
 					.Append(axis).Append(" => ").Append(AxisPropertyName(axis, axisPropertyNames)).AppendLine(",");
 			}
 			builder.Append(innerMemberIndent)
@@ -717,13 +717,13 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		return baseName;
 	}
 
-	private static Dictionary<PhysicalAxis, string> BuildAxisPropertyNames(
+	private static Dictionary<Axis, string> BuildAxisPropertyNames(
 		string deviceProductName,
 		string deviceBaseIdentifier,
 		ImmutableArray<AxisRename> axisRenames,
 		string? extraIdentifier = null)
 	{
-		var result = new Dictionary<PhysicalAxis, string>();
+		var result = new Dictionary<Axis, string>();
 		foreach (var rename in axisRenames)
 		{
 			if (rename.DeviceName == deviceProductName || rename.DeviceName == deviceBaseIdentifier
@@ -736,7 +736,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		return result;
 	}
 
-	private static string AxisPropertyName(PhysicalAxis axisName, Dictionary<PhysicalAxis, string> axisPropertyNames) =>
+	private static string AxisPropertyName(Axis axisName, Dictionary<Axis, string> axisPropertyNames) =>
 		axisPropertyNames.GetValueOrDefault(axisName, axisName.ToString());
 
 	private static Dictionary<int, string> BuildButtonPropertyNames(
@@ -870,7 +870,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				continue;
 			}
 
-			var axisName = GetPhysicalAxisFromExpression(argList.Arguments[1].Expression, attr, 1);
+			var axisName = GetAxisFromExpression(argList.Arguments[1].Expression, attr, 1);
 			if (axisName is null)
 			{
 				continue;
@@ -911,26 +911,26 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		};
 	}
 
-	private static PhysicalAxis? GetPhysicalAxis(int value) => value switch
+	private static Axis? GetAxis(int value) => value switch
 	{
 		< 0 => null,
-		_ => (PhysicalAxis)value,
+		_ => (Axis)value,
 	};
 
-	private static PhysicalAxis? GetPhysicalAxisFromExpression(ExpressionSyntax expr, AttributeData attr, int index)
+	private static Axis? GetAxisFromExpression(ExpressionSyntax expr, AttributeData attr, int index)
 	{
 		if (attr.ConstructorArguments.Length > index)
 		{
 			var value = GetTypedConstantInt32(attr.ConstructorArguments[index], -1);
 			if (value >= 0)
 			{
-				return GetPhysicalAxis(value);
+				return GetAxis(value);
 			}
 		}
 
-		// Fall back to syntax: PhysicalAxis.Slider1 → parse enum member name
+		// Fall back to syntax: Axis.Slider1 → parse enum member name
 		if (expr is MemberAccessExpressionSyntax memberAccess
-		    && Enum.TryParse<PhysicalAxis>(memberAccess.Name.Identifier.ValueText, out var axis))
+		    && Enum.TryParse<Axis>(memberAccess.Name.Identifier.ValueText, out var axis))
 		{
 			return axis;
 		}
@@ -1307,7 +1307,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 
 	private readonly record struct DeviceRename(string DeviceName, string NewName);
 
-	private readonly record struct AxisRename(string DeviceName, PhysicalAxis OriginalAxis, string NewPropertyName);
+	private readonly record struct AxisRename(string DeviceName, Axis OriginalAxis, string NewPropertyName);
 
 	private readonly record struct ButtonRename(string DeviceName, int Button, string NewPropertyName);
 }

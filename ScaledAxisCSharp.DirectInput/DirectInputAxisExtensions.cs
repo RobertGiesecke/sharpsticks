@@ -2,7 +2,7 @@
 
 namespace ScaledAxisCSharp.DirectInput;
 
-public static class DirectInputPhysicalAxisExtensions
+public static class DirectInputAxisExtensions
 {
 	public static readonly Guid XAxisGuid = new(0xA36D02E0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54,
 		0x00,
@@ -32,7 +32,7 @@ public static class DirectInputPhysicalAxisExtensions
 		0x00,
 		0x00);
 
-	extension(PhysicalAxis)
+	extension(Axis)
 	{
 		public static Guid GuidXAxis => XAxisGuid;
 		public static Guid GuidYAxis => YAxisGuid;
@@ -42,41 +42,41 @@ public static class DirectInputPhysicalAxisExtensions
 		public static Guid GuidRzAxis => RzAxisGuid;
 		public static Guid GuidSlider => SliderGuid;
 
-		public static PhysicalAxis? GetDirectInputPhysicalAxis(Guid axisGuid, ref int sliderIndex)
+		public static Axis? GetDirectInputAxis(Guid axisGuid, ref int sliderIndex)
 		{
 			if (axisGuid == XAxisGuid)
 			{
-				return PhysicalAxis.X;
+				return Axis.X;
 			}
 
 			if (axisGuid == YAxisGuid)
 			{
-				return PhysicalAxis.Y;
+				return Axis.Y;
 			}
 
 			if (axisGuid == ZAxisGuid)
 			{
-				return PhysicalAxis.Z;
+				return Axis.Z;
 			}
 
 			if (axisGuid == RxAxisGuid)
 			{
-				return PhysicalAxis.Rx;
+				return Axis.Rx;
 			}
 
 			if (axisGuid == RyAxisGuid)
 			{
-				return PhysicalAxis.Ry;
+				return Axis.Ry;
 			}
 
 			if (axisGuid == RzAxisGuid)
 			{
-				return PhysicalAxis.Rz;
+				return Axis.Rz;
 			}
 
 			if (axisGuid == SliderGuid && sliderIndex < 2)
 			{
-				var axis = sliderIndex == 0 ? PhysicalAxis.Slider1 : PhysicalAxis.Slider2;
+				var axis = sliderIndex == 0 ? Axis.Slider1 : Axis.Slider2;
 				sliderIndex++;
 				return axis;
 			}

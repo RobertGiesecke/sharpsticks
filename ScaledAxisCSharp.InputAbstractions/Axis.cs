@@ -2,8 +2,8 @@ using System.Text.Json.Serialization;
 
 namespace ScaledAxisCSharp.InputAbstractions;
 
-[JsonConverter(typeof(JsonStringEnumConverter<PhysicalAxis>))]
-public enum PhysicalAxis
+[JsonConverter(typeof(JsonStringEnumConverter<Axis>))]
+public enum Axis
 {
 	X,
 	Y,

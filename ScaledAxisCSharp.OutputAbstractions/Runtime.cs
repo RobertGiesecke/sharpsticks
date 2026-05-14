@@ -35,7 +35,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		public required int SourceDeviceIndex { get; init; }
 		public required JoystickDevice SourceDevice { get; init; }
 		public required AxisBinding Source { get; init; }
-		public required PhysicalAxis OutputAxis { get; init; }
+		public required Axis OutputAxis { get; init; }
 		public required double Scale { get; init; }
 		public required double Offset { get; init; }
 		public required IAxisModifier? Modifier { get; init; }
@@ -273,9 +273,9 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	private static void AppendAxisDebugLine(
 		StringBuilder debugLines,
 		int deviceId,
-		PhysicalAxis axis,
+		Axis axis,
 		uint outputDeviceId,
-		PhysicalAxis outputAxis,
+		Axis outputAxis,
 		AxisDebugSample sample,
 		double output)
 	{

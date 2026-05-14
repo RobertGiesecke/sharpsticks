@@ -25,10 +25,10 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="..\ScaledAxisCSharp.InputAbstractions\PhysicalAxis.cs"
-                 Link="included-runtime\InputAbstractions\PhysicalAxis.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputPhysicalAxisExtensions.cs"
-                 Link="included-runtime\DirectInput\DirectInputPhysicalAxisExtensions.cs" />
+        <Compile Include="..\ScaledAxisCSharp.InputAbstractions\Axis.cs"
+                 Link="included-runtime\InputAbstractions\Axis.cs" />
+        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputAxisExtensions.cs"
+                 Link="included-runtime\DirectInput\DirectInputAxisExtensions.cs" />
         <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInput8VTable.cs"
                  Link="included-runtime\DirectInput\DirectInput8VTable.cs" />
         <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputDeviceEnumerator.cs"

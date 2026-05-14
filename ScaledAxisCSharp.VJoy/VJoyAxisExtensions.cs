@@ -4,19 +4,19 @@ namespace ScaledAxisCSharp.VJoy;
 
 public static class VJoyAxisExtensions
 {
-	extension(PhysicalAxis address)
+	extension(Axis address)
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
 		public uint GetVJoyAxisId() => address switch
 		{
-			PhysicalAxis.X => VJoyAxisConstants.X,
-			PhysicalAxis.Y => VJoyAxisConstants.Y,
-			PhysicalAxis.Z => VJoyAxisConstants.Z,
-			PhysicalAxis.Rx => VJoyAxisConstants.Rx,
-			PhysicalAxis.Ry => VJoyAxisConstants.Ry,
-			PhysicalAxis.Rz => VJoyAxisConstants.Rz,
-			PhysicalAxis.Slider1 => VJoyAxisConstants.Slider1,
-			PhysicalAxis.Slider2 => VJoyAxisConstants.Slider2,
+			Axis.X => VJoyAxisConstants.X,
+			Axis.Y => VJoyAxisConstants.Y,
+			Axis.Z => VJoyAxisConstants.Z,
+			Axis.Rx => VJoyAxisConstants.Rx,
+			Axis.Ry => VJoyAxisConstants.Ry,
+			Axis.Rz => VJoyAxisConstants.Rz,
+			Axis.Slider1 => VJoyAxisConstants.Slider1,
+			Axis.Slider2 => VJoyAxisConstants.Slider2,
 			_ => throw new ArgumentOutOfRangeException(nameof(address), address, null),
 		};
 	}

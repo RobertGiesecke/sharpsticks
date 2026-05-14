@@ -35,18 +35,18 @@ internal static unsafe partial class DirectInputNative
 		return (int)((type & 0x00FFFF00) >> 8);
 	}
 
-	public static uint GetAxisOffset(PhysicalAxis axis)
+	public static uint GetAxisOffset(Axis axis)
 	{
 		return axis switch
 		{
-			PhysicalAxis.X => 0,
-			PhysicalAxis.Y => 4,
-			PhysicalAxis.Z => 8,
-			PhysicalAxis.Rx => 12,
-			PhysicalAxis.Ry => 16,
-			PhysicalAxis.Rz => 20,
-			PhysicalAxis.Slider1 => 24,
-			PhysicalAxis.Slider2 => 28,
+			Axis.X => 0,
+			Axis.Y => 4,
+			Axis.Z => 8,
+			Axis.Rx => 12,
+			Axis.Ry => 16,
+			Axis.Rz => 20,
+			Axis.Slider1 => 24,
+			Axis.Slider2 => 28,
 			_ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
 		};
 	}

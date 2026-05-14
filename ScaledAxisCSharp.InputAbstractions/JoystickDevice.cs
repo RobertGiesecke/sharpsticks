@@ -6,7 +6,7 @@ public abstract class JoystickDevice : IDisposable
 	public required string Name { get; init; }
 	public required string InstanceName { get; init; }
 	public required JoystickCapabilities Capabilities { get; init; }
-	public required ImmutableArray<PhysicalAxis> PhysicalAxes { get; init; }
+	public required ImmutableArray<Axis> PhysicalAxes { get; init; }
 	public required WaitHandle DataAvailable { get; init; }
 	public abstract bool TryRead(out JoystickState state, out string? error);
 	public abstract double ReadNormalizedAxis(in JoystickState state, AxisBinding binding);

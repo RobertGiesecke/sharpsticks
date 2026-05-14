@@ -73,47 +73,47 @@ internal static class DeviceSnapshots
 		}
 	}
 
-	private static ImmutableArray<PhysicalAxis> EnumerateVJoyAxes(uint deviceId)
+	private static ImmutableArray<Axis> EnumerateVJoyAxes(uint deviceId)
 	{
-		var builder = ImmutableArray.CreateBuilder<PhysicalAxis>();
+		var builder = ImmutableArray.CreateBuilder<Axis>();
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x30))
 		{
-			builder.Add(PhysicalAxis.X);
+			builder.Add(Axis.X);
 		}
 
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x31))
 		{
-			builder.Add(PhysicalAxis.Y);
+			builder.Add(Axis.Y);
 		}
 
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x32))
 		{
-			builder.Add(PhysicalAxis.Z);
+			builder.Add(Axis.Z);
 		}
 
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x33))
 		{
-			builder.Add(PhysicalAxis.Rx);
+			builder.Add(Axis.Rx);
 		}
 
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x34))
 		{
-			builder.Add(PhysicalAxis.Ry);
+			builder.Add(Axis.Ry);
 		}
 
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x35))
 		{
-			builder.Add(PhysicalAxis.Rz);
+			builder.Add(Axis.Rz);
 		}
 
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x36))
 		{
-			builder.Add(PhysicalAxis.Slider1);
+			builder.Add(Axis.Slider1);
 		}
 
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x37))
 		{
-			builder.Add(PhysicalAxis.Slider2);
+			builder.Add(Axis.Slider2);
 		}
 
 		return builder.ToImmutable();
@@ -134,7 +134,7 @@ internal static class DeviceSnapshots
 internal readonly record struct DirectInputDeviceSnapshot(
 	int DeviceId,
 	string ProductName,
-	ImmutableArray<PhysicalAxis> Axes,
+	ImmutableArray<Axis> Axes,
 	uint ButtonCount);
 
-internal readonly record struct VJoyDeviceSnapshot(uint DeviceId, ImmutableArray<PhysicalAxis> Axes, uint ButtonCount);
+internal readonly record struct VJoyDeviceSnapshot(uint DeviceId, ImmutableArray<Axis> Axes, uint ButtonCount);

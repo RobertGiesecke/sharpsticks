@@ -9,7 +9,7 @@ public static class AxisBindingParser
 			ArgumentNullException.ThrowIfNull(input);
 			return new AxisBinding(
 				input.DeviceId,
-				PhysicalAxis.Parse(input.Axis),
+				Axis.Parse(input.Axis),
 				AxisMode.Parse(input.Mode),
 				input.Invert,
 				input.Deadzone);

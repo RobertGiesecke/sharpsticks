@@ -23,7 +23,7 @@ public static class RuntimeBuilder
 			var referencedDeviceIds = new HashSet<int>();
 			using var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToPooledList();
 			using var axisRoutes = options.Routes.OfType<AxisRoute>().ToPooledList();
-			var claimedAxes = new HashSet<(uint OutputDeviceId, PhysicalAxis Axis)>();
+			var claimedAxes = new HashSet<(uint OutputDeviceId, Axis Axis)>();
 			var referencedOutputDeviceIds = new HashSet<uint>();
 
 			foreach (var mapping in buttonRoutes)

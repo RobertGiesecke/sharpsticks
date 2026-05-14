@@ -39,7 +39,7 @@ public static class BindingExtensions
 	public static AxisRoute RouteAxis(
 		this AxisBinding binding,
 		uint outputDeviceId,
-		PhysicalAxis outputAxis,
+		Axis outputAxis,
 		double scale = 1.0,
 		double offset = 0.0,
 		IAxisModifier? modifier = null) =>
@@ -68,7 +68,7 @@ public static class BindingExtensions
 	public static AxisRoute RouteAxis(
 		this AxisBinding binding,
 		uint outputDeviceId,
-		PhysicalAxis outputAxis,
+		Axis outputAxis,
 		RouteAxisOptions? options = null) =>
 		RouteTo(
 			binding,

@@ -40,7 +40,7 @@ public static class RuntimeExtensions
 			foreach (var mapping in config.AxisMappings)
 			{
 				var source = AxisBinding.Parse(mapping.Source);
-				var targetAxis = PhysicalAxis.Parse(mapping.TargetAxis);
+				var targetAxis = Axis.Parse(mapping.TargetAxis);
 
 				axisRoutes.Add(new AxisRoute
 				{

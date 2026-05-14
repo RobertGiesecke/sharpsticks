@@ -52,9 +52,9 @@ internal sealed class RenameButton : Attribute
 internal sealed class RenameAxis : Attribute
 {
 	public string DeviceName { get; }
-	public PhysicalAxis Axis { get; }
+	public Axis Axis { get; }
 	public string NewName { get; }
-	public RenameAxis(string deviceName, PhysicalAxis axis, string newName)
+	public RenameAxis(string deviceName, Axis axis, string newName)
 	{
 		DeviceName = deviceName;
 		Axis = axis;

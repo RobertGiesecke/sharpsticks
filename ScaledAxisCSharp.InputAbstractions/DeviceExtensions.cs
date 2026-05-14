@@ -2,10 +2,10 @@
 
 public static class DeviceExtensions
 {
-	public static AxisBinding BindAxis<T>(this T device, PhysicalAxis physicalAxis)
+	public static AxisBinding BindAxis<T>(this T device, Axis axis)
 		where T : JoystickDevice
 	{
-		return new AxisBinding(device.DeviceId, physicalAxis, AxisMode.Signed, false, 0.0);
+		return new AxisBinding(device.DeviceId, axis, AxisMode.Signed, false, 0.0);
 	}
 
 	public static ButtonBinding BindButton<T>(this T device, int sourceButton)

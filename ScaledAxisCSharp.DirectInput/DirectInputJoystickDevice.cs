@@ -8,8 +8,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	private const int AxisRangeMax = 32767;
 	private const int DefaultAxisRangeMin = 0;
 	private const int DefaultAxisRangeMax = 65535;
-	private readonly Dictionary<PhysicalAxis, AxisDecoderKind> _AxisDecoderKinds = [];
-	private readonly IReadOnlyDictionary<PhysicalAxis, AxisRange> _AxisRanges;
+	private readonly Dictionary<Axis, AxisDecoderKind> _AxisDecoderKinds = [];
+	private readonly IReadOnlyDictionary<Axis, AxisRange> _AxisRanges;
 	private readonly nint _DevicePointer;
 	private bool _Disposed;
 
@@ -19,8 +19,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		DirectInputDeviceInfo info,
 		DirectInputDeviceCaps caps,
 		nint devicePointer,
-		ImmutableArray<PhysicalAxis> physicalAxes,
-		IReadOnlyDictionary<PhysicalAxis, AxisRange> axisRanges,
+		ImmutableArray<Axis> physicalAxes,
+		IReadOnlyDictionary<Axis, AxisRange> axisRanges,
 		WaitHandle dataAvailable)
 	{
 		DeviceId = deviceId;
@@ -277,18 +277,18 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	{
 		var sliderIndex = 0;
 
-		foreach (var axis in objects.Where(IsAxisObject).OrderBy(GetAxisSortKey))
+		foreach (var deviceObjectInfo in objects.Where(IsAxisObject).OrderBy(GetAxisSortKey))
 		{
-			var physicalAxis = PhysicalAxis.GetDirectInputPhysicalAxis(axis.TypeGuid, ref sliderIndex);
-			if (physicalAxis is null)
+			var axis = Axis.GetDirectInputAxis(deviceObjectInfo.TypeGuid, ref sliderIndex);
+			if (axis is null)
 			{
 				continue;
 			}
 
 			axisEntries.Add(new AxisFormatEntry(
-				physicalAxis.Value,
-				DirectInputNative.GetAxisOffset(physicalAxis.Value),
-				axis.Type));
+				axis.Value,
+				DirectInputNative.GetAxisOffset(axis.Value),
+				deviceObjectInfo.Type));
 		}
 	}
 
@@ -337,10 +337,10 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 	}
 
-	private static Dictionary<PhysicalAxis, AxisRange> ConfigureAxisRanges(nint devicePointer,
+	private static Dictionary<Axis, AxisRange> ConfigureAxisRanges(nint devicePointer,
 		IReadOnlyList<AxisFormatEntry> axisEntries)
 	{
-		var ranges = new Dictionary<PhysicalAxis, AxisRange>();
+		var ranges = new Dictionary<Axis, AxisRange>();
 
 		foreach (var axisEntry in axisEntries)
 		{
@@ -387,7 +387,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	}
 
 	private double Normalize(
-		PhysicalAxis axis,
+		Axis axis,
 		int rawValue,
 		AxisRange range,
 		AxisMode mode,
@@ -414,7 +414,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	}
 
 	private double NormalizeBase(
-		PhysicalAxis axis,
+		Axis axis,
 		int rawValue,
 		AxisRange range,
 		AxisMode mode,
@@ -466,7 +466,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		return Math.Clamp(normalized, 0.0, 1.0);
 	}
 
-	private AxisDecoderKind GetOrDetectSignedDecoder(PhysicalAxis axis, int rawValue, AxisRange range)
+	private AxisDecoderKind GetOrDetectSignedDecoder(Axis axis, int rawValue, AxisRange range)
 	{
 		if (_AxisDecoderKinds.TryGetValue(axis, out var existing) &&
 		    existing is AxisDecoderKind.NativeSigned or AxisDecoderKind.UnsignedCentered)

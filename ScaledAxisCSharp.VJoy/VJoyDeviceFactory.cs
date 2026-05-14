@@ -50,7 +50,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 			throw new InvalidOperationException($"Failed to reset vJoy device {deviceId}.");
 		}
 
-		var axisLimits = new Dictionary<PhysicalAxis, AxisLimits>();
+		var axisLimits = new Dictionary<Axis, AxisLimits>();
 		foreach (var axis in axisRoutes.Select(route => route.OutputBinding.Axis)
 			         .Distinct())
 		{

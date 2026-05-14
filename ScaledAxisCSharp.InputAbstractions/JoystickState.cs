@@ -12,18 +12,18 @@ public readonly record struct JoystickState(
 	ulong ButtonBitsLow,
 	ulong ButtonBitsHigh)
 {
-	public int GetAxisValue(PhysicalAxis axis)
+	public int GetAxisValue(Axis axis)
 	{
 		return axis switch
 		{
-			PhysicalAxis.X => X,
-			PhysicalAxis.Y => Y,
-			PhysicalAxis.Z => Z,
-			PhysicalAxis.Rx => Rx,
-			PhysicalAxis.Ry => Ry,
-			PhysicalAxis.Rz => Rz,
-			PhysicalAxis.Slider1 => Slider1,
-			PhysicalAxis.Slider2 => Slider2,
+			Axis.X => X,
+			Axis.Y => Y,
+			Axis.Z => Z,
+			Axis.Rx => Rx,
+			Axis.Ry => Ry,
+			Axis.Rz => Rz,
+			Axis.Slider1 => Slider1,
+			Axis.Slider2 => Slider2,
 			_ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
 		};
 	}

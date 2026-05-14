@@ -2,20 +2,20 @@ namespace ScaledAxisCSharp.VJoy;
 
 public sealed class VJoyDevice : OutputDevice
 {
-	private readonly FrozenDictionary<PhysicalAxis, AxisLimits> _AxisLimits;
-	private readonly Dictionary<PhysicalAxis, int> _LastAxisValues;
+	private readonly FrozenDictionary<Axis, AxisLimits> _AxisLimits;
+	private readonly Dictionary<Axis, int> _LastAxisValues;
 	private readonly Dictionary<int, bool> _LastButtonValues;
 
-	public VJoyDevice(uint deviceId, Dictionary<PhysicalAxis, AxisLimits> axisLimits)
+	public VJoyDevice(uint deviceId, Dictionary<Axis, AxisLimits> axisLimits)
 		: base(deviceId)
 	{
 		_AxisLimits = axisLimits.ToFrozenDictionary();
-		_LastAxisValues = new Dictionary<PhysicalAxis, int>(axisLimits.Count);
+		_LastAxisValues = new Dictionary<Axis, int>(axisLimits.Count);
 		_LastButtonValues = new Dictionary<int, bool>(128);
 	}
 
 
-	public override void SetAxis(PhysicalAxis axis, double normalizedValue)
+	public override void SetAxis(Axis axis, double normalizedValue)
 	{
 		ThrowIfDisposed();
 		ThrowIfFrozen();

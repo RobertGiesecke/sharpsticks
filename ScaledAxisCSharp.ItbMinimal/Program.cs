@@ -46,12 +46,12 @@ BuildAndRunAsConsole(new()
 [GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 //
 [RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
-[RenameAxis(DeviceNames.RightVpcStickWarBRD, PhysicalAxis.Z, "Twist")]
+[RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
 //
 [RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
-[RenameAxis(DeviceNames.LeftVpcStickWarBRD, PhysicalAxis.Slider1, "BrakeLever")]
+[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
