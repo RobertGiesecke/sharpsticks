@@ -7,5 +7,9 @@
     <ItemGroup>
         <PackageReference Include="Collections.Pooled.V2" Version="2.4.1"/>
         <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.7" />
+        <PackageReference Include="MinVer" Version="7.0.0">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
     </ItemGroup>
 </Project>

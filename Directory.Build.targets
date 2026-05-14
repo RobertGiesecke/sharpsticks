@@ -1,5 +1,10 @@
 <Project>
 
+    <ItemGroup>
+        <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="all"
+                          IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"/>
+    </ItemGroup>
+
     <Target Name="GenerateBuildTransitiveProps"
             BeforeTargets="Build;Pack"
             Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
@@ -9,9 +14,6 @@
             <_BuildTransitivePartialFile>$(_BuildTransitiveDir)$(MSBuildProjectName).partial.props</_BuildTransitivePartialFile>
             <_BuildTransitivePackFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)pack-buildTransitive\$(MSBuildProjectName).props</_BuildTransitivePackFile>
         </PropertyGroup>
-        <ItemGroup>
-            <PackageReference Include="MinVer" Version="7.0.0"/>
-        </ItemGroup>
         <ItemGroup>
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
