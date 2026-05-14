@@ -20,7 +20,7 @@ var axisOptions = new RouteAxisOptions
 	Modifier = blendedCurveWithPrecisionHold,
 };
 
-using var connectedDevices = DirectInputJoystickDevice.EnumerateConnected();
+using var connectedDevices = EnumerateConnectedDevices();
 
 BuildAndRunAsConsole(new()
 {
