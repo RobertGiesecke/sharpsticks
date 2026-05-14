@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsRoslynComponent>true</IsRoslynComponent>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <NoAutoProps>true</NoAutoProps>
+        <PublishAot>false</PublishAot>
+        <InvariantGlobalization>false</InvariantGlobalization>
+        <RootNamespace>ScaledAxisCSharp.Generators</RootNamespace>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <NoWarn>$(NoWarn);RS1035;RS1041;RS2008</NoWarn>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);AddAnalyzerRuntimeFilesToPackage</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Remove="included-files\**\*.cs" />
+        <EmbeddedResource Include="included-files\**\*.cs"
+                          LogicalName="included-files/%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInput8VTable.cs"
+                 Link="included-runtime\DirectInput\DirectInput8VTable.cs" />
+        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputDeviceEnumerator.cs"
+                 Link="included-runtime\DirectInput\DirectInputDeviceEnumerator.cs" />
+        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputDeviceInfo.cs"
+                 Link="included-runtime\DirectInput\DirectInputDeviceInfo.cs" />
+        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputDeviceInstanceNative.cs"
+                 Link="included-runtime\DirectInput\DirectInputDeviceInstanceNative.cs" />
+        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputNative.Enumeration.cs"
+                 Link="included-runtime\DirectInput\DirectInputNative.Enumeration.cs" />
+        <Compile Include="..\ScaledAxisCSharp.DirectInput\UnknownVTable.cs"
+                 Link="included-runtime\DirectInput\UnknownVTable.cs" />
+        <Compile Include="..\ScaledAxisCSharp.VJoy\VjdStatus.cs"
+                 Link="included-runtime\VJoy\VjdStatus.cs" />
+        <Compile Include="..\ScaledAxisCSharp.VJoy\VJoyDeviceInfo.cs"
+                 Link="included-runtime\VJoy\VJoyDeviceInfo.cs" />
+        <Compile Include="..\ScaledAxisCSharp.VJoy\VJoyDevices.cs"
+                 Link="included-runtime\VJoy\VJoyDevices.cs" />
+        <Compile Include="..\ScaledAxisCSharp.VJoy\VJoyNative.cs"
+                 Link="included-runtime\VJoy\VJoyNative.cs" />
+    </ItemGroup>
+
+    <Target Name="AddAnalyzerRuntimeFilesToPackage"
+            DependsOnTargets="Build">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="$(TargetPath)"
+                                    PackagePath="analyzers/dotnet/cs" />
+        </ItemGroup>
+    </Target>
+
+</Project>
