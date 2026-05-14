@@ -279,7 +279,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 
 		foreach (var axis in objects.Where(IsAxisObject).OrderBy(GetAxisSortKey))
 		{
-			var physicalAxis = GetPhysicalAxis(axis.TypeGuid, ref sliderIndex);
+			var physicalAxis = PhysicalAxis.GetDirectInputPhysicalAxis(axis.TypeGuid, ref sliderIndex);
 			if (physicalAxis is null)
 			{
 				continue;
@@ -384,48 +384,6 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			var guid when guid == DirectInputNative.GuidSlider => 6 + DirectInputNative.GetInstance(objectInfo.Type),
 			_ => int.MaxValue,
 		};
-	}
-
-	private static PhysicalAxis? GetPhysicalAxis(Guid axisGuid, ref int sliderIndex)
-	{
-		if (axisGuid == DirectInputNative.GuidXAxis)
-		{
-			return PhysicalAxis.X;
-		}
-
-		if (axisGuid == DirectInputNative.GuidYAxis)
-		{
-			return PhysicalAxis.Y;
-		}
-
-		if (axisGuid == DirectInputNative.GuidZAxis)
-		{
-			return PhysicalAxis.Z;
-		}
-
-		if (axisGuid == DirectInputNative.GuidRxAxis)
-		{
-			return PhysicalAxis.Rx;
-		}
-
-		if (axisGuid == DirectInputNative.GuidRyAxis)
-		{
-			return PhysicalAxis.Ry;
-		}
-
-		if (axisGuid == DirectInputNative.GuidRzAxis)
-		{
-			return PhysicalAxis.Rz;
-		}
-
-		if (axisGuid == DirectInputNative.GuidSlider && sliderIndex < 2)
-		{
-			var axis = sliderIndex == 0 ? PhysicalAxis.Slider1 : PhysicalAxis.Slider2;
-			sliderIndex++;
-			return axis;
-		}
-
-		return null;
 	}
 
 	private double Normalize(
