@@ -1,5 +1,5 @@
-﻿//#:package ScaledAxisCSharp.Console@0.1.0-debug08
-#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
+﻿#:package ScaledAxisCSharp.Console@0.1.0-debug09
+//#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]

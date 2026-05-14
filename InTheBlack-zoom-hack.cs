@@ -1,5 +1,5 @@
-#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
-//#:package ScaledAxisCSharp.Console@0.1.0-debug07
+//#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
+#:package ScaledAxisCSharp.Console@0.1.0-debug09
 using static Devices.Typed;
 using static Devices;
 
@@ -28,7 +28,6 @@ using static Devices;
 [assembly:RenameAxis(DeviceNames.VJoyDevice1, Axis.Slider1, "ZoomIn")]
 [assembly:RenameAxis(DeviceNames.VJoyDevice1, Axis.Slider2, "ZoomOut")]
 
-using var connectedDevices = EnumerateConnectedDevices();
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
@@ -48,14 +47,12 @@ var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
-	ConnectedDevices = [.. connectedDevices],
 	Routes =
 	[
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
-		LeftStick.Buttons.Trigger.RouteButton(outputDeviceId: 1, 40),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
-		RightStick.Buttons.CounterMeasureHatEast.RouteButton(outputDeviceId: 1, 22),
-		LeftStick.Buttons.BrakeLever.RouteButton(outputDeviceId: 1, 20),
+		RightStick.Buttons.CounterMeasureHatEast.RouteTo(VJoy1.Buttons.Btn22),
+		LeftStick.Buttons.BrakeLever.RouteTo(VJoy1.Buttons.Btn20),
 		RightStick.Axes.X.RouteTo(VJoy1.Axes.Roll, modifier: blendedCurveWithPrecisionHold),
 		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: blendedCurveWithPrecisionHold),
 		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: blendedCurveWithPrecisionHold),
