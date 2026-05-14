@@ -1,4 +1,6 @@
-﻿namespace ScaledAxisCSharp.DirectInput;
+using System.Runtime.InteropServices;
+
+namespace ScaledAxisCSharp.DirectInput;
 
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct UnknownVTable

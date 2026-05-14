@@ -1,10 +1,11 @@
 ﻿namespace ScaledAxisCSharp.DirectInput;
 
-internal readonly record struct DirectInputDeviceInfo(Guid InstanceGuid, string ProductName, string InstanceName)
+public readonly record struct DirectInputDeviceInfo(int DeviceId, Guid InstanceGuid, string ProductName, string InstanceName)
 {
-	public static unsafe DirectInputDeviceInfo FromNative(DirectInputDeviceInstanceNative* native)
+	internal static unsafe DirectInputDeviceInfo FromNative(int deviceId, DirectInputDeviceInstanceNative* native)
 	{
 		return new DirectInputDeviceInfo(
+			deviceId,
 			native->InstanceGuid,
 			ReadNullTerminatedString(native->ProductName, 260),
 			ReadNullTerminatedString(native->InstanceName, 260));

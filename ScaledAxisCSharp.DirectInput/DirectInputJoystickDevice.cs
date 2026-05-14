@@ -124,34 +124,15 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 
 	public static PooledList<DirectInputJoystickDevice> EnumerateConnected()
 	{
-		var directInput = DirectInputContext.GetOrCreate();
-		using var deviceInfos = new PooledList<DirectInputDeviceInfo>();
-		var handle = GCHandle.Alloc(deviceInfos);
+		var directInput = DirectInputDeviceEnumerator.GetOrCreateContext();
+		var deviceInfos = DirectInputDeviceEnumerator.EnumerateConnectedDeviceInfos(directInput);
 
+		var devices = new PooledList<DirectInputJoystickDevice>(deviceInfos.Length);
 		try
 		{
-			var enumResult = DirectInputNative.EnumDevices(
-				directInput,
-				&EnumDevicesCallback,
-				GCHandle.ToIntPtr(handle),
-				DirectInputNative.DiEdFlAttachedOnly);
-
-			if (!DirectInputNative.Succeeded(enumResult))
+			foreach (var deviceInfo in deviceInfos)
 			{
-				throw new InvalidOperationException($"DirectInput enumeration failed with HRESULT 0x{enumResult:X8}.");
-			}
-		}
-		finally
-		{
-			handle.Free();
-		}
-
-		var devices = new PooledList<DirectInputJoystickDevice>(deviceInfos.Count);
-		try
-		{
-			for (var index = 0; index < deviceInfos.Count; index++)
-			{
-				var device = OpenDevice(directInput, deviceInfos[index], index);
+				var device = OpenDevice(directInput, deviceInfo);
 				if (device is not null)
 				{
 					devices.Add(device);
@@ -168,7 +149,12 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 	}
 
-	private static DirectInputJoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info, int deviceId)
+	public static ImmutableArray<DirectInputDeviceInfo> EnumerateConnectedDeviceInfos()
+	{
+		return DirectInputDeviceEnumerator.EnumerateConnectedDeviceInfos();
+	}
+
+	private static DirectInputJoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info)
 	{
 		var instanceGuid = info.InstanceGuid;
 		var createResult = DirectInputNative.CreateDevice(directInput, in instanceGuid, out var devicePointer);
@@ -246,7 +232,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 
 			success = true;
 			return new DirectInputJoystickDevice(
-				deviceId,
+				info.DeviceId,
 				info,
 				caps,
 				devicePointer,
@@ -619,14 +605,6 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	}
 
 	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
-	private static int EnumDevicesCallback(DirectInputDeviceInstanceNative* instance, nint referenceData)
-	{
-		var devices = (PooledList<DirectInputDeviceInfo>)GCHandle.FromIntPtr(referenceData).Target!;
-		devices.Add(DirectInputDeviceInfo.FromNative(instance));
-		return DirectInputNative.DiEnumContinue;
-	}
-
-	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
 	private static int EnumObjectsCallback(DirectInputDeviceObjectInstanceNative* instance, nint referenceData)
 	{
 		var objects = (PooledList<DirectInputDeviceObjectInfo>)GCHandle.FromIntPtr(referenceData).Target!;
@@ -673,35 +651,6 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			};
 
 			return new DataFormatScope(buffer, dataFormat);
-		}
-	}
-
-	private static class DirectInputContext
-	{
-		private static nint _DirectInput;
-
-		public static nint GetOrCreate()
-		{
-			if (_DirectInput != 0)
-			{
-				return _DirectInput;
-			}
-
-			var instanceHandle = DirectInputNative.GetModuleHandle(null);
-			var result = DirectInputNative.DirectInput8Create(
-				instanceHandle,
-				DirectInputNative.DirectInputVersion,
-				in DirectInputNative.IidIDirectInput8W,
-				out var directInputPointer,
-				IntPtr.Zero);
-
-			if (!DirectInputNative.Succeeded(result) || directInputPointer == IntPtr.Zero)
-			{
-				throw new InvalidOperationException($"DirectInput8Create failed with HRESULT 0x{result:X8}.");
-			}
-
-			_DirectInput = directInputPointer;
-			return _DirectInput;
 		}
 	}
 

@@ -1,19 +1,13 @@
+using System.Runtime.InteropServices;
+
 namespace ScaledAxisCSharp.DirectInput;
 
-internal static unsafe class DirectInputNative
+internal static unsafe partial class DirectInputNative
 {
-	public const uint DirectInputVersion = 0x0800;
-	public const uint Di8DevClassGameCtrl = 4;
-	public const uint DiEdFlAttachedOnly = 0x00000001;
 	public const uint DiDfAbsAxis = 0x00000001;
 	public const uint DiPhByOffset = 1;
 	public const uint DiSclNonExclusive = 0x00000002;
 	public const uint DiSclBackground = 0x00000008;
-	public const int DiEnumContinue = 1;
-
-	public static readonly Guid IidIDirectInput8W =
-		new(0xBF798031, 0x483A, 0x4DA2, 0xAA, 0x99, 0x5D, 0x64, 0xED, 0x36, 0x97, 0x00);
-
 	public static readonly Guid GuidXAxis = new(0xA36D02E0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00,
 		0x00);
 
@@ -43,17 +37,6 @@ internal static unsafe class DirectInputNative
 
 	public static readonly Guid DiPropRange = new(4, 0, 0, 0xC0, 0, 0, 0, 0, 0, 0, 0x46);
 
-	[DllImport("dinput8.dll", PreserveSig = true)]
-	public static extern int DirectInput8Create(
-		IntPtr hinst,
-		uint dwVersion,
-		in Guid riidltf,
-		out IntPtr ppvOut,
-		IntPtr punkOuter);
-
-	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-	public static extern IntPtr GetModuleHandle(string? lpModuleName);
-
 	[DllImport("kernel32.dll", SetLastError = true)]
 	public static extern nint CreateEventW(nint lpEventAttributes, bool bManualReset, bool bInitialState, nint lpName);
 
@@ -66,11 +49,6 @@ internal static unsafe class DirectInputNative
 
 	[DllImport("user32.dll")]
 	public static extern IntPtr GetDesktopWindow();
-
-	public static bool Succeeded(int hresult)
-	{
-		return hresult >= 0;
-	}
 
 	public static int GetInstance(uint type)
 	{
@@ -108,17 +86,6 @@ internal static unsafe class DirectInputNative
 		return 272;
 	}
 
-	public static int Release(nint comObject)
-	{
-		if (comObject == 0)
-		{
-			return 0;
-		}
-
-		var vtable = *(UnknownVTable**)comObject;
-		return (int)vtable->Release(comObject);
-	}
-
 	public static int CreateDevice(nint directInput, in Guid instanceGuid, out nint devicePointer)
 	{
 		var vtable = *(DirectInput8VTable**)directInput;
@@ -127,16 +94,6 @@ internal static unsafe class DirectInputNative
 		{
 			return vtable->CreateDevice(directInput, guidPointer, devicePointerTarget, 0);
 		}
-	}
-
-	public static int EnumDevices(
-		nint directInput,
-		delegate* unmanaged[Stdcall]<DirectInputDeviceInstanceNative*, nint, int> callback,
-		nint referenceData,
-		uint flags)
-	{
-		var vtable = *(DirectInput8VTable**)directInput;
-		return vtable->EnumDevices(directInput, Di8DevClassGameCtrl, callback, referenceData, flags);
 	}
 
 	public static int SetCooperativeLevel(nint device, nint windowHandle, uint flags)
