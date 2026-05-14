@@ -8,8 +8,7 @@ public static class RuntimeBuilder
 		public DebugLogger? DebugLogger { get; init; }
 		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
 		public required ImmutableArray<JoystickDevice> ConnectedDevices { get; init; }
-		public ImmutableArray<ButtonRoute> ButtonRoutes { get; init; } = [];
-		public ImmutableArray<AxisRoute> AxisRoutes { get; init; } = [];
+		public ImmutableArray<IRoute> Routes { get; init; } = [];
 	}
 
 	extension(Runtime)
@@ -22,8 +21,8 @@ public static class RuntimeBuilder
 			using var connectedDevicesById = options.ConnectedDevices
 				.ToPooledDictionary(device => device.DeviceId);
 			var referencedDeviceIds = new HashSet<int>();
-			var buttonRoutes = options.ButtonRoutes;
-			var axisRoutes = options.AxisRoutes;
+			using var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToPooledList();
+			using var axisRoutes = options.Routes.OfType<AxisRoute>().ToPooledList();
 			var claimedAxes = new HashSet<(uint OutputDeviceId, PhysicalAxis Axis)>();
 			var referencedOutputDeviceIds = new HashSet<uint>();
 
@@ -97,7 +96,9 @@ public static class RuntimeBuilder
 					.OrderBy(deviceId => deviceId)
 					.Select<uint, OutputDevice>(deviceId => optionsOutputDeviceFactory.Open(
 						deviceId,
+						// ReSharper disable once AccessToDisposedClosure
 						buttonRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray(),
+						// ReSharper disable once AccessToDisposedClosure
 						axisRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray()))
 					.ToImmutableArray();
 				try
@@ -106,8 +107,8 @@ public static class RuntimeBuilder
 						options.Name,
 						options.DebugLogger,
 						devices,
-						buttonRoutes,
-						axisRoutes,
+						[..buttonRoutes],
+						[..axisRoutes],
 						outputDevices);
 				}
 				catch

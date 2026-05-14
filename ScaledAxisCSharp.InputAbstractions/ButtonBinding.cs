@@ -1,3 +1,3 @@
 ﻿namespace ScaledAxisCSharp.InputAbstractions;
 
-public readonly record struct ButtonBinding(int DeviceId, int ButtonNumber);
+public sealed record ButtonBinding(int DeviceId, int ButtonNumber): InputBinding(DeviceId);

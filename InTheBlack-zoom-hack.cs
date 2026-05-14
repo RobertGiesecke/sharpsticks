@@ -24,16 +24,13 @@ BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
 	ConnectedDevices = [.. connectedDevices],
-	ButtonRoutes =
+	Routes =
 	[
 		RightStick.Buttons.Trigger.RouteTo(VJoyLeft.Buttons.Fire),
 		LeftStick.Buttons.Trigger.RouteButton(outputDeviceId: 1, 40),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoyLeft.Buttons.CenterHeadTracking),
 		RightStick.Buttons.CounterMeasureHatEast.RouteButton(outputDeviceId: 1, 22),
 		LeftStick.Buttons.BrakeLever.RouteButton(outputDeviceId: 1, 20),
-	],
-	AxisRoutes =
-	[
 		RightStick.Axes.X.RouteTo(VJoyLeft.Axes.Roll, modifier: blendedCurveWithPrecisionHold),
 		RightStick.Axes.Y.RouteTo(VJoyLeft.Axes.Pitch, modifier: blendedCurveWithPrecisionHold),
 		RightStick.Axes.Twist.RouteTo(VJoyLeft.Axes.Yaw, modifier: blendedCurveWithPrecisionHold),

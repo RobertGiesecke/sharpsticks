@@ -5,4 +5,4 @@ public sealed record AxisBinding(
 	PhysicalAxis Axis,
 	AxisMode Mode = AxisMode.Signed,
 	bool Invert = false,
-	double Deadzone = 0.0);
+	double Deadzone = 0.0) : InputBinding(DeviceId);

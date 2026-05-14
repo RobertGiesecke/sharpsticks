@@ -59,8 +59,11 @@ public static class RuntimeExtensions
 				Name = config.Name ?? "unnamed",
 				OutputDeviceFactory = outputDeviceFactory ?? VJoyDeviceFactory.Instance,
 				ConnectedDevices = [..connectedDevices],
-				ButtonRoutes = [..buttonRoutes],
-				AxisRoutes = [..axisRoutes],
+				Routes =
+				[
+					..buttonRoutes,
+					..axisRoutes,
+				],
 			};
 			return buildOptions;
 		}

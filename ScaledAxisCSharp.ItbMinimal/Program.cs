@@ -29,15 +29,12 @@ BuildAndRunAsConsole(new()
 	[
 		..connectedDevices
 	],
-	ButtonRoutes =
+	Routes =
 	[
 		RightStick.Buttons.Trigger.RouteTo(VJoyLeft.Buttons.Fire),
 		LeftStick.Buttons.Trigger.RouteButton(1, 40),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoyLeft.Buttons.CenterHeadTracking),
 		RightStick.Buttons.CounterMeasureHatEast.RouteButton(1, 22),
-	],
-	AxisRoutes =
-	[
 		RightStick.Axes.X.RouteToSameAxisOnOutput(1, options: axisOptions),
 		RightStick.Axes.Y.RouteToSameAxisOnOutput(1, options: axisOptions),
 		RightStick.Axes.Twist.RouteToSameAxisOnOutput(1, options: axisOptions),
