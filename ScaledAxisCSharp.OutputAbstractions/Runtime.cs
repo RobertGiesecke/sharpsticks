@@ -69,12 +69,12 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			.ToPooledDictionary(t => t.DeviceId, t => t.Index);
 		_ButtonRoutes =
 		[
-			..buttonRoutes.GroupBy(t => (t.OutputDeviceId, t.TargetButton))
+			..buttonRoutes.GroupBy(t => t.OutputBinding)
 				.Select(group => new OutputButtonWithBindings
 				{
 					// ReSharper disable once AccessToDisposedClosure
 					OutputDevice = outputDevices[outputDeviceIndexes[group.Key.OutputDeviceId]],
-					TargetButton = group.Key.TargetButton,
+					TargetButton = group.Key.ButtonNumber,
 					Bindings =
 					[
 						..group.Select(t => t.Binding)
@@ -92,11 +92,11 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			..axisRoutes.Select(route => new OutputAxisRoute
 			{
 				// ReSharper disable once AccessToDisposedClosure
-				OutputDevice = outputDevices[outputDeviceIndexes[route.OutputDeviceId]],
+				OutputDevice = outputDevices[outputDeviceIndexes[route.OutputBinding.OutputDeviceId]],
 				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
 				SourceDevice = DevicesById[route.Source.DeviceId],
 				Source = route.Source,
-				OutputAxis = route.OutputAxis,
+				OutputAxis = route.OutputBinding.Axis,
 				Scale = route.Scale,
 				Offset = route.Offset,
 				Modifier = route.Modifier,

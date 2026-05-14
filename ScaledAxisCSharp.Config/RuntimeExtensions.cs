@@ -31,8 +31,10 @@ public static class RuntimeExtensions
 					throw new InvalidOperationException("Target buttons are 1-based.");
 				}
 
-				buttonRoutes.Add(new ButtonRoute(mapping.SourceBinding, mapping.VJoyDeviceId ?? config.VJoyDeviceId,
-					mapping.TargetButton));
+				buttonRoutes.Add(new ButtonRoute(
+					mapping.SourceBinding,
+					new(mapping.VJoyDeviceId ?? config.VJoyDeviceId,
+						mapping.TargetButton)));
 			}
 
 			foreach (var mapping in config.AxisMappings)
@@ -43,8 +45,9 @@ public static class RuntimeExtensions
 				axisRoutes.Add(new AxisRoute
 				{
 					Source = source,
-					OutputDeviceId = mapping.OutputDeviceId ?? config.VJoyDeviceId,
-					OutputAxis = targetAxis,
+					OutputBinding = new(
+						mapping.OutputDeviceId ?? config.VJoyDeviceId,
+						targetAxis),
 					Scale = mapping.Scale,
 					Offset = mapping.Offset,
 					Modifier = mapping.Modifier,

@@ -20,6 +20,22 @@ public static class BindingExtensions
 		binding.RouteAxis(outputDeviceId, binding.Axis, scale, offset, modifier);
 
 	[OverloadResolutionPriority(1)]
+	public static AxisRoute RouteTo(
+		this AxisBinding binding,
+		OutputAxisBinding outputBinding,
+		double scale = 1.0,
+		double offset = 0.0,
+		IAxisModifier? modifier = null) =>
+		new()
+		{
+			Source = binding,
+			OutputBinding = outputBinding,
+			Scale = scale,
+			Offset = offset,
+			Modifier = modifier,
+		};
+
+	[OverloadResolutionPriority(1)]
 	public static AxisRoute RouteAxis(
 		this AxisBinding binding,
 		uint outputDeviceId,
@@ -27,14 +43,25 @@ public static class BindingExtensions
 		double scale = 1.0,
 		double offset = 0.0,
 		IAxisModifier? modifier = null) =>
+		RouteTo(
+			binding,
+			new(outputDeviceId, outputAxis),
+			scale,
+			offset,
+			modifier);
+
+	[OverloadResolutionPriority(2)]
+	public static AxisRoute RouteTo(
+		this AxisBinding binding,
+		OutputAxisBinding outputBinding,
+		RouteAxisOptions? options = null) =>
 		new()
 		{
 			Source = binding,
-			OutputDeviceId = outputDeviceId,
-			OutputAxis = outputAxis,
-			Scale = scale,
-			Offset = offset,
-			Modifier = modifier,
+			OutputBinding = outputBinding,
+			Scale = options?.Scale ?? 1.0,
+			Offset = options?.Offset ?? 0.0,
+			Modifier = options?.Modifier,
 		};
 
 	[OverloadResolutionPriority(2)]
@@ -43,21 +70,21 @@ public static class BindingExtensions
 		uint outputDeviceId,
 		PhysicalAxis outputAxis,
 		RouteAxisOptions? options = null) =>
-		new()
-		{
-			Source = binding,
-			OutputDeviceId = outputDeviceId,
-			OutputAxis = outputAxis,
-			Scale = options?.Scale ?? 1.0,
-			Offset = options?.Offset ?? 0.0,
-			Modifier = options?.Modifier,
-		};
+		RouteTo(
+			binding,
+			new(outputDeviceId, outputAxis),
+			options);
 
 	public static ImmutableArray<AxisRoute> RouteAbsoluteRelative(
 		this AxisBinding binding,
 		AbsoluteRelativeAxisOptions options)
 	{
-		if (options.OutputDeviceId < 1)
+		if (options.IncreaseAxis.OutputDeviceId < 1)
+		{
+			throw new InvalidOperationException("Output device ids are 1-based.");
+		}
+
+		if (options.DecreaseAxis.OutputDeviceId < 1)
 		{
 			throw new InvalidOperationException("Output device ids are 1-based.");
 		}
@@ -77,19 +104,20 @@ public static class BindingExtensions
 
 		return
 		[
-			binding.RouteAxis(
-				options.OutputDeviceId,
+			binding.RouteTo(
 				options.IncreaseAxis,
 				modifier: increaseModifier),
-			binding.RouteAxis(
-				options.OutputDeviceId,
+			binding.RouteTo(
 				options.DecreaseAxis,
 				modifier: decreaseModifier),
 		];
 	}
 
 	public static ButtonRoute RouteButton(this ButtonBinding binding, uint outputDeviceId, int targetButton) =>
-		new(binding, outputDeviceId, targetButton);
+		RouteTo(binding, new(outputDeviceId, targetButton));
+
+	public static ButtonRoute RouteTo(this ButtonBinding binding, OutputButtonBinding outputBinding) =>
+		new(binding, outputBinding);
 
 	public static IEnumerable<ButtonRoute> RouteButtonsToOutput<TDevice>(
 		this TDevice device,
@@ -106,7 +134,7 @@ public static class BindingExtensions
 				continue;
 			}
 
-			yield return binding.RouteButton(outputDeviceId, binding.ButtonNumber);
+			yield return binding.RouteTo(new(outputDeviceId, binding.ButtonNumber));
 		}
 	}
 

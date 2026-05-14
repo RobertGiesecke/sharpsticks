@@ -51,7 +51,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 		}
 
 		var axisLimits = new Dictionary<PhysicalAxis, AxisLimits>();
-		foreach (var axis in axisRoutes.Select(route => route.OutputAxis)
+		foreach (var axis in axisRoutes.Select(route => route.OutputBinding.Axis)
 			         .Distinct())
 		{
 			var hidUsage = axis.GetVJoyAxisId();
@@ -74,7 +74,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 		}
 
 		var buttonCount = VJoyNative.GetVJDButtonNumber(deviceId);
-		foreach (var targetButton in buttonRoutes.Select(route => route.TargetButton).Distinct())
+		foreach (var targetButton in buttonRoutes.Select(route => route.OutputBinding.ButtonNumber).Distinct())
 		{
 			if (targetButton > buttonCount)
 			{

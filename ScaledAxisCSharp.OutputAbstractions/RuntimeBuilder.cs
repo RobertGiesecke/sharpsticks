@@ -34,31 +34,31 @@ public static class RuntimeBuilder
 					throw new InvalidOperationException("Source buttons are 1-based.");
 				}
 
-				if (mapping.TargetButton < 1)
+				if (mapping.OutputBinding.ButtonNumber < 1)
 				{
 					throw new InvalidOperationException("Target buttons are 1-based.");
 				}
 
-				if (mapping.OutputDeviceId < 1)
+				if (mapping.OutputBinding.OutputDeviceId < 1)
 				{
 					throw new InvalidOperationException("Output device ids are 1-based.");
 				}
 
 				referencedDeviceIds.Add(mapping.Binding.DeviceId);
-				referencedOutputDeviceIds.Add(mapping.OutputDeviceId);
+				referencedOutputDeviceIds.Add(mapping.OutputBinding.OutputDeviceId);
 			}
 
 			foreach (var mapping in axisRoutes)
 			{
-				if (mapping.OutputDeviceId < 1)
+				if (mapping.OutputBinding.OutputDeviceId < 1)
 				{
 					throw new InvalidOperationException("Output device ids are 1-based.");
 				}
 
-				if (!claimedAxes.Add((mapping.OutputDeviceId, mapping.OutputAxis)))
+				if (!claimedAxes.Add((mapping.OutputBinding.OutputDeviceId, mapping.OutputBinding.Axis)))
 				{
 					throw new InvalidOperationException(
-						$"Target axis '{mapping.OutputAxis}' on Output device {mapping.OutputDeviceId} is mapped more than once.");
+						$"Target axis '{mapping.OutputBinding.Axis}' on Output device {mapping.OutputBinding.OutputDeviceId} is mapped more than once.");
 				}
 
 				referencedDeviceIds.Add(mapping.Source.DeviceId);
@@ -67,7 +67,7 @@ public static class RuntimeBuilder
 					m.FillDevices(referencedDeviceIds);
 				}
 
-				referencedOutputDeviceIds.Add(mapping.OutputDeviceId);
+				referencedOutputDeviceIds.Add(mapping.OutputBinding.OutputDeviceId);
 			}
 
 
@@ -97,8 +97,8 @@ public static class RuntimeBuilder
 					.OrderBy(deviceId => deviceId)
 					.Select<uint, OutputDevice>(deviceId => optionsOutputDeviceFactory.Open(
 						deviceId,
-						buttonRoutes.Where(route => route.OutputDeviceId == deviceId).ToArray(),
-						axisRoutes.Where(route => route.OutputDeviceId == deviceId).ToArray()))
+						buttonRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray(),
+						axisRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray()))
 					.ToImmutableArray();
 				try
 				{
