@@ -55,30 +55,30 @@ internal sealed class MacroEngine : IDisposable
 		NextDeadlineTicks = earliest;
 	}
 
-	internal void OnPress(MacroSession session, OutputButtonBinding button)
+	internal void OnPress(MacroRouteState route, OutputButtonBinding button)
 	{
-		if (session.HeldButtons.Add(button))
+		if (route.HeldButtons.Add(button))
 		{
 			_HeldCounts[button] = _HeldCounts.GetValueOrDefault(button) + 1;
 		}
 	}
 
-	internal void OnRelease(MacroSession session, OutputButtonBinding button)
+	internal void OnRelease(MacroRouteState route, OutputButtonBinding button)
 	{
-		if (session.HeldButtons.Remove(button))
+		if (route.HeldButtons.Remove(button))
 		{
 			DecrementHeld(button);
 		}
 	}
 
-	internal void ReleaseAllForSession(MacroSession session)
+	internal void ReleaseAllForRoute(MacroRouteState route)
 	{
-		foreach (var button in session.HeldButtons)
+		foreach (var button in route.HeldButtons)
 		{
 			DecrementHeld(button);
 		}
 
-		session.HeldButtons.Clear();
+		route.HeldButtons.Clear();
 	}
 
 	private void DecrementHeld(OutputButtonBinding button)
@@ -134,6 +134,7 @@ internal sealed class MacroRouteState : IDisposable
 	public int SourceDeviceIndex { get; }
 	public bool WasPressedLastFrame;
 	public PooledQueue<TriggerKind> Pending { get; } = new(4);
+	public PooledSet<OutputButtonBinding> HeldButtons { get; } = new();
 	public MacroSession? Running { get; private set; }
 	public long? NextDeadlineTicks { get; private set; }
 
@@ -196,7 +197,7 @@ internal sealed class MacroRouteState : IDisposable
 			case MacroReentry.CancelAndRestart:
 				if (Running is not null)
 				{
-					_Engine.ReleaseAllForSession(Running);
+					_Engine.ReleaseAllForRoute(this);
 					Running.Dispose();
 					Running = null;
 				}
@@ -218,7 +219,7 @@ internal sealed class MacroRouteState : IDisposable
 				continue;
 			}
 
-			Running = new MacroSession(_Engine, actions, _Frequency);
+			Running = new MacroSession(_Engine, this, actions, _Frequency);
 			return;
 		}
 	}
@@ -230,7 +231,9 @@ internal sealed class MacroRouteState : IDisposable
 			return;
 		}
 
-		_Engine.ReleaseAllForSession(Running);
+		// Normal completion: leave the session's outstanding presses in place
+		// so a macro like [Press(X)] holds X across its end. Cancellation paths
+		// (CancelAndRestart, engine dispose) DO release — see those call sites.
 		Running.Dispose();
 		Running = null;
 	}
@@ -239,11 +242,12 @@ internal sealed class MacroRouteState : IDisposable
 	{
 		if (Running is not null)
 		{
-			_Engine.ReleaseAllForSession(Running);
 			Running.Dispose();
 			Running = null;
 		}
 
+		_Engine.ReleaseAllForRoute(this);
+		HeldButtons.Dispose();
 		Pending.Dispose();
 	}
 }
@@ -251,22 +255,24 @@ internal sealed class MacroRouteState : IDisposable
 internal sealed class MacroSession : IDisposable, IMacroOutputSink
 {
 	private readonly MacroEngine _Engine;
+	private readonly MacroRouteState _Route;
 	private readonly PooledStack<MacroFrame> _CallStack;
 	private readonly MacroContext _Ctx;
 
-	public PooledSet<OutputButtonBinding> HeldButtons { get; } = new();
 	public long? NextStepDeadline { get; private set; }
 
-	public MacroSession(MacroEngine engine, ImmutableArray<IMacroAction> actions, long frequency)
+	public MacroSession(MacroEngine engine, MacroRouteState route,
+		ImmutableArray<IMacroAction> actions, long frequency)
 	{
 		_Engine = engine;
+		_Route = route;
 		_CallStack = new(4);
 		_CallStack.Push(new MacroFrame { Actions = actions });
 		_Ctx = new MacroContext(this, frequency);
 	}
 
-	void IMacroOutputSink.Press(OutputButtonBinding button) => _Engine.OnPress(this, button);
-	void IMacroOutputSink.Release(OutputButtonBinding button) => _Engine.OnRelease(this, button);
+	void IMacroOutputSink.Press(OutputButtonBinding button) => _Engine.OnPress(_Route, button);
+	void IMacroOutputSink.Release(OutputButtonBinding button) => _Engine.OnRelease(_Route, button);
 
 	public SessionStepResult Step(long now)
 	{
@@ -313,7 +319,6 @@ internal sealed class MacroSession : IDisposable, IMacroOutputSink
 	public void Dispose()
 	{
 		_CallStack.Dispose();
-		HeldButtons.Dispose();
 	}
 }
 
