@@ -11,7 +11,9 @@ public sealed record ButtonMacroRoute : IBoundRoute
 	public required ButtonBinding Binding { get; init; }
 	public ImmutableArray<IMacroAction> OnPress { get; init; } = [];
 	public ImmutableArray<IMacroAction> OnRelease { get; init; } = [];
-	public MacroReentry Reentry { get; init; } = MacroReentry.QueueUntilDone;
+
+	public const MacroReentry DefaultReentry = MacroReentry.QueueUntilDone;
+	public MacroReentry Reentry { get; init; } = DefaultReentry;
 
 	InputBinding IBoundRoute.InputBinding => Binding;
 

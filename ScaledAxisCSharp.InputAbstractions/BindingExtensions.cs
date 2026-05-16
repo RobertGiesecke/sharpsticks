@@ -119,6 +119,23 @@ public static class BindingExtensions
 	public static ButtonRoute RouteTo(this ButtonBinding binding, OutputButtonBinding outputBinding) =>
 		new(binding, outputBinding);
 
+
+	public readonly record struct ComplexRouteOptions()
+	{
+		public ImmutableArray<IMacroAction> OnPress { get; init; } = [];
+		public ImmutableArray<IMacroAction> OnRelease { get; init; } = [];
+		public MacroReentry? Reentry { get; init; }
+	}
+
+	public static ButtonMacroRoute ComplexRoute(this ButtonBinding binding, ComplexRouteOptions options) =>
+		new()
+		{
+			Binding = binding,
+			Reentry = options.Reentry ?? ButtonMacroRoute.DefaultReentry,
+			OnPress = options.OnPress,
+			OnRelease = options.OnRelease,
+		};
+
 	public static IEnumerable<ButtonRoute> RouteButtonsToOutput<TDevice>(
 		this TDevice device,
 		uint outputDeviceId,
