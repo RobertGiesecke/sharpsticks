@@ -1,7 +1,5 @@
-//#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
-#:package ScaledAxisCSharp.Console@0.1.0-debug09
-using static Devices.Typed;
-using static Devices;
+#:project ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj
+//#:package ScaledAxisCSharp.Console@0.1.0-debug09
 
 [assembly:GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
@@ -31,9 +29,10 @@ using static Devices;
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
-	NormalCurve = new AxisCurve { Max = 1.0d },
+	NormalCurve = one2oneCurve,
 	PrecisionCurve = new AxisCurve { Max = 0.184d },
 	ModifierAxis = LeftStick.Axes.BrakeLever,
+	Stateful = true,
 };
 
 // 50% when left 2nd stage trigger is pressed, blended otherwise
@@ -41,7 +40,8 @@ var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
 {
 	Buttons = [LeftStick.Buttons.SecondStageTrigger],
 	WhenPressed = new AxisCurve { Max = 0.5d },
-	WhenNotPressed = modifierBlendCurve,
+	WhenNotPressed = one2oneCurve,
+	Stateful = WhenButtonPressedStateful.WhenPressed,
 };
 
 BuildAndRunAsConsole(new()
@@ -51,7 +51,6 @@ BuildAndRunAsConsole(new()
 	[
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
-		RightStick.Buttons.CounterMeasureHatEast.RouteTo(VJoy1.Buttons.Btn22),
 		LeftStick.Buttons.BrakeLever.RouteTo(VJoy1.Buttons.Btn20),
 		RightStick.Axes.X.RouteTo(VJoy1.Axes.Roll, modifier: blendedCurveWithPrecisionHold),
 		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: blendedCurveWithPrecisionHold),
