@@ -251,7 +251,7 @@ public sealed class WhenButtonPressedAxisModifierTests : IDisposable
 	}
 
 	private IOutputRuntimeContext BuildRuntime(WhenButtonPressedAxisModifier modifier) =>
-		Runtime.Build(new RuntimeBuilder.BuildOptions
+		Runtime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,

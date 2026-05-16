@@ -29,7 +29,7 @@ public sealed class AxisCurveTests : IDisposable
 	[InlineData(-1.0, -1.0)]
 	public void Linear_Max1_IsIdentity(double input, double expected)
 	{
-		using var runtime = BuildRuntime(new AxisCurve { Max = 1.0 });
+		using var runtime = BuildRuntime(new() { Max = 1.0 });
 		_Stick.SetAxisValue(Axis.X, input);
 		runtime.ProcessFrame();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
@@ -44,7 +44,7 @@ public sealed class AxisCurveTests : IDisposable
 	[InlineData(1.0, 0.184, 0.184)]
 	public void Linear_ScalesByMax(double input, double max, double expected)
 	{
-		using var runtime = BuildRuntime(new AxisCurve { Max = max });
+		using var runtime = BuildRuntime(new() { Max = max });
 		_Stick.SetAxisValue(Axis.X, input);
 		runtime.ProcessFrame();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
@@ -59,7 +59,7 @@ public sealed class AxisCurveTests : IDisposable
 	[InlineData(-1.0)]
 	public void Flat_AlwaysReturnsZero(double input)
 	{
-		using var runtime = BuildRuntime(new AxisCurve { Max = 1.0, Steepness = 0.0 });
+		using var runtime = BuildRuntime(new() { Max = 1.0, Steepness = 0.0 });
 		_Stick.SetAxisValue(Axis.X, input);
 		runtime.ProcessFrame();
 		Assert.Equal(0.0, _Output.GetAxisValue(Axis.X), Precision);
@@ -74,7 +74,7 @@ public sealed class AxisCurveTests : IDisposable
 	[InlineData(-1.0, -1.0)]
 	public void EaseOut_Steepness0_5_ApplesQuadratic(double input, double expected)
 	{
-		using var runtime = BuildRuntime(new AxisCurve { Max = 1.0, Steepness = 0.5 });
+		using var runtime = BuildRuntime(new() { Max = 1.0, Steepness = 0.5 });
 		_Stick.SetAxisValue(Axis.X, input);
 		runtime.ProcessFrame();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
@@ -89,7 +89,7 @@ public sealed class AxisCurveTests : IDisposable
 	[InlineData(-1.0, -1.0)]
 	public void EaseIn_Steepness1_5_AppliesSquareRoot(double input, double expected)
 	{
-		using var runtime = BuildRuntime(new AxisCurve { Max = 1.0, Steepness = 1.5 });
+		using var runtime = BuildRuntime(new() { Max = 1.0, Steepness = 1.5 });
 		_Stick.SetAxisValue(Axis.X, input);
 		runtime.ProcessFrame();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
@@ -104,7 +104,7 @@ public sealed class AxisCurveTests : IDisposable
 	[InlineData(-0.7, -1.0)]
 	public void Steepness2_IsAHardStepAcrossZero(double input, double expected)
 	{
-		using var runtime = BuildRuntime(new AxisCurve { Max = 1.0, Steepness = 2.0 });
+		using var runtime = BuildRuntime(new() { Max = 1.0, Steepness = 2.0 });
 		_Stick.SetAxisValue(Axis.X, input);
 		runtime.ProcessFrame();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
@@ -114,7 +114,7 @@ public sealed class AxisCurveTests : IDisposable
 	public void NonLinearMaxScales_OutputByMax()
 	{
 		// Steepness=0.5 (quadratic), Max=0.5: input 0.5 → 0.5 * 0.25 = 0.125
-		using var runtime = BuildRuntime(new AxisCurve { Max = 0.5, Steepness = 0.5 });
+		using var runtime = BuildRuntime(new() { Max = 0.5, Steepness = 0.5 });
 		_Stick.SetAxisValue(Axis.X, 0.5);
 		runtime.ProcessFrame();
 		Assert.Equal(0.125, _Output.GetAxisValue(Axis.X), Precision);
@@ -137,7 +137,7 @@ public sealed class AxisCurveTests : IDisposable
 	}
 
 	private IOutputRuntimeContext BuildRuntime(AxisCurve curve) =>
-		Runtime.Build(new RuntimeBuilder.BuildOptions
+		Runtime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,

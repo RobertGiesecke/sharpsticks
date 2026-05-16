@@ -1,9 +1,6 @@
 ﻿namespace ScaledAxisCSharp.InputAbstractions;
 
-public interface IModifier
-{
-	void FillDevices(ICollection<int> deviceIds);
-}
+public interface IModifier : IFillDevices;
 
 public interface IModifier<out TRuntimeModifier> : IModifier
 {

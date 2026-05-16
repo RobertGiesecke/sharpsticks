@@ -33,14 +33,14 @@ public sealed partial class AppJsonContext : JsonSerializerContext
 				return;
 			}
 
-			info.PolymorphismOptions = new JsonPolymorphismOptions
+			info.PolymorphismOptions = new()
 			{
 				TypeDiscriminatorPropertyName = "$type",
 				DerivedTypes =
 				{
-					new JsonDerivedType(typeof(AxisCurve), "curve"),
-					new JsonDerivedType(typeof(BlendedAxisCurve), "blended"),
-					new JsonDerivedType(typeof(WhenButtonPressedAxisModifier), "whenButtonPressed"),
+					new(typeof(AxisCurve), "curve"),
+					new(typeof(BlendedAxisCurve), "blended"),
+					new(typeof(WhenButtonPressedAxisModifier), "whenButtonPressed"),
 				},
 			};
 		}),

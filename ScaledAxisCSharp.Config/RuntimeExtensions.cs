@@ -71,27 +71,22 @@ public static class RuntimeExtensions
 			];
 		}
 
-		/// <summary>
-		/// Yields every <c>DeviceId</c> referenced anywhere in the config —
-		/// in bindings and recursively inside modifier nesting.
-		/// </summary>
-		public IEnumerable<int> EnumerateReferencedDeviceIds()
+		private void FillDevices(ICollection<int> deviceIds)
 		{
 			foreach (var mapping in config.ButtonMappings)
 			{
-				yield return mapping.SourceBinding.DeviceId;
+				deviceIds.Add(mapping.SourceBinding.DeviceId);
 			}
 
 			foreach (var mapping in config.AxisMappings)
 			{
-				yield return mapping.Source.DeviceId;
-				if (mapping.Modifier is { } modifier)
+				deviceIds.Add(mapping.Source.DeviceId);
+				if (mapping.Modifier is not { } modifier)
 				{
-					foreach (var id in EnumerateModifierDeviceIds(modifier))
-					{
-						yield return id;
-					}
+					continue;
 				}
+
+				modifier.FillDevices(deviceIds);
 			}
 		}
 
@@ -105,15 +100,19 @@ public static class RuntimeExtensions
 		{
 			using var byId = connectedDevices.ToPooledDictionary(static d => d.DeviceId);
 
-			var captured = new List<DeviceReference>();
-			foreach (var id in config.EnumerateReferencedDeviceIds().Distinct().OrderBy(static i => i))
+			using var captured = new PooledList<DeviceReference>();
+			using var deviceIds = new PooledSet<int>();
+			config.FillDevices(deviceIds);
+			using var sortedDeviceIds = deviceIds.ToPooledList();
+			sortedDeviceIds.Sort();
+			foreach (var id in sortedDeviceIds)
 			{
 				if (!byId.TryGetValue(id, out var device))
 				{
 					continue;
 				}
 
-				captured.Add(new DeviceReference
+				captured.Add(new()
 				{
 					DeviceId = id,
 					Name = device.Name,
@@ -121,7 +120,7 @@ public static class RuntimeExtensions
 				});
 			}
 
-			config.Devices = captured;
+			config.Devices = [..captured];
 		}
 
 		/// <summary>
@@ -136,12 +135,11 @@ public static class RuntimeExtensions
 		/// Thrown when a config entry can't be paired (no same-name device
 		/// left to match it).
 		/// </exception>
-		public IReadOnlyDictionary<int, int> ResolveDeviceMap(IReadOnlyList<JoystickDevice> connectedDevices)
+		public void ResolveDeviceMap(IReadOnlyList<JoystickDevice> connectedDevices, IDictionary<int, int>? map)
 		{
-			var map = new Dictionary<int, int>();
 			if (config.Devices.Count == 0)
 			{
-				return map;
+				return;
 			}
 
 			using var matchedCurrentIds = new PooledSet<int>();
@@ -175,6 +173,7 @@ public static class RuntimeExtensions
 			{
 				using var sortedConfigs = group.OrderBy(static c => c.DeviceId).ToPooledList();
 				using var sortedCurrents = connectedDevices
+					// ReSharper disable once AccessToDisposedClosure
 					.Where(d => d.Name == group.Key && !matchedCurrentIds.Contains(d.DeviceId))
 					.OrderBy(static d => d.DeviceId)
 					.ToPooledList();
@@ -192,7 +191,7 @@ public static class RuntimeExtensions
 				}
 			}
 
-			return map;
+			return;
 		}
 	}
 
@@ -211,9 +210,12 @@ public static class RuntimeExtensions
 			using var asJoystickDevices = connectedDevices
 				.Select<PlatformDefaultInputDevice, JoystickDevice>(d => d)
 				.ToPooledList();
-			var deviceMap = config.ResolveDeviceMap(asJoystickDevices);
 
-			return new RuntimeBuilder.BuildOptions
+			using var deviceMap = new PooledDictionary<int, int>();
+
+			config.ResolveDeviceMap(asJoystickDevices, deviceMap);
+
+			return new()
 			{
 				Name = config.Name ?? "unnamed",
 				OutputDeviceFactory = outputDeviceFactory ?? PlatformDefaultOutputDeviceFactory.Instance,
@@ -226,7 +228,7 @@ public static class RuntimeExtensions
 	private static readonly Dictionary<int, int> EmptyMap = new();
 
 	private static int Translate(int id, IReadOnlyDictionary<int, int> map) =>
-		map.TryGetValue(id, out var actual) ? actual : id;
+		map.GetValueOrDefault(id, id);
 
 	private static IAxisModifier? TranslateModifier(IAxisModifier? modifier, IReadOnlyDictionary<int, int> map)
 	{
@@ -244,46 +246,13 @@ public static class RuntimeExtensions
 					DeviceId = Translate(blended.ModifierAxis.DeviceId, map),
 				},
 			},
-			WhenButtonPressedAxisModifier when_ => when_ with
+			WhenButtonPressedAxisModifier whenBtnPressed => whenBtnPressed with
 			{
-				Buttons = [..when_.Buttons.Select(b => b with { DeviceId = Translate(b.DeviceId, map) })],
-				WhenPressed = TranslateModifier(when_.WhenPressed, map),
-				WhenNotPressed = TranslateModifier(when_.WhenNotPressed, map),
+				Buttons = [..whenBtnPressed.Buttons.Select(b => b with { DeviceId = Translate(b.DeviceId, map) })],
+				WhenPressed = TranslateModifier(whenBtnPressed.WhenPressed, map),
+				WhenNotPressed = TranslateModifier(whenBtnPressed.WhenNotPressed, map),
 			},
-			_ => modifier,  // AxisCurve and friends carry no DeviceIds
+			_ => modifier, // AxisCurve and friends carry no DeviceIds
 		};
-	}
-
-	private static IEnumerable<int> EnumerateModifierDeviceIds(IAxisModifier modifier)
-	{
-		switch (modifier)
-		{
-			case BlendedAxisCurve blended:
-				yield return blended.ModifierAxis.DeviceId;
-				break;
-			case WhenButtonPressedAxisModifier when_:
-				foreach (var button in when_.Buttons)
-				{
-					yield return button.DeviceId;
-				}
-
-				if (when_.WhenPressed is { } whenPressed)
-				{
-					foreach (var id in EnumerateModifierDeviceIds(whenPressed))
-					{
-						yield return id;
-					}
-				}
-
-				if (when_.WhenNotPressed is { } whenNotPressed)
-				{
-					foreach (var id in EnumerateModifierDeviceIds(whenNotPressed))
-					{
-						yield return id;
-					}
-				}
-
-				break;
-		}
 	}
 }

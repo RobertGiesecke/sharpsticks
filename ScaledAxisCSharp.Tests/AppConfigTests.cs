@@ -45,12 +45,12 @@ public sealed class AppConfigTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(3, 1),
+					SourceBinding = new(3, 1),
 					TargetButton = 12,
 				},
 				new()
 				{
-					SourceBinding = new ButtonBinding(5, 7),
+					SourceBinding = new(5, 7),
 					VJoyDeviceId = 3,
 					TargetButton = 4,
 				},
@@ -59,7 +59,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput
+					Source = new()
 					{
 						DeviceId = 3,
 						Axis = "y",
@@ -188,7 +188,7 @@ public sealed class AppConfigTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(1, 1),
+					SourceBinding = new(1, 1),
 					TargetButton = 1,
 				},
 			],
@@ -196,7 +196,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = 1, Axis = "x" },
+					Source = new() { DeviceId = 1, Axis = "x" },
 					TargetAxis = "x",
 				},
 			},
@@ -220,7 +220,7 @@ public sealed class AppConfigTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(1, 1),
+					SourceBinding = new(1, 1),
 					VJoyDeviceId = 9,
 					TargetButton = 1,
 				},
@@ -229,7 +229,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = 1, Axis = "x" },
+					Source = new() { DeviceId = 1, Axis = "x" },
 					TargetAxis = "y",
 					OutputDeviceId = 11,
 				},
@@ -250,7 +250,7 @@ public sealed class AppConfigTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(1, 0),
+					SourceBinding = new(1, 0),
 					TargetButton = 1,
 				},
 			],
@@ -263,7 +263,7 @@ public sealed class AppConfigTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(1, 1),
+					SourceBinding = new(1, 1),
 					TargetButton = 0,
 				},
 			],
@@ -286,7 +286,7 @@ public sealed class AppConfigTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(stick.DeviceId, 1),
+					SourceBinding = new(stick.DeviceId, 1),
 					TargetButton = 5,
 				},
 			],
@@ -316,7 +316,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput
+					Source = new()
 					{
 						DeviceId = stick.DeviceId,
 						Axis = "slider1",
@@ -357,7 +357,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput
+					Source = new()
 					{
 						DeviceId = stick.DeviceId,
 						Axis = "x",
@@ -394,7 +394,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = stick.DeviceId, Axis = "x" },
+					Source = new() { DeviceId = stick.DeviceId, Axis = "x" },
 					TargetAxis = "x",
 					Modifier = new AxisCurve { Max = 0.5 },
 				},
@@ -415,8 +415,8 @@ public sealed class AppConfigTests : IDisposable
 
 		var modifier = new BlendedAxisCurve
 		{
-			NormalCurve = new AxisCurve { Max = 1.0 },
-			PrecisionCurve = new AxisCurve { Max = 0.5 },
+			NormalCurve = new() { Max = 1.0 },
+			PrecisionCurve = new() { Max = 0.5 },
 			ModifierAxis = stick.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned },
 		};
 
@@ -427,7 +427,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = stick.DeviceId, Axis = "x" },
+					Source = new() { DeviceId = stick.DeviceId, Axis = "x" },
 					TargetAxis = "x",
 					Modifier = modifier,
 				},
@@ -466,7 +466,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = stick.DeviceId, Axis = "x" },
+					Source = new() { DeviceId = stick.DeviceId, Axis = "x" },
 					TargetAxis = "x",
 					Modifier = modifier,
 				},
@@ -511,7 +511,7 @@ public sealed class AppConfigTests : IDisposable
 			Gain = 1.0,
 		});
 
-		using var runtime = Runtime.Build(new RuntimeBuilder.BuildOptions
+		using var runtime = Runtime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
@@ -599,26 +599,26 @@ public sealed class AppConfigTests : IDisposable
 	{
 		var modifier = new WhenButtonPressedAxisModifier
 		{
-			Buttons = [new ButtonBinding(stickDeviceId, 1)],
+			Buttons = [new(stickDeviceId, 1)],
 			WhenPressed = new AxisCurve { Max = 0.5 },
 			WhenNotPressed = new BlendedAxisCurve
 			{
-				NormalCurve = new AxisCurve { Max = 1.0 },
-				PrecisionCurve = new AxisCurve { Max = 0.2 },
-				ModifierAxis = new AxisBinding(stickDeviceId, Axis.Slider1, AxisMode.Unsigned),
+				NormalCurve = new() { Max = 1.0 },
+				PrecisionCurve = new() { Max = 0.2 },
+				ModifierAxis = new(stickDeviceId, Axis.Slider1, AxisMode.Unsigned),
 				Stateful = true,
 			},
 			Stateful = WhenButtonPressedStateful.WhenPressed,
 		};
 
-		return new AppConfig
+		return new()
 		{
 			VJoyDeviceId = outputDeviceId,
 			AxisMappings =
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = stickDeviceId, Axis = "x" },
+					Source = new() { DeviceId = stickDeviceId, Axis = "x" },
 					TargetAxis = "x",
 					Modifier = modifier,
 				},
@@ -640,14 +640,14 @@ public sealed class AppConfigTests : IDisposable
 
 		public ComplexHarness(AppConfig config)
 		{
-			Fakes = new FakeDeviceManager();
+			Fakes = new();
 			Stick = Fakes.AddInputDevice("Stick")
 				.AddAxis(Axis.X)
 				.AddAxis(Axis.Slider1)
 				.AddButtons(4)
 				.Build();
 			Output = Fakes.AddOutputDevice().AddAxis(Axis.X).Build();
-			Runtime = OutputAbstractions.Runtime.Build(new RuntimeBuilder.BuildOptions
+			Runtime = OutputAbstractions.Runtime.Build(new()
 			{
 				Name = "test",
 				ConnectedDevices = Fakes.InputDevices,
@@ -672,7 +672,7 @@ public sealed class AppConfigTests : IDisposable
 		JsonSerializer.Deserialize(json, AppJsonContext.Default.AppConfig);
 
 	private IOutputRuntimeContext BuildRuntime(AppConfig config) =>
-		Runtime.Build(new RuntimeBuilder.BuildOptions
+		Runtime.Build(new()
 		{
 			Name = config.Name ?? "test",
 			ConnectedDevices = _Fakes.InputDevices,

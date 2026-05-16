@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Collections.Pooled;
 
 namespace ScaledAxisCSharp.Tests;
 
@@ -30,7 +31,7 @@ public sealed class DeviceReferenceTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(stickA.DeviceId, 1),
+					SourceBinding = new(stickA.DeviceId, 1),
 					TargetButton = 1,
 				},
 			],
@@ -38,19 +39,19 @@ public sealed class DeviceReferenceTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = stickA.DeviceId, Axis = "x" },
+					Source = new() { DeviceId = stickA.DeviceId, Axis = "x" },
 					TargetAxis = "x",
 					Modifier = new WhenButtonPressedAxisModifier
 					{
 						// referenced device id 2 — nested inside the modifier
-						Buttons = [new ButtonBinding(stickB.DeviceId, 1)],
+						Buttons = [new(stickB.DeviceId, 1)],
 						WhenPressed = new AxisCurve { Max = 0.5 },
 						WhenNotPressed = new BlendedAxisCurve
 						{
-							NormalCurve = new AxisCurve { Max = 1.0 },
-							PrecisionCurve = new AxisCurve { Max = 0.2 },
+							NormalCurve = new() { Max = 1.0 },
+							PrecisionCurve = new() { Max = 0.2 },
 							// also device id 2 via the modifier axis
-							ModifierAxis = new AxisBinding(stickB.DeviceId, Axis.Slider1, AxisMode.Unsigned),
+							ModifierAxis = new(stickB.DeviceId, Axis.Slider1, AxisMode.Unsigned),
 						},
 					},
 				},
@@ -85,7 +86,10 @@ public sealed class DeviceReferenceTests : IDisposable
 		{
 			Devices =
 			{
-				new() { DeviceId = 3, Name = "VPC Stick", InstanceGuid = Guid.Parse("00000000-0000-0000-0000-000000000001") },
+				new()
+				{
+					DeviceId = 3, Name = "VPC Stick", InstanceGuid = Guid.Parse("00000000-0000-0000-0000-000000000001")
+				},
 				new() { DeviceId = 7, Name = "Other Stick", InstanceGuid = null },
 			},
 		};
@@ -108,7 +112,8 @@ public sealed class DeviceReferenceTests : IDisposable
 	{
 		_Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build();
 
-		var map = new AppConfig().ResolveDeviceMap(_Fakes.InputDevices);
+		using var map = new PooledDictionary<int, int>();
+		new AppConfig().ResolveDeviceMap(_Fakes.InputDevices, map);
 
 		Assert.Empty(map);
 	}
@@ -118,20 +123,21 @@ public sealed class DeviceReferenceTests : IDisposable
 	{
 		// Stick at config-time was DeviceId=3; today the platform gave it id 7.
 		var guid = Guid.NewGuid();
-		_Fakes.AddInputDevice("Filler").AddAxis(Axis.X).Build();          // id 1
-		_Fakes.AddInputDevice("Filler 2").AddAxis(Axis.X).Build();        // id 2
+		_Fakes.AddInputDevice("Filler").AddAxis(Axis.X).Build(); // id 1
+		_Fakes.AddInputDevice("Filler 2").AddAxis(Axis.X).Build(); // id 2
 		var stick = _Fakes.AddInputDevice("Stick").AddAxis(Axis.X)
-			.WithInstanceGuid(guid).Build();                              // id 3 (we want this matched)
+			.WithInstanceGuid(guid).Build(); // id 3 (we want this matched)
 
 		var config = new AppConfig
 		{
 			Devices = { new() { DeviceId = 99, Name = "wrong name on purpose", InstanceGuid = guid } },
 		};
 
-		var map = config.ResolveDeviceMap(_Fakes.InputDevices);
+		using var map = new PooledDictionary<int, int>();
+		config.ResolveDeviceMap(_Fakes.InputDevices, map);
 
 		Assert.Single(map);
-		Assert.Equal(stick.DeviceId, map[99]);  // GUID wins even though Name doesn't match.
+		Assert.Equal(stick.DeviceId, map[99]); // GUID wins even though Name doesn't match.
 	}
 
 	[Fact]
@@ -145,7 +151,8 @@ public sealed class DeviceReferenceTests : IDisposable
 			Devices = { new() { DeviceId = 42, Name = "Target" /* no GUID */ } },
 		};
 
-		var map = config.ResolveDeviceMap(_Fakes.InputDevices);
+		using var map = new PooledDictionary<int, int>();
+		config.ResolveDeviceMap(_Fakes.InputDevices, map);
 
 		Assert.Equal(stick.DeviceId, map[42]);
 	}
@@ -155,20 +162,21 @@ public sealed class DeviceReferenceTests : IDisposable
 	{
 		// Two "Stick" devices in the config, two "Stick" connected. No GUIDs.
 		// Config's "Stick" with lowest id pairs with connected lowest id, etc.
-		var first = _Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build();   // id 1
-		_Fakes.AddInputDevice("Filler").AddAxis(Axis.X).Build();             // id 2
+		var first = _Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build(); // id 1
+		_Fakes.AddInputDevice("Filler").AddAxis(Axis.X).Build(); // id 2
 		var second = _Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build(); // id 3
 
 		var config = new AppConfig
 		{
 			Devices =
 			{
-				new() { DeviceId = 100, Name = "Stick" },  // lowest config id
+				new() { DeviceId = 100, Name = "Stick" }, // lowest config id
 				new() { DeviceId = 200, Name = "Stick" },
 			},
 		};
 
-		var map = config.ResolveDeviceMap(_Fakes.InputDevices);
+		using var map = new PooledDictionary<int, int>();
+		config.ResolveDeviceMap(_Fakes.InputDevices, map);
 
 		Assert.Equal(first.DeviceId, map[100]);
 		Assert.Equal(second.DeviceId, map[200]);
@@ -179,10 +187,10 @@ public sealed class DeviceReferenceTests : IDisposable
 	{
 		// One "Stick" matched by GUID, the rest matched by sorted-id fallback.
 		var guid = Guid.NewGuid();
-		_Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build();            // id 1, no special guid
+		_Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build(); // id 1, no special guid
 		var byGuid = _Fakes.AddInputDevice("Stick").AddAxis(Axis.X)
-			.WithInstanceGuid(guid).Build();                               // id 2 (this is the guid-matched one)
-		var firstByName = _Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build();  // id 3
+			.WithInstanceGuid(guid).Build(); // id 2 (this is the guid-matched one)
+		var firstByName = _Fakes.AddInputDevice("Stick").AddAxis(Axis.X).Build(); // id 3
 
 		var config = new AppConfig
 		{
@@ -194,7 +202,8 @@ public sealed class DeviceReferenceTests : IDisposable
 			},
 		};
 
-		var map = config.ResolveDeviceMap(_Fakes.InputDevices);
+		using var map = new PooledDictionary<int, int>();
+		config.ResolveDeviceMap(_Fakes.InputDevices, map);
 
 		// GUID-matched: 300 → byGuid (id 2)
 		Assert.Equal(byGuid.DeviceId, map[300]);
@@ -213,7 +222,8 @@ public sealed class DeviceReferenceTests : IDisposable
 			Devices = { new() { DeviceId = 1, Name = "MissingStick" } },
 		};
 
-		Assert.Throws<InvalidOperationException>(() => config.ResolveDeviceMap(_Fakes.InputDevices));
+		using var map = new PooledDictionary<int, int>();
+		Assert.Throws<InvalidOperationException>(() => config.ResolveDeviceMap(_Fakes.InputDevices, map));
 	}
 
 	// ── End-to-end: load with different ids, runtime works ──────────────
@@ -244,7 +254,7 @@ public sealed class DeviceReferenceTests : IDisposable
 			[
 				new()
 				{
-					SourceBinding = new ButtonBinding(configStickId, 1),
+					SourceBinding = new(configStickId, 1),
 					TargetButton = 3,
 				},
 			],
@@ -252,11 +262,11 @@ public sealed class DeviceReferenceTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = configStickId, Axis = "x" },
+					Source = new() { DeviceId = configStickId, Axis = "x" },
 					TargetAxis = "x",
 					Modifier = new WhenButtonPressedAxisModifier
 					{
-						Buttons = [new ButtonBinding(configStickId, 2)],
+						Buttons = [new(configStickId, 2)],
 						WhenPressed = new AxisCurve { Max = 0.5 },
 						WhenNotPressed = new AxisCurve { Max = 1.0 },
 					},
@@ -264,10 +274,11 @@ public sealed class DeviceReferenceTests : IDisposable
 			},
 		};
 
-		var deviceMap = config.ResolveDeviceMap(_Fakes.InputDevices);
+		using var deviceMap = new PooledDictionary<int, int>();
+		config.ResolveDeviceMap(_Fakes.InputDevices, deviceMap);
 		Assert.Equal(stick.DeviceId, deviceMap[configStickId]);
 
-		using var runtime = Runtime.Build(new RuntimeBuilder.BuildOptions
+		using var runtime = Runtime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
@@ -308,7 +319,7 @@ public sealed class DeviceReferenceTests : IDisposable
 			{
 				new()
 				{
-					Source = new AxisInput { DeviceId = 1, Axis = "x" },
+					Source = new() { DeviceId = 1, Axis = "x" },
 					TargetAxis = "x",
 					Modifier = new AxisCurve { Max = 0.5 },
 				},
@@ -320,19 +331,20 @@ public sealed class DeviceReferenceTests : IDisposable
 		// 2. Simulate the next session: a different FakeDeviceManager with
 		// a filler device claiming id 1 first, then the real stick at id 2.
 		using var nextSession = new FakeDeviceManager();
-		nextSession.AddInputDevice("Some other device").AddAxis(Axis.X).Build();   // id 1
+		nextSession.AddInputDevice("Some other device").AddAxis(Axis.X).Build(); // id 1
 		var reconnected = nextSession.AddInputDevice("Stick").AddAxis(Axis.X).AddButtons(2)
-			.WithInstanceGuid(saveTimeGuid).Build();                              // id 2
+			.WithInstanceGuid(saveTimeGuid).Build(); // id 2
 		var output = nextSession.AddOutputDevice().AddAxis(Axis.X).Build();
 
 		var loaded = (AppConfig?)JsonSerializer.Deserialize(json, typeof(AppConfig), AppJsonContext.Polymorphic);
 		Assert.NotNull(loaded);
 		loaded!.VJoyDeviceId = output.DeviceId;
 
-		var map = loaded.ResolveDeviceMap(nextSession.InputDevices);
-		Assert.Equal(reconnected.DeviceId, map[1]);  // config-side id 1 → today's id 2
+		using var map = new PooledDictionary<int, int>();
+		loaded.ResolveDeviceMap(nextSession.InputDevices, map);
+		Assert.Equal(reconnected.DeviceId, map[1]); // config-side id 1 → today's id 2
 
-		using var runtime = Runtime.Build(new RuntimeBuilder.BuildOptions
+		using var runtime = Runtime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = nextSession.InputDevices,
@@ -342,6 +354,6 @@ public sealed class DeviceReferenceTests : IDisposable
 
 		reconnected.SetAxisValue(Axis.X, 0.8);
 		runtime.ProcessFrame();
-		Assert.Equal(0.4, output.GetAxisValue(Axis.X), Precision);  // 0.5x curve applied
+		Assert.Equal(0.4, output.GetAxisValue(Axis.X), Precision); // 0.5x curve applied
 	}
 }
