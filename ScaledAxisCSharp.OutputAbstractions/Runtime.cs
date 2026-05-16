@@ -250,17 +250,28 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 			route.OutputDevice.SetAxisValue(route.OutputAxis, output);
 
-			if (debugLines is not null)
+			if (debugLines is null)
 			{
-				AppendAxisDebugLine(debugLines, route.Source.DeviceId, route.Source.Axis,
-					route.OutputDevice.DeviceId, route.OutputAxis, sample, output);
-				if (route.RuntimeModifier is IRuntimeAxisDebugView debugView &&
-				    debugView.GetDebugView() is { Length: > 0 } debugText)
-				{
-					debugLines.Append("  ");
-					debugLines.AppendLine(debugText);
-				}
+				continue;
 			}
+
+			AppendAxisDebugLine(
+				debugLines,
+				route.Source.DeviceId,
+				route.Source.Axis,
+				route.OutputDevice.DeviceId,
+				route.OutputAxis,
+				sample,
+				output);
+
+			if (route.RuntimeModifier is not IRuntimeAxisDebugView debugView ||
+			    debugView.GetDebugView() is not { Length: > 0 } debugText)
+			{
+				continue;
+			}
+
+			debugLines.Append("  ");
+			debugLines.AppendLine(debugText);
 		}
 	}
 
