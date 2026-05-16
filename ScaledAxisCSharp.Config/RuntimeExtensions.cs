@@ -1,21 +1,16 @@
-﻿namespace ScaledAxisCSharp.Config;
+namespace ScaledAxisCSharp.Config;
 
 public static class RuntimeExtensions
 {
-	extension(Runtime)
+	extension(AppConfig config)
 	{
-		public static IOutputRuntimeContext BuildFromConfig(AppConfig config)
+		/// <summary>
+		/// Translate an <see cref="AppConfig"/>'s mappings into the
+		/// <see cref="IRoute"/> objects a <see cref="Runtime"/> consumes.
+		/// Doesn't enumerate any devices — usable in tests that wire fakes.
+		/// </summary>
+		public ImmutableArray<IRoute> BuildRoutes()
 		{
-			var buildOptions = GetBuildOptionsFromConfig(config);
-			return Runtime.Build(buildOptions);
-		}
-
-		public static RuntimeBuilder.BuildOptions GetBuildOptionsFromConfig(AppConfig config,
-			IOutputDeviceFactory? outputDeviceFactory = null)
-		{
-			using var connectedDevices = PlatformDefaultInputDevice.EnumerateConnected();
-			using var connectedDevicesById = connectedDevices
-				.ToPooledDictionary(device => device.DeviceId);
 			var buttonRoutes = new List<ButtonRoute>();
 			var axisRoutes = new List<AxisRoute>();
 
@@ -54,18 +49,34 @@ public static class RuntimeExtensions
 				});
 			}
 
-			var buildOptions = new RuntimeBuilder.BuildOptions
+			return
+			[
+				..buttonRoutes,
+				..axisRoutes,
+			];
+		}
+	}
+
+	extension(Runtime)
+	{
+		public static IOutputRuntimeContext BuildFromConfig(AppConfig config)
+		{
+			var buildOptions = GetBuildOptionsFromConfig(config);
+			return Runtime.Build(buildOptions);
+		}
+
+		public static RuntimeBuilder.BuildOptions GetBuildOptionsFromConfig(AppConfig config,
+			IOutputDeviceFactory? outputDeviceFactory = null)
+		{
+			using var connectedDevices = PlatformDefaultInputDevice.EnumerateConnected();
+
+			return new RuntimeBuilder.BuildOptions
 			{
 				Name = config.Name ?? "unnamed",
 				OutputDeviceFactory = outputDeviceFactory ?? PlatformDefaultOutputDeviceFactory.Instance,
 				ConnectedDevices = [..connectedDevices],
-				Routes =
-				[
-					..buttonRoutes,
-					..axisRoutes,
-				],
+				Routes = config.BuildRoutes(),
 			};
-			return buildOptions;
 		}
 	}
 }
