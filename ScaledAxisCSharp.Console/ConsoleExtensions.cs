@@ -11,7 +11,7 @@ public static class ConsoleExtensions
 		public DebugLogger? DebugLogger { get; init; }
 		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
 		public ImmutableArray<JoystickDevice>? ConnectedDevices { get; init; }
-		public ImmutableArray<IRoute> Routes { get; init; } = [];
+		public ImmutableArray<IBoundRoute> Routes { get; init; } = [];
 	}
 
 	extension(IOutputRuntimeContext runtime)

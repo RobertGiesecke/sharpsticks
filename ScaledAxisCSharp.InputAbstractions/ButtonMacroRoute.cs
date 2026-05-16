@@ -6,16 +6,16 @@ namespace ScaledAxisCSharp.InputAbstractions;
 /// <see cref="OnRelease"/> on the inverse edge. Press and release runs share a
 /// single FIFO so event order is preserved.
 /// </summary>
-public sealed record ButtonMacroRoute : IRoute
+public sealed record ButtonMacroRoute : IBoundRoute
 {
 	public required ButtonBinding Binding { get; init; }
 	public ImmutableArray<IMacroAction> OnPress { get; init; } = [];
 	public ImmutableArray<IMacroAction> OnRelease { get; init; } = [];
 	public MacroReentry Reentry { get; init; } = MacroReentry.QueueUntilDone;
 
-	InputBinding IRoute.InputBinding => Binding;
+	InputBinding IBoundRoute.InputBinding => Binding;
 
 	// A macro can write to multiple output devices; the actual targets are
 	// discovered by walking actions via IMacroAction.FillOutputs.
-	uint IRoute.OutputDeviceId => 0;
+	uint IBoundRoute.OutputDeviceId => 0;
 }

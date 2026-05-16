@@ -300,9 +300,123 @@ public sealed class MacroTests : IDisposable
 		Assert.False(_Output.GetButtonState(3));
 	}
 
+	// ── Force-release: macro overrides a route's assertion ──────────────
+
+	[Fact]
+	public void MacroRelease_OverridesRouteAssertion_UntilRouteFallsAndRises()
+	{
+		// Stick.B1 routes B1 → output.B3 directly. Stick.B2 fires a macro that
+		// force-releases B3 while held, then re-presses it after a short wait.
+		// While the macro suppresses, output.B3 must follow the macro, not the
+		// route. When the user releases-and-re-presses Stick.B1, the macro's
+		// suppression clears on the route's falling edge so the next route press
+		// asserts the button again.
+		var target = _Output.BindButton(3);
+		using var runtime = Build(
+			new ButtonRoute(_Stick.BindButton(1), target),
+			new ButtonMacroRoute
+			{
+				Binding = _Stick.BindButton(2),
+				OnPress =
+				[
+					Macros.Release(target),
+					Macros.Wait(TimeSpan.FromMilliseconds(20)),
+					Macros.Press(target),
+				],
+			});
+
+		runtime.ProcessFrame();
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(3));   // route holds B3.
+
+		_Stick.PressButton(2);
+		runtime.ProcessFrame();
+		// Macro asserts force-release on B3. Route still has B1 down, but the
+		// suppressor overrides it.
+		Assert.False(_Output.GetButtonState(3));
+
+		// Wait elapses. Macro Press re-asserts; suppression clears.
+		_Time.Advance(TimeSpan.FromMilliseconds(25));
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(3));
+	}
+
+	[Fact]
+	public void RouteFallingEdge_ClearsMacroSuppression_SoNextRoutePressAsserts()
+	{
+		// Macro force-releases B3 without re-pressing. Route was pressing B3 via
+		// B1; macro suppression hides it. If the user releases B1 and presses it
+		// again, the suppression should clear on the falling edge so the next
+		// route press takes effect.
+		var target = _Output.BindButton(3);
+		using var runtime = Build(
+			new ButtonRoute(_Stick.BindButton(1), target),
+			new ButtonMacroRoute
+			{
+				Binding = _Stick.BindButton(2),
+				OnPress = [Macros.Release(target)],
+			});
+
+		runtime.ProcessFrame();
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(3));
+
+		// Macro asserts force-release. Suppression engaged.
+		_Stick.PressButton(2);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(3));
+
+		// Route falling edge clears suppression. Output drops fully (no asserter).
+		_Stick.ReleaseButton(1);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(3));
+
+		// Next route press asserts again — the prior suppression is gone.
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(3));
+	}
+
+	[Fact]
+	public void TwoRouteSourcesOnSameOutput_BothMustReleaseBeforeOutputDrops()
+	{
+		// Refcount semantics: two ButtonRoutes target the same output. Either
+		// one being pressed is enough to hold the output; both must release for
+		// the output to drop.
+		var target = _Output.BindButton(3);
+		using var runtime = Build(
+			new ButtonRoute(_Stick.BindButton(1), target),
+			new ButtonRoute(_Stick.BindButton(2), target));
+
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(3));
+
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(3));
+
+		_Stick.PressButton(2);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(3));
+
+		// Release one source: output stays held — the route group's edge-tracked
+		// contribution stays asserted because the OR over its bindings still
+		// asserts. (Per-group contributes 1; the second binding's press is what
+		// keeps the group asserting.)
+		_Stick.ReleaseButton(1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(3));
+
+		_Stick.ReleaseButton(2);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(3));
+	}
+
 	// ── Helpers ─────────────────────────────────────────────────────────
 
-	private IOutputRuntimeContext Build(params IRoute[] routes) =>
+	private IOutputRuntimeContext Build(params IBoundRoute[] routes) =>
 		Runtime.Build(new()
 		{
 			Name = "test",

@@ -8,6 +8,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	private readonly DebugLogger? _DebugLogger;
 	private readonly ImmutableArray<OutputAxisRoute> _AxisRoutes;
 	private readonly ImmutableArray<OutputButtonWithBindings> _ButtonRoutes;
+	private readonly FrozenDictionary<OutputButtonBinding, OutputButtonWithBindings> _ButtonRoutesByBinding;
 	private readonly ImmutableArray<JoystickDevice> _Devices;
 	private readonly ImmutableArray<OutputDevice> _OutputDevices;
 	private readonly MacroEngine? _Macros;
@@ -18,12 +19,22 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
 	public ImmutableArray<JoystickDevice> Devices => _Devices;
 
+	/// <summary>
+	/// One entry per distinct output button (route- or macro-targeted, or both).
+	/// Tracks current assertions across all sources via <see cref="Pressers"/>
+	/// and macro release-overrides via <see cref="Suppressors"/>. The button is
+	/// held when <c>Pressers &gt; 0 &amp;&amp; Suppressors == 0</c>.
+	/// </summary>
 	private sealed class OutputButtonWithBindings
 	{
 		public required OutputDevice OutputDevice { get; init; }
 		public required int TargetButton { get; init; }
 		public required OutputButtonBinding TargetBinding { get; init; }
 		public required ImmutableArray<ButtonBindingWithDeviceId> Bindings { get; init; }
+
+		public int Pressers;
+		public int Suppressors;
+		public bool WasRouteAssertingLastFrame;
 	}
 
 	private sealed class ButtonBindingWithDeviceId
@@ -133,12 +144,25 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			})
 		];
 		_OutputDevices = outputDevices;
+		_ButtonRoutesByBinding = _ButtonRoutes.ToFrozenDictionary(r => r.TargetBinding);
 		_CurrentStates = new JoystickState?[DevicesById.Count];
 		_LastReportedReadFailure = new();
 		_Macros = macroRoutes.IsEmpty
 			? null
-			: new MacroEngine(macroRoutes, DeviceIndexesById, timeSource);
+			: new MacroEngine(
+				macroRoutes,
+				DeviceIndexesById,
+				timeSource,
+				IncrementPressers,
+				DecrementPressers,
+				IncrementSuppressors,
+				DecrementSuppressors);
 	}
+
+	private void IncrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Pressers++;
+	private void DecrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Pressers--;
+	private void IncrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Suppressors++;
+	private void DecrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Suppressors--;
 
 
 	private readonly JoystickState?[] _CurrentStates;
@@ -234,7 +258,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	{
 		foreach (var route in _ButtonRoutes)
 		{
-			var isPressed = false;
+			ButtonBinding? assertingBinding = null;
 			foreach (var buttonBindingW in route.Bindings)
 			{
 				if (states[buttonBindingW.SourceDeviceIndex] is not { } state)
@@ -249,49 +273,54 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 					continue;
 				}
 
-				if (debugLines is not null)
-				{
-					debugLines.Append("button ");
-					debugLines.Append(buttonBinding.DeviceId);
-					debugLines.Append(':');
-					debugLines.Append(buttonBinding.ButtonNumber);
-					debugLines.Append(" -> ");
-					debugLines.Append("output");
-					debugLines.Append(route.OutputDevice.DeviceId);
-					debugLines.Append(':');
-					debugLines.Append(route.TargetButton);
-					debugLines.Append(" = ");
-					debugLines.AppendLine("down");
-				}
-
-				isPressed = true;
+				assertingBinding = buttonBinding;
 				break;
 			}
 
-			if (!isPressed && _Macros is not null && _Macros.IsHeld(route.TargetBinding))
+			var routeAsserting = assertingBinding is not null;
+			if (routeAsserting != route.WasRouteAssertingLastFrame)
 			{
-				if (debugLines is not null)
+				if (routeAsserting)
 				{
-					debugLines.Append("macro -> output");
-					debugLines.Append(route.OutputDevice.DeviceId);
-					debugLines.Append(':');
-					debugLines.Append(route.TargetButton);
-					debugLines.AppendLine(" = down");
+					route.Pressers++;
+				}
+				else
+				{
+					route.Pressers--;
+					// Falling edge ends the macro suppression window: a route's
+					// next press cycle should be free to assert again.
+					_Macros?.ClearSuppressionFor(route.TargetBinding);
 				}
 
-				isPressed = true;
+				route.WasRouteAssertingLastFrame = routeAsserting;
 			}
 
-			route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
+			var isPressed = route.Pressers > 0 && route.Suppressors == 0;
 
-			if (debugLines is not null && !isPressed)
+			if (debugLines is not null)
 			{
-				debugLines.Append("button -> output");
+				if (assertingBinding is { } bound)
+				{
+					debugLines.Append("button ");
+					debugLines.Append(bound.DeviceId);
+					debugLines.Append(':');
+					debugLines.Append(bound.ButtonNumber);
+					debugLines.Append(" -> ");
+				}
+				else if (isPressed)
+				{
+					debugLines.Append("macro -> ");
+				}
+
+				debugLines.Append("output");
 				debugLines.Append(route.OutputDevice.DeviceId);
 				debugLines.Append(':');
 				debugLines.Append(route.TargetButton);
-				debugLines.AppendLine(" = up");
+				debugLines.Append(" = ");
+				debugLines.AppendLine(isPressed ? "down" : "up");
 			}
+
+			route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
 		}
 	}
 

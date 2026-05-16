@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.OutputAbstractions;
+﻿namespace ScaledAxisCSharp.OutputAbstractions;
 
 public static class RuntimeBuilder
 {
@@ -9,7 +9,7 @@ public static class RuntimeBuilder
 		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
 		public ITimeSource? TimeSource { get; init; }
 		public required ImmutableArray<JoystickDevice> ConnectedDevices { get; init; }
-		public ImmutableArray<IRoute> Routes { get; init; } = [];
+		public ImmutableArray<IBoundRoute> Routes { get; init; } = [];
 	}
 
 	extension(Runtime)

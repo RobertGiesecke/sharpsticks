@@ -4,21 +4,33 @@ namespace ScaledAxisCSharp.OutputAbstractions;
 /// Drives every <see cref="ButtonMacroRoute"/> across frames: edge-detects the
 /// source button, queues OnPress/OnRelease runs per the route's
 /// <see cref="MacroReentry"/> policy, steps the active session each frame, and
-/// tracks which output buttons are currently held by any session so
-/// <see cref="Runtime"/> can OR them into the normal button route output.
+/// pumps Press/Release events through the <see cref="Runtime"/>-supplied
+/// pressers / suppressors callbacks. The engine itself owns no held-state — the
+/// counts live on <see cref="Runtime"/>'s <c>OutputButtonWithBindings</c>.
 /// </summary>
 internal sealed class MacroEngine : IDisposable
 {
 	private readonly ImmutableArray<MacroRouteState> _Routes;
 	private readonly ITimeSource _Time;
-	private readonly PooledDictionary<OutputButtonBinding, int> _HeldCounts = new();
+	private readonly Action<OutputButtonBinding> _IncPress;
+	private readonly Action<OutputButtonBinding> _DecPress;
+	private readonly Action<OutputButtonBinding> _IncSuppress;
+	private readonly Action<OutputButtonBinding> _DecSuppress;
 
 	public MacroEngine(
 		ImmutableArray<ButtonMacroRoute> routes,
 		FrozenDictionary<int, int> deviceIndexesById,
-		ITimeSource time)
+		ITimeSource time,
+		Action<OutputButtonBinding> incrementPressers,
+		Action<OutputButtonBinding> decrementPressers,
+		Action<OutputButtonBinding> incrementSuppressors,
+		Action<OutputButtonBinding> decrementSuppressors)
 	{
 		_Time = time;
+		_IncPress = incrementPressers;
+		_DecPress = decrementPressers;
+		_IncSuppress = incrementSuppressors;
+		_DecSuppress = decrementSuppressors;
 		_Routes =
 		[
 			..routes.Select(r => new MacroRouteState(
@@ -28,9 +40,6 @@ internal sealed class MacroEngine : IDisposable
 				time.Frequency)),
 		];
 	}
-
-	public bool IsHeld(OutputButtonBinding button) =>
-		_HeldCounts.TryGetValue(button, out var c) && c > 0;
 
 	/// <summary>
 	/// Earliest deadline at which the next sleeping macro must be revisited.
@@ -55,43 +64,63 @@ internal sealed class MacroEngine : IDisposable
 		NextDeadlineTicks = earliest;
 	}
 
+	/// <summary>
+	/// Called by <see cref="Runtime"/> on a route group's falling edge: any
+	/// macro that has the button latched as "released-override" drops the
+	/// override so the next route press can assert again.
+	/// </summary>
+	public void ClearSuppressionFor(OutputButtonBinding button)
+	{
+		foreach (var route in _Routes)
+		{
+			if (route.ReleasedButtons.Remove(button))
+			{
+				_DecSuppress(button);
+			}
+		}
+	}
+
 	internal void OnPress(MacroRouteState route, OutputButtonBinding button)
 	{
-		if (route.HeldButtons.Add(button))
+		if (route.ReleasedButtons.Remove(button))
 		{
-			_HeldCounts[button] = _HeldCounts.GetValueOrDefault(button) + 1;
+			_DecSuppress(button);
+		}
+
+		if (route.PressedButtons.Add(button))
+		{
+			_IncPress(button);
 		}
 	}
 
 	internal void OnRelease(MacroRouteState route, OutputButtonBinding button)
 	{
-		if (route.HeldButtons.Remove(button))
+		if (route.PressedButtons.Remove(button))
 		{
-			DecrementHeld(button);
+			_DecPress(button);
+		}
+
+		if (route.ReleasedButtons.Add(button))
+		{
+			_IncSuppress(button);
 		}
 	}
 
 	internal void ReleaseAllForRoute(MacroRouteState route)
 	{
-		foreach (var button in route.HeldButtons)
+		foreach (var button in route.PressedButtons)
 		{
-			DecrementHeld(button);
+			_DecPress(button);
 		}
 
-		route.HeldButtons.Clear();
-	}
+		route.PressedButtons.Clear();
 
-	private void DecrementHeld(OutputButtonBinding button)
-	{
-		var c = _HeldCounts.GetValueOrDefault(button);
-		if (c <= 1)
+		foreach (var button in route.ReleasedButtons)
 		{
-			_HeldCounts.Remove(button);
+			_DecSuppress(button);
 		}
-		else
-		{
-			_HeldCounts[button] = c - 1;
-		}
+
+		route.ReleasedButtons.Clear();
 	}
 
 	public void Dispose()
@@ -100,8 +129,6 @@ internal sealed class MacroEngine : IDisposable
 		{
 			route.Dispose();
 		}
-
-		_HeldCounts.Dispose();
 	}
 }
 
@@ -134,7 +161,13 @@ internal sealed class MacroRouteState : IDisposable
 	public int SourceDeviceIndex { get; }
 	public bool WasPressedLastFrame;
 	public PooledQueue<TriggerKind> Pending { get; } = new(4);
-	public PooledSet<OutputButtonBinding> HeldButtons { get; } = new();
+
+	/// <summary>Buttons this route currently asserts via <c>Press</c>.</summary>
+	public PooledSet<OutputButtonBinding> PressedButtons { get; } = new();
+
+	/// <summary>Buttons this route currently force-releases via <c>Release</c>.</summary>
+	public PooledSet<OutputButtonBinding> ReleasedButtons { get; } = new();
+
 	public MacroSession? Running { get; private set; }
 	public long? NextDeadlineTicks { get; private set; }
 
@@ -231,9 +264,9 @@ internal sealed class MacroRouteState : IDisposable
 			return;
 		}
 
-		// Normal completion: leave the session's outstanding presses in place
-		// so a macro like [Press(X)] holds X across its end. Cancellation paths
-		// (CancelAndRestart, engine dispose) DO release — see those call sites.
+		// Normal completion leaves the route's outstanding presses + suppressions
+		// in place so a macro like [Press(X)] holds X across its end. Cancellation
+		// paths (CancelAndRestart, engine dispose) DO release — see those call sites.
 		Running.Dispose();
 		Running = null;
 	}
@@ -247,7 +280,8 @@ internal sealed class MacroRouteState : IDisposable
 		}
 
 		_Engine.ReleaseAllForRoute(this);
-		HeldButtons.Dispose();
+		PressedButtons.Dispose();
+		ReleasedButtons.Dispose();
 		Pending.Dispose();
 	}
 }

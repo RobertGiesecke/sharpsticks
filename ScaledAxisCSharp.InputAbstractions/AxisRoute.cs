@@ -1,6 +1,6 @@
 namespace ScaledAxisCSharp.InputAbstractions;
 
-public sealed record AxisRoute : Route
+public sealed record AxisRoute : BoundRoute
 {
 	public required AxisBinding Source { get; init; }
 	public required OutputAxisBinding OutputBinding { get; init; }

@@ -6,7 +6,7 @@ public static class RuntimeExtensions
 	{
 		/// <summary>
 		/// Translate an <see cref="AppConfig"/>'s mappings into the
-		/// <see cref="IRoute"/> objects a <see cref="Runtime"/> consumes.
+		/// <see cref="IBoundRoute"/> objects a <see cref="Runtime"/> consumes.
 		/// Doesn't enumerate any devices — usable in tests that wire fakes.
 		/// </summary>
 		/// <param name="deviceMap">
@@ -14,7 +14,7 @@ public static class RuntimeExtensions
 		/// <c>DeviceId</c> in bindings (and inside nested modifiers) is
 		/// rewritten through this map. Unmapped ids pass through unchanged.
 		/// </param>
-		public ImmutableArray<IRoute> BuildRoutes(IReadOnlyDictionary<int, int>? deviceMap = null)
+		public ImmutableArray<IBoundRoute> BuildRoutes(IReadOnlyDictionary<int, int>? deviceMap = null)
 		{
 			deviceMap ??= EmptyMap;
 
