@@ -380,6 +380,119 @@ public sealed class MacroTests : IDisposable
 	}
 
 	[Fact]
+	public void MacroReleaseThatDoesNotRePress_KeepsOutputSuppressed_UntilDirectBindFalls()
+	{
+		// stick.B1 → out.B1 directly.
+		// stick.B2 → macro: Release(out.B1), Press(out.B3), Wait, Release(out.B3).
+		// After the macro finishes, out.B1 must remain released even though
+		// stick.B1 is still held: only the route group's falling edge clears
+		// the macro's suppression on out.B1.
+		var b1 = _Output.BindButton(1);
+		var b3 = _Output.BindButton(3);
+		using var runtime = Build(
+			new ButtonRoute(_Stick.BindButton(1), b1),
+			new ButtonMacroRoute
+			{
+				Binding = _Stick.BindButton(2),
+				OnPress =
+				[
+					Macros.Release(b1),
+					Macros.Press(b3),
+					Macros.Wait(TimeSpan.FromMilliseconds(50)),
+					Macros.Release(b3),
+				],
+			});
+
+		runtime.ProcessFrame();
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(1));
+		Assert.False(_Output.GetButtonState(3));
+
+		// Macro starts. Release(B1) suppresses out.B1, Press(B3), then Wait.
+		_Stick.PressButton(2);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+		Assert.True(_Output.GetButtonState(3));
+
+		// Time elapses — macro runs the final Release(B3) and finishes. out.B1
+		// was never re-pressed by the macro, so its suppressor stays in place.
+		_Time.Advance(TimeSpan.FromMilliseconds(60));
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+		Assert.False(_Output.GetButtonState(3));
+
+		// Releasing the macro source (stick.B2) doesn't clear suppression of
+		// out.B1 — only the *direct* route's falling edge does that.
+		_Stick.ReleaseButton(2);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Stick.B1 is still held. Output stays released across additional frames.
+		runtime.ProcessFrame();
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Now release stick.B1: route group's falling edge clears suppression.
+		// Output is still released (no presser).
+		_Stick.ReleaseButton(1);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Press stick.B1 again: rising edge re-asserts the output.
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(1));
+	}
+
+	[Fact]
+	public void MacroSuppression_OnGroupWithMultipleBindings_NeedsAllBindingsToFall()
+	{
+		// Direct group has two bindings (stick.B1 OR stick.B2) → out.B1.
+		// Macro on stick.B3 force-releases out.B1. Even if stick.B1 releases,
+		// stick.B2 keeps the group asserting, so the group's falling edge
+		// doesn't fire and suppression stays in place. Both must fall before
+		// the next press can assert.
+		var b1 = _Output.BindButton(1);
+		using var runtime = Build(
+			new ButtonRoute(_Stick.BindButton(1), b1),
+			new ButtonRoute(_Stick.BindButton(2), b1),
+			new ButtonMacroRoute
+			{
+				Binding = _Stick.BindButton(3),
+				OnPress = [Macros.Release(b1)],
+			});
+
+		runtime.ProcessFrame();
+		_Stick.PressButton(1);
+		_Stick.PressButton(2);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(1));
+
+		_Stick.PressButton(3);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1)); // suppressed
+
+		// Drop one binding: group still asserts via the other; no falling edge.
+		_Stick.ReleaseButton(1);
+		runtime.ProcessFrame();
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Drop BOTH bindings: now the group falls and suppression clears.
+		_Stick.ReleaseButton(1);
+		_Stick.ReleaseButton(2);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Press either binding again: rising edge asserts.
+		_Stick.PressButton(2);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(1));
+	}
+
+	[Fact]
 	public void TwoRouteSourcesOnSameOutput_BothMustReleaseBeforeOutputDrops()
 	{
 		// Refcount semantics: two ButtonRoutes target the same output. Either
