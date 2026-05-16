@@ -17,7 +17,10 @@ public sealed record AxisCurve : IAxisModifier
 		}
 	} = InitialSteepness;
 
+	[System.Text.Json.Serialization.JsonIgnore]
 	public bool IsLinear { get; private init; } = Math.Abs(InitialSteepness - 1.0) < Tolerance;
+
+	[System.Text.Json.Serialization.JsonIgnore]
 	public bool IsFlat { get; private init; } = Math.Abs(InitialSteepness) < Tolerance;
 
 	public void FillDevices(ICollection<int> deviceIds)
