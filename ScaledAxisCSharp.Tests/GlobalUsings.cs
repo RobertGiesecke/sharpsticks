@@ -1,4 +1,7 @@
 global using System.Collections.Immutable;
+global using System.Diagnostics.CodeAnalysis;
+global using System.Text.Json;
+global using Collections.Pooled;
 global using ScaledAxisCSharp.Config;
 global using ScaledAxisCSharp.InputAbstractions;
 global using ScaledAxisCSharp.OutputAbstractions;

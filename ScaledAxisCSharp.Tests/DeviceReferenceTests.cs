@@ -1,6 +1,3 @@
-using System.Text.Json;
-using Collections.Pooled;
-
 namespace ScaledAxisCSharp.Tests;
 
 /// <summary>
