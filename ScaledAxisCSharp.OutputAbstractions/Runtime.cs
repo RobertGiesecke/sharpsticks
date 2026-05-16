@@ -104,19 +104,19 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			})
 		];
 		_OutputDevices = outputDevices;
+		_CurrentStates = new JoystickState?[DevicesById.Count];
+		_LastReportedReadFailure = new PooledSet<int>();
 	}
 
+
+	private readonly JoystickState?[] _CurrentStates;
+	private readonly PooledSet<int> _LastReportedReadFailure;
 
 	public void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null)
 	{
 		debugLogger ??= _DebugLogger;
-		using var debugLinesScope = SharedPools.StringBuilder.GetInstance();
 		try
 		{
-			var currentStates = new JoystickState?[DevicesById.Count];
-			var currentStatesSpan = currentStates.AsSpan();
-
-			using var lastReportedReadFailure = new PooledSet<int>();
 			LogStartup(debugLogger);
 
 			var waitHandles = DevicesById.Values
@@ -132,34 +132,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 					break;
 				}
 
-				// clear all states
-				currentStatesSpan.Fill(null);
-
-				for (var deviceIndex = 0; deviceIndex < _Devices.Length; deviceIndex++)
-				{
-					var device = _Devices[deviceIndex];
-					if (device.TryRead(out var state, out var error))
-					{
-						currentStates[deviceIndex] = state;
-						lastReportedReadFailure.Remove(device.DeviceId);
-					}
-					else if (lastReportedReadFailure.Add(device.DeviceId) && error is not null)
-					{
-						Console.Error.WriteLine(error);
-					}
-				}
-
-				var shouldLog = debugLogger?.ShouldLogNow() is true;
-				var debugLines = shouldLog ? debugLinesScope.Instance : null;
-				debugLines?.Clear();
-
-				ApplyButtons(currentStates, debugLines);
-				ApplyAxes(currentStates, debugLines);
-
-				if (shouldLog && debugLogger is not null && debugLines is not null)
-				{
-					debugLogger.WriteBlock(debugLines);
-				}
+				ProcessFrame(debugLogger);
 			}
 		}
 		finally
@@ -168,6 +141,41 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			{
 				outputDevice.Dispose();
 			}
+		}
+	}
+
+	public void ProcessFrame(DebugLogger? debugLogger = null)
+	{
+		debugLogger ??= _DebugLogger;
+		using var debugLinesScope = SharedPools.StringBuilder.GetInstance();
+
+		var currentStates = _CurrentStates;
+		currentStates.AsSpan().Fill(null);
+
+		for (var deviceIndex = 0; deviceIndex < _Devices.Length; deviceIndex++)
+		{
+			var device = _Devices[deviceIndex];
+			if (device.TryReadState(out var state, out var error))
+			{
+				currentStates[deviceIndex] = state;
+				_LastReportedReadFailure.Remove(device.DeviceId);
+			}
+			else if (_LastReportedReadFailure.Add(device.DeviceId) && error is not null)
+			{
+				Console.Error.WriteLine(error);
+			}
+		}
+
+		var shouldLog = debugLogger?.ShouldLogNow() is true;
+		var debugLines = shouldLog ? debugLinesScope.Instance : null;
+		debugLines?.Clear();
+
+		ApplyButtons(currentStates, debugLines);
+		ApplyAxes(currentStates, debugLines);
+
+		if (shouldLog && debugLogger is not null && debugLines is not null)
+		{
+			debugLogger.WriteBlock(debugLines);
 		}
 	}
 
@@ -209,7 +217,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 				break;
 			}
 
-			route.OutputDevice.SetButton(route.TargetButton, isPressed);
+			route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
 
 			if (debugLines is not null && !isPressed)
 			{
@@ -240,7 +248,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 				output = m.Apply(output, states);
 			}
 
-			route.OutputDevice.SetAxis(route.OutputAxis, output);
+			route.OutputDevice.SetAxisValue(route.OutputAxis, output);
 
 			if (debugLines is not null)
 			{
@@ -309,6 +317,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 	public void Dispose()
 	{
+		_LastReportedReadFailure.Dispose();
 		DisposeDevices(DevicesById.Values);
 		foreach (var outputDevice in _OutputDevices)
 		{

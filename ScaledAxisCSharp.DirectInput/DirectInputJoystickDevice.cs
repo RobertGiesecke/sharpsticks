@@ -50,7 +50,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		DirectInputNative.Release(_DevicePointer);
 	}
 
-	public override bool TryRead(out JoystickState state, out string? error)
+	public override bool TryReadState(out JoystickState state, out string? error)
 	{
 		var pollResult = DirectInputNative.Poll(_DevicePointer);
 		if (!DirectInputNative.Succeeded(pollResult))
@@ -88,7 +88,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		return true;
 	}
 
-	public override double ReadNormalizedAxis(in JoystickState state, AxisBinding binding)
+	public override double ReadNormalizedAxisValue(in JoystickState state, AxisBinding binding)
 	{
 		return ReadAxisDebugSample(state, binding).NormalizedValue;
 	}

@@ -15,7 +15,7 @@ public sealed class VJoyDevice : OutputDevice
 	}
 
 
-	public override void SetAxis(Axis axis, double normalizedValue)
+	public override void SetAxisValue(Axis axis, double normalizedValue)
 	{
 		ThrowIfDisposed();
 		ThrowIfFrozen();
@@ -41,7 +41,7 @@ public sealed class VJoyDevice : OutputDevice
 		_LastAxisValues[axis] = translated;
 	}
 
-	public override void SetButton(int buttonNumber, bool pressed)
+	public override void SetButtonState(int buttonNumber, bool pressed)
 	{
 		ThrowIfDisposed();
 		ThrowIfFrozen();

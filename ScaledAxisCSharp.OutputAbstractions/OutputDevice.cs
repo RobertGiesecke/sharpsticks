@@ -18,8 +18,8 @@ public abstract class OutputDevice : IDisposable
 		Frozen = true;
 	}
 
-	public abstract void SetAxis(Axis axis, double normalizedValue);
-	public abstract void SetButton(int buttonNumber, bool pressed);
+	public abstract void SetAxisValue(Axis axis, double normalizedValue);
+	public abstract void SetButtonState(int buttonNumber, bool pressed);
 
 	public void Dispose()
 	{
