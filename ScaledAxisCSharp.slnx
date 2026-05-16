@@ -1,0 +1,17 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="ScaledAxisCSharp.Config/ScaledAxisCSharp.Config.csproj" />
+  <Project Path="ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj" />
+  <Project Path="ScaledAxisCSharp.DirectInput/ScaledAxisCSharp.DirectInput.csproj" />
+  <Project Path="ScaledAxisCSharp.Generators/ScaledAxisCSharp.Generators.csproj" />
+  <Project Path="ScaledAxisCSharp.InputAbstractions/ScaledAxisCSharp.InputAbstractions.csproj" />
+  <Project Path="ScaledAxisCSharp.ItbMinimal/ScaledAxisCSharp.ItbMinimal.csproj">
+    <Build Solution="Release|Any CPU" Project="false" />
+  </Project>
+  <Project Path="ScaledAxisCSharp.OutputAbstractions/ScaledAxisCSharp.OutputAbstractions.csproj" />
+  <Project Path="ScaledAxisCSharp.VJoy/ScaledAxisCSharp.VJoy.csproj" />
+</Solution>
