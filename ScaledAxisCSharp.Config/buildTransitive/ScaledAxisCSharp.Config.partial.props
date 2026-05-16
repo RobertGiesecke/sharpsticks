@@ -1,0 +1,7 @@
+<Project>
+    <ItemGroup>
+        <Using Alias="PlatformDefaultInputDevice" Include="ScaledAxisCSharp.DirectInput.DirectInputJoystickDevice"/>
+        <Using Alias="PlatformDefaultOutputDevice" Include="ScaledAxisCSharp.VJoy.VJoyDevice"/>
+        <Using Alias="PlatformDefaultOutputDeviceFactory" Include="ScaledAxisCSharp.VJoy.VJoyDeviceFactory"/>
+    </ItemGroup>
+</Project>

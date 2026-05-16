@@ -13,7 +13,7 @@ public static class RuntimeExtensions
 		public static RuntimeBuilder.BuildOptions GetBuildOptionsFromConfig(AppConfig config,
 			IOutputDeviceFactory? outputDeviceFactory = null)
 		{
-			using var connectedDevices = DirectInputJoystickDevice.EnumerateConnected();
+			using var connectedDevices = PlatformDefaultInputDevice.EnumerateConnected();
 			using var connectedDevicesById = connectedDevices
 				.ToPooledDictionary(device => device.DeviceId);
 			var buttonRoutes = new List<ButtonRoute>();
@@ -57,7 +57,7 @@ public static class RuntimeExtensions
 			var buildOptions = new RuntimeBuilder.BuildOptions
 			{
 				Name = config.Name ?? "unnamed",
-				OutputDeviceFactory = outputDeviceFactory ?? VJoyDeviceFactory.Instance,
+				OutputDeviceFactory = outputDeviceFactory ?? PlatformDefaultOutputDeviceFactory.Instance,
 				ConnectedDevices = [..connectedDevices],
 				Routes =
 				[

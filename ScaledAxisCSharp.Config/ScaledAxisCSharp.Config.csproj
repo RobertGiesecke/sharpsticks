@@ -10,6 +10,7 @@
         <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj"/>
     </ItemGroup>
 
+    <Import Project="buildTransitive\ScaledAxisCSharp.Config.partial.props" />
     <ItemGroup>
       <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" />
       <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.7" />
