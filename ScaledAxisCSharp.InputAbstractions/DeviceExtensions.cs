@@ -55,13 +55,13 @@ public static class DeviceExtensions
 		throw new InvalidOperationException($"No joystick device matched '{productName}'.");
 	}
 
-	public static Dictionary<int, T> CollectDevices<T>(
+	public static void CollectDevices<T>(
 		this IReadOnlyList<T> devices,
-		IEnumerable<int> deviceIds)
+		IEnumerable<int> deviceIds,
+		IDictionary<int, T> selected)
 		where T : JoystickDevice
 	{
 		using var byId = devices.ToPooledDictionary(device => device.DeviceId);
-		var selected = new Dictionary<int, T>();
 
 		foreach (var deviceId in deviceIds.Distinct())
 		{
@@ -73,7 +73,5 @@ public static class DeviceExtensions
 
 			selected[deviceId] = device;
 		}
-
-		return selected;
 	}
 }

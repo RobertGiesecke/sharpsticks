@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 
 namespace ScaledAxisCSharp.DirectInput;
@@ -8,8 +9,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	private const int AxisRangeMax = 32767;
 	private const int DefaultAxisRangeMin = 0;
 	private const int DefaultAxisRangeMax = 65535;
-	private readonly Dictionary<Axis, AxisDecoderKind> _AxisDecoderKinds = [];
-	private readonly IReadOnlyDictionary<Axis, AxisRange> _AxisRanges;
+	private readonly PooledDictionary<Axis, AxisDecoderKind> _AxisDecoderKinds;
+	private readonly FrozenDictionary<Axis, AxisRange> _AxisRanges;
 	private readonly nint _DevicePointer;
 	private bool _Disposed;
 
@@ -20,7 +21,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		DirectInputDeviceCaps caps,
 		nint devicePointer,
 		ImmutableArray<Axis> physicalAxes,
-		IReadOnlyDictionary<Axis, AxisRange> axisRanges,
+		FrozenDictionary<Axis, AxisRange> axisRanges,
 		WaitHandle dataAvailable)
 	{
 		DeviceId = deviceId;
@@ -32,6 +33,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		_DevicePointer = devicePointer;
 		_AxisRanges = axisRanges;
 		DataAvailable = dataAvailable;
+		_AxisDecoderKinds = new(physicalAxes.Length);
 	}
 
 	public override void Dispose()
@@ -44,6 +46,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		_Disposed = true;
 		DirectInputNative.SetEventNotification(_DevicePointer, 0);
 		DataAvailable.Dispose();
+		_AxisDecoderKinds.Dispose();
 		DirectInputNative.Unacquire(_DevicePointer);
 		DirectInputNative.Release(_DevicePointer);
 	}
@@ -181,7 +184,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			}
 
 			using var objectInfos = new PooledList<DirectInputDeviceObjectInfo>();
-			EnumerateObjects(devicePointer, objectInfos);
+			FillObjectInfos(devicePointer, objectInfos);
 			using var axisEntries = new PooledList<AxisFormatEntry>(objectInfos.Count);
 			BuildAxisFormatEntries(objectInfos, axisEntries);
 
@@ -213,8 +216,9 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			dataAvailable = new(false);
 			dataAvailable.SafeWaitHandle = new(eventHandle, ownsHandle: true);
 
-			var physicalAxes = axisEntries.ConvertAll(entry => entry.Axis);
-			var axisRanges = ConfigureAxisRanges(devicePointer, axisEntries);
+			using var physicalAxes = axisEntries.ConvertAll(entry => entry.Axis);
+			using var axisRanges = new PooledDictionary<Axis, AxisRange>(axisEntries.Count);
+			ConfigureAxisRanges(devicePointer, axisEntries, axisRanges);
 
 			var capsResult = DirectInputNative.GetCapabilities(devicePointer, out var caps);
 			if (!DirectInputNative.Succeeded(capsResult))
@@ -235,7 +239,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				caps,
 				devicePointer,
 				[..physicalAxes],
-				axisRanges,
+				axisRanges.ToFrozenDictionary(),
 				dataAvailable);
 		}
 		finally
@@ -250,7 +254,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 	}
 
-	private static void EnumerateObjects(nint devicePointer, ICollection<DirectInputDeviceObjectInfo> objectInfos)
+	private static void FillObjectInfos(nint devicePointer, ICollection<DirectInputDeviceObjectInfo> objectInfos)
 	{
 		var handle = GCHandle.Alloc(objectInfos);
 
@@ -335,11 +339,11 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 	}
 
-	private static Dictionary<Axis, AxisRange> ConfigureAxisRanges(nint devicePointer,
-		IReadOnlyList<AxisFormatEntry> axisEntries)
+	private static void ConfigureAxisRanges(
+		nint devicePointer,
+		IReadOnlyList<AxisFormatEntry> axisEntries,
+		IDictionary<Axis, AxisRange> axisRanges)
 	{
-		var ranges = new Dictionary<Axis, AxisRange>();
-
 		foreach (var axisEntry in axisEntries)
 		{
 			DirectInputNative.SetRangeProperty(devicePointer, axisEntry.Offset, AxisRangeMin, AxisRangeMax);
@@ -347,15 +351,13 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			if (DirectInputNative.Succeeded(
 				    DirectInputNative.GetRangeProperty(devicePointer, axisEntry.Offset, out var range)))
 			{
-				ranges[axisEntry.Axis] = new(range.Min, range.Max);
+				axisRanges[axisEntry.Axis] = new(range.Min, range.Max);
 			}
 			else
 			{
-				ranges[axisEntry.Axis] = new(AxisRangeMin, AxisRangeMax);
+				axisRanges[axisEntry.Axis] = new(AxisRangeMin, AxisRangeMax);
 			}
 		}
-
-		return ranges;
 	}
 
 	private static bool IsAxisObject(DirectInputDeviceObjectInfo objectInfo)

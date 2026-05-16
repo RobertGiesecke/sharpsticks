@@ -135,7 +135,7 @@ public static class RuntimeExtensions
 		/// Thrown when a config entry can't be paired (no same-name device
 		/// left to match it).
 		/// </exception>
-		public void ResolveDeviceMap(IReadOnlyList<JoystickDevice> connectedDevices, IDictionary<int, int>? map)
+		public void ResolveDeviceMap(IReadOnlyList<JoystickDevice> connectedDevices, IDictionary<int, int> map)
 		{
 			if (config.Devices.Count == 0)
 			{
