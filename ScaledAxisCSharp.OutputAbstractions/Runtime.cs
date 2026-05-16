@@ -19,6 +19,13 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
 	public ImmutableArray<JoystickDevice> Devices => _Devices;
 
+	private record struct OutputButtonState
+	{
+		public int Pressers;
+		public int Suppressors;
+		public bool WasRouteAssertingLastFrame;
+	}
+
 	/// <summary>
 	/// One entry per distinct output button (route- or macro-targeted, or both).
 	/// Tracks current assertions across all sources via <see cref="Pressers"/>
@@ -32,9 +39,25 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		public required OutputButtonBinding TargetBinding { get; init; }
 		public required ImmutableArray<ButtonBindingWithDeviceId> Bindings { get; init; }
 
-		public int Pressers;
-		public int Suppressors;
-		public bool WasRouteAssertingLastFrame;
+		private OutputButtonState _OutputButtonState;
+		public int Pressers => _OutputButtonState.Pressers;
+		public int Suppressors => _OutputButtonState.Suppressors;
+		public bool WasRouteAssertingLastFrame => _OutputButtonState.WasRouteAssertingLastFrame;
+		public void SetWasRouteAssertingLastFrame(bool value)
+		{
+			ref var outputButtonState = ref _OutputButtonState;
+			outputButtonState.WasRouteAssertingLastFrame = value;
+		}
+
+		public static void IncrementPressers(ref OutputButtonState outputButtonState ) => outputButtonState.Pressers++;
+		public static void IncrementSuppressors(ref OutputButtonState outputButtonState ) => outputButtonState.Suppressors++;
+		public static void DecrementSuppressors(ref OutputButtonState outputButtonState ) => outputButtonState.Suppressors--;
+		public static void DecrementPressers(ref OutputButtonState outputButtonState ) => outputButtonState.Pressers--;
+
+		public void IncrementPressers() => IncrementPressers(ref _OutputButtonState);
+		public void IncrementSuppressors() => IncrementSuppressors(ref _OutputButtonState);
+		public void DecrementSuppressors() => DecrementSuppressors(ref _OutputButtonState);
+		public void DecrementPressers() => DecrementPressers(ref _OutputButtonState);
 	}
 
 	private sealed class ButtonBindingWithDeviceId
@@ -159,11 +182,10 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 				DecrementSuppressors);
 	}
 
-	private void IncrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Pressers++;
-	private void DecrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Pressers--;
-	private void IncrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Suppressors++;
-	private void DecrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].Suppressors--;
-
+	private void IncrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].IncrementPressers();
+	private void DecrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].DecrementPressers();
+	private void IncrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].IncrementSuppressors();
+	private void DecrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].DecrementSuppressors();
 
 	private readonly JoystickState?[] _CurrentStates;
 	private readonly PooledSet<int> _LastReportedReadFailure;
@@ -282,20 +304,20 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			{
 				if (routeAsserting)
 				{
-					route.Pressers++;
+					route.IncrementPressers();
 				}
 				else
 				{
-					route.Pressers--;
+					route.DecrementPressers();
 					// Falling edge ends the macro suppression window: a route's
 					// next press cycle should be free to assert again.
 					_Macros?.ClearSuppressionFor(route.TargetBinding);
 				}
 
-				route.WasRouteAssertingLastFrame = routeAsserting;
+				route.SetWasRouteAssertingLastFrame(routeAsserting);
 			}
 
-			var isPressed = route.Pressers > 0 && route.Suppressors == 0;
+			var isPressed = route is { Pressers: > 0, Suppressors: 0 };
 
 			if (debugLines is not null)
 			{
