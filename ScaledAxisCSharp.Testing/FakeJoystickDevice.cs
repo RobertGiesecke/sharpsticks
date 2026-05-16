@@ -22,7 +22,8 @@ public sealed class FakeJoystickDevice : JoystickDevice, IFakeDevice
 		string name,
 		ImmutableArray<Axis> axes,
 		int buttonCount = 32,
-		string? instanceName = null)
+		string? instanceName = null,
+		Guid? instanceGuid = null)
 	{
 		_DataAvailable = new(initialState: false);
 		_Buttons = new bool[Math.Max(buttonCount, 1)];
@@ -30,6 +31,7 @@ public sealed class FakeJoystickDevice : JoystickDevice, IFakeDevice
 		DeviceId = deviceId;
 		Name = name;
 		InstanceName = instanceName ?? name;
+		InstanceGuid = instanceGuid ?? Guid.CreateVersion7();
 		Capabilities = new((uint)axes.Length, (uint)buttonCount, 0);
 		PhysicalAxes = axes;
 		DataAvailable = _DataAvailable;

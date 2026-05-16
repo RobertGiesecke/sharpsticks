@@ -5,6 +5,16 @@ public abstract class JoystickDevice : IDisposable
 	public required int DeviceId { get; init; }
 	public required string Name { get; init; }
 	public required string InstanceName { get; init; }
+
+	/// <summary>
+	/// Per-instance identity. Platform-supplied stable id for this specific
+	/// plugged-in device: on Windows that's DirectInput's <c>guidInstance</c>;
+	/// on Linux a future impl would synthesize one (SDL-style) from
+	/// bus/vendor/product/serial. Survives Windows reassigning
+	/// <see cref="DeviceId"/> between sessions.
+	/// </summary>
+	public required Guid InstanceGuid { get; init; }
+
 	public required JoystickCapabilities Capabilities { get; init; }
 	public required ImmutableArray<Axis> PhysicalAxes { get; init; }
 	public required WaitHandle DataAvailable { get; init; }

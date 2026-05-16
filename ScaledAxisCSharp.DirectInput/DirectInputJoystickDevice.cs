@@ -34,8 +34,6 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		DataAvailable = dataAvailable;
 	}
 
-	public Guid InstanceGuid { get; }
-
 	public override void Dispose()
 	{
 		if (_Disposed)

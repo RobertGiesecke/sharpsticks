@@ -15,6 +15,7 @@ public sealed class FakeInputDeviceBuilder
 	private readonly Dictionary<Axis, double> _RestValues = [];
 	private int _ButtonCount;
 	private string? _InstanceName;
+	private Guid? _InstanceGuid;
 	private FakeJoystickDevice? _Built;
 
 	internal FakeInputDeviceBuilder(FakeDeviceManager manager, int deviceId, string name)
@@ -56,6 +57,13 @@ public sealed class FakeInputDeviceBuilder
 		return this;
 	}
 
+	public FakeInputDeviceBuilder WithInstanceGuid(Guid instanceGuid)
+	{
+		ThrowIfBuilt();
+		_InstanceGuid = instanceGuid;
+		return this;
+	}
+
 	public FakeJoystickDevice Build()
 	{
 		if (_Built is not null)
@@ -68,7 +76,8 @@ public sealed class FakeInputDeviceBuilder
 			_Name,
 			[.._Axes],
 			Math.Max(_ButtonCount, 1),
-			_InstanceName);
+			_InstanceName,
+			_InstanceGuid);
 
 		foreach (var (axis, rest) in _RestValues)
 		{
