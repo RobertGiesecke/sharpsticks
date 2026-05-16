@@ -525,6 +525,144 @@ public sealed class AppConfigTests : IDisposable
 		Assert.Equal(0.0, output.GetAxisValue(Axis.Slider2), Precision);
 	}
 
+	// ── Complex modifier JSON round-trip through Runtime ────────────────
+
+	[Fact]
+	public void Json_ComplexNestedModifier_RoundTripsAndBehavesIdentically()
+	{
+		// AxisMapping.Modifier =
+		//   WhenButtonPressedAxisModifier(Stateful = WhenPressed)
+		//     WhenPressed     = AxisCurve(0.5)         ← halves input while held
+		//     WhenNotPressed  = BlendedAxisCurve(Stateful = true)
+		//         NormalCurve    = AxisCurve(1.0)      ← identity
+		//         PrecisionCurve = AxisCurve(0.2)
+		//         ModifierAxis   = Slider1 (unsigned)
+		//
+		// The whole thing is serialized to JSON, deserialized into a fresh
+		// AppConfig, materialized through Runtime against a separate set of
+		// fakes, and driven with the same inputs as the in-code version —
+		// outputs must match frame-for-frame.
+
+		var config = BuildComplexConfig(stickDeviceId: 1, outputDeviceId: 1u);
+
+		var json = JsonSerializer.Serialize(config, typeof(AppConfig), AppJsonContext.Polymorphic);
+		Assert.Contains("\"$type\": \"whenButtonPressed\"", json);
+		Assert.Contains("\"$type\": \"blended\"", json);
+
+		var roundTripped = (AppConfig?)JsonSerializer.Deserialize(json, typeof(AppConfig), AppJsonContext.Polymorphic);
+		Assert.NotNull(roundTripped);
+
+		using var origHarness = new ComplexHarness(config);
+		using var rtHarness = new ComplexHarness(roundTripped!);
+
+		void Drive(double x, double slider1, bool buttonPressed)
+		{
+			origHarness.Stick.SetAxisValue(Axis.X, x);
+			origHarness.Stick.SetAxisValue(Axis.Slider1, slider1);
+			origHarness.Stick.SetButtonState(1, buttonPressed);
+			origHarness.Runtime.ProcessFrame();
+
+			rtHarness.Stick.SetAxisValue(Axis.X, x);
+			rtHarness.Stick.SetAxisValue(Axis.Slider1, slider1);
+			rtHarness.Stick.SetButtonState(1, buttonPressed);
+			rtHarness.Runtime.ProcessFrame();
+
+			Assert.Equal(
+				origHarness.Output.GetAxisValue(Axis.X),
+				rtHarness.Output.GetAxisValue(Axis.X),
+				Precision);
+		}
+
+		// 1. modifier slider at rest, no button → normal curve (identity).
+		Drive(0.8, 0.0, buttonPressed: false);
+
+		// 2. modifier slider engages fully → blended (stateful) holds value
+		//    on entry, then drift through precision curve as input moves.
+		Drive(0.8, 1.0, buttonPressed: false);
+		Drive(0.6, 1.0, buttonPressed: false);
+
+		// 3. press button → WhenPressed (stateful) holds previous output.
+		Drive(0.6, 1.0, buttonPressed: true);
+
+		// 4. drift input while button held → integrate through WhenPressed.
+		Drive(0.4, 1.0, buttonPressed: true);
+
+		// 5. release button → leaves stateful branch, blended takes over.
+		Drive(0.4, 1.0, buttonPressed: false);
+
+		// 6. modifier slider drops → blended fades back to normal curve.
+		Drive(0.4, 0.5, buttonPressed: false);
+		Drive(0.4, 0.0, buttonPressed: false);
+	}
+
+	private static AppConfig BuildComplexConfig(int stickDeviceId, uint outputDeviceId)
+	{
+		var modifier = new WhenButtonPressedAxisModifier
+		{
+			Buttons = [new ButtonBinding(stickDeviceId, 1)],
+			WhenPressed = new AxisCurve { Max = 0.5 },
+			WhenNotPressed = new BlendedAxisCurve
+			{
+				NormalCurve = new AxisCurve { Max = 1.0 },
+				PrecisionCurve = new AxisCurve { Max = 0.2 },
+				ModifierAxis = new AxisBinding(stickDeviceId, Axis.Slider1, AxisMode.Unsigned),
+				Stateful = true,
+			},
+			Stateful = WhenButtonPressedStateful.WhenPressed,
+		};
+
+		return new AppConfig
+		{
+			VJoyDeviceId = outputDeviceId,
+			AxisMappings =
+			{
+				new()
+				{
+					Source = new AxisInput { DeviceId = stickDeviceId, Axis = "x" },
+					TargetAxis = "x",
+					Modifier = modifier,
+				},
+			},
+		};
+	}
+
+	/// <summary>
+	/// A self-contained fakes + runtime for one snapshot of an AppConfig.
+	/// Two are created side-by-side in the round-trip test so the same input
+	/// sequence can be driven through both.
+	/// </summary>
+	private sealed class ComplexHarness : IDisposable
+	{
+		public FakeDeviceManager Fakes { get; }
+		public FakeJoystickDevice Stick { get; }
+		public FakeOutputDevice Output { get; }
+		public IOutputRuntimeContext Runtime { get; }
+
+		public ComplexHarness(AppConfig config)
+		{
+			Fakes = new FakeDeviceManager();
+			Stick = Fakes.AddInputDevice("Stick")
+				.AddAxis(Axis.X)
+				.AddAxis(Axis.Slider1)
+				.AddButtons(4)
+				.Build();
+			Output = Fakes.AddOutputDevice().AddAxis(Axis.X).Build();
+			Runtime = OutputAbstractions.Runtime.Build(new RuntimeBuilder.BuildOptions
+			{
+				Name = "test",
+				ConnectedDevices = Fakes.InputDevices,
+				OutputDeviceFactory = Fakes.OutputDeviceFactory,
+				Routes = config.BuildRoutes(),
+			});
+		}
+
+		public void Dispose()
+		{
+			Runtime.Dispose();
+			Fakes.Dispose();
+		}
+	}
+
 	// ── Helpers ─────────────────────────────────────────────────────────
 
 	private static string Serialize(AppConfig config) =>
