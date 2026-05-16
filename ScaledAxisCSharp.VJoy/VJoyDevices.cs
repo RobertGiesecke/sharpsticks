@@ -28,7 +28,7 @@ public static class VJoyDevices
 				var status = VJoyNative.GetVJDStatus(deviceId);
 				if (status is VjdStatus.Free or VjdStatus.Own)
 				{
-					builder.Add(new VJoyDeviceInfo(deviceId, status));
+					builder.Add(new(deviceId, status));
 				}
 			}
 

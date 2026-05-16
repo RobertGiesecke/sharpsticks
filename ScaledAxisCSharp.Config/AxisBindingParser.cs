@@ -7,7 +7,7 @@ public static class AxisBindingParser
 		public static AxisBinding Parse(AxisInput input)
 		{
 			ArgumentNullException.ThrowIfNull(input);
-			return new AxisBinding(
+			return new(
 				input.DeviceId,
 				Axis.Parse(input.Axis),
 				AxisMode.Parse(input.Mode),

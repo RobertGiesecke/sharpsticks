@@ -4,6 +4,6 @@ internal readonly record struct DirectInputDeviceObjectInfo(Guid TypeGuid, uint 
 {
 	public static unsafe DirectInputDeviceObjectInfo FromNative(DirectInputDeviceObjectInstanceNative* native)
 	{
-		return new DirectInputDeviceObjectInfo(native->TypeGuid, native->Offset, native->Type);
+		return new(native->TypeGuid, native->Offset, native->Type);
 	}
 }

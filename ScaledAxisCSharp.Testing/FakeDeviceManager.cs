@@ -26,13 +26,13 @@ public sealed class FakeDeviceManager : IDisposable
 	{
 		ThrowIfDisposed();
 		var id = deviceId ?? _NextInputDeviceId++;
-		return new FakeInputDeviceBuilder(this, id, name);
+		return new(this, id, name);
 	}
 
 	public FakeOutputDeviceBuilder AddOutputDevice()
 	{
 		ThrowIfDisposed();
-		return new FakeOutputDeviceBuilder(this);
+		return new(this);
 	}
 
 	public FakeOutputDevice GetOutputDevice(uint deviceId) => _OutputDeviceFactory.Get(deviceId);

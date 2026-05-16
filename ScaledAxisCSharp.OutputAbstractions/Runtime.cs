@@ -105,7 +105,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		];
 		_OutputDevices = outputDevices;
 		_CurrentStates = new JoystickState?[DevicesById.Count];
-		_LastReportedReadFailure = new PooledSet<int>();
+		_LastReportedReadFailure = new();
 	}
 
 

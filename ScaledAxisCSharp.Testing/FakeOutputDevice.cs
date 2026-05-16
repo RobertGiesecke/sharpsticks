@@ -47,7 +47,7 @@ public sealed class FakeOutputDevice : OutputDevice, IFakeDevice
 
 		var clamped = Math.Clamp(normalizedValue, -1.0, 1.0);
 		_Axes[axis] = clamped;
-		_AxisWrites.Add(new AxisWrite(axis, clamped));
+		_AxisWrites.Add(new(axis, clamped));
 	}
 
 	public override void SetButtonState(int buttonNumber, bool pressed)
@@ -62,7 +62,7 @@ public sealed class FakeOutputDevice : OutputDevice, IFakeDevice
 		}
 
 		_Buttons[buttonNumber] = pressed;
-		_ButtonWrites.Add(new ButtonWrite(buttonNumber, pressed));
+		_ButtonWrites.Add(new(buttonNumber, pressed));
 	}
 
 	public double GetAxisValue(Axis axis) => _Axes.GetValueOrDefault(axis, 0.0);

@@ -5,13 +5,13 @@ public static class DeviceExtensions
 	public static AxisBinding BindAxis<T>(this T device, Axis axis)
 		where T : JoystickDevice
 	{
-		return new AxisBinding(device.DeviceId, axis, AxisMode.Signed, false, 0.0);
+		return new(device.DeviceId, axis, AxisMode.Signed, false, 0.0);
 	}
 
 	public static ButtonBinding BindButton<T>(this T device, int sourceButton)
 		where T : JoystickDevice
 	{
-		return new ButtonBinding(device.DeviceId, sourceButton);
+		return new(device.DeviceId, sourceButton);
 	}
 
 	public static T ResolveDevice<T>(this IReadOnlyList<T> devices, string productName)

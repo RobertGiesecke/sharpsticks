@@ -4,7 +4,7 @@ public readonly record struct DirectInputDeviceInfo(int DeviceId, Guid InstanceG
 {
 	internal static unsafe DirectInputDeviceInfo FromNative(int deviceId, DirectInputDeviceInstanceNative* native)
 	{
-		return new DirectInputDeviceInfo(
+		return new(
 			deviceId,
 			native->InstanceGuid,
 			ReadNullTerminatedString(native->ProductName, 260),
@@ -16,6 +16,6 @@ public readonly record struct DirectInputDeviceInfo(int DeviceId, Guid InstanceG
 		var length = 0;
 		while (length < capacity && buffer[length] != '\0') length++;
 
-		return new string(buffer, 0, length);
+		return new(buffer, 0, length);
 	}
 }

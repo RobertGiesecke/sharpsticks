@@ -22,7 +22,7 @@ public static class SharedPools
 
 		public ObjectScope<T> GetInstance()
 		{
-			return new ObjectScope<T>(this)
+			return new(this)
 			{
 				Instance = _ObjectPool.Get(),
 			};

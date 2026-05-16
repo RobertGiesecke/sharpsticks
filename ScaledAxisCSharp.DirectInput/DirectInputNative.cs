@@ -106,7 +106,7 @@ internal static unsafe partial class DirectInputNative
 		var vtable = *(DirectInputDevice8VTable**)device;
 		var range = new DirectInputPropertyRange
 		{
-			Header = new DirectInputPropertyHeader
+			Header = new()
 			{
 				Size = (uint)sizeof(DirectInputPropertyRange),
 				HeaderSize = (uint)sizeof(DirectInputPropertyHeader),
@@ -124,9 +124,9 @@ internal static unsafe partial class DirectInputNative
 	public static int GetRangeProperty(nint device, uint offset, out DirectInputPropertyRange range)
 	{
 		var vtable = *(DirectInputDevice8VTable**)device;
-		range = new DirectInputPropertyRange
+		range = new()
 		{
-			Header = new DirectInputPropertyHeader
+			Header = new()
 			{
 				Size = (uint)sizeof(DirectInputPropertyRange),
 				HeaderSize = (uint)sizeof(DirectInputPropertyHeader),
@@ -145,7 +145,7 @@ internal static unsafe partial class DirectInputNative
 	public static int GetCapabilities(nint device, out DirectInputDeviceCaps caps)
 	{
 		var vtable = *(DirectInputDevice8VTable**)device;
-		caps = new DirectInputDeviceCaps
+		caps = new()
 		{
 			Size = (uint)sizeof(DirectInputDeviceCaps),
 		};

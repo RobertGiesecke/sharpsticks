@@ -156,7 +156,7 @@ public static class BindingExtensions
 
 			if (optionsCallback?.Invoke(device, axisBinding) is not { } options)
 			{
-				options = new RouteAxisOptions();
+				options = new();
 			}
 
 			yield return axisBinding.RouteToSameAxisOnOutput(outputDeviceId, options);

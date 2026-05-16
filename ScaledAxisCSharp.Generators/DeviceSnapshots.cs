@@ -44,7 +44,7 @@ internal static class DeviceSnapshots
 			{
 				DeviceCapabilityHelper.TryGetCapabilities(
 					directInput, device.InstanceGuid, out var axes, out var buttonCount);
-				builder.Add(new DirectInputDeviceSnapshot(device.DeviceId, device.ProductName, axes, buttonCount));
+				builder.Add(new(device.DeviceId, device.ProductName, axes, buttonCount));
 			}
 
 			return (true, builder.ToImmutable(), null);
@@ -73,7 +73,7 @@ internal static class DeviceSnapshots
 				{
 					var axes = EnumerateVJoyAxes(deviceId);
 					var buttonCount = (uint)Math.Max(0, VJoyNative.GetVJDButtonNumber(deviceId));
-					builder.Add(new VJoyDeviceSnapshot(deviceId, axes, buttonCount));
+					builder.Add(new(deviceId, axes, buttonCount));
 				}
 			}
 

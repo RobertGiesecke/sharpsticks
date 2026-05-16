@@ -7,13 +7,13 @@ public static class OutputExtensions
 	public static OutputButtonBinding BindButton<T>(this T device, int sourceButton)
 		where T : OutputDevice
 	{
-		return new OutputButtonBinding(device.DeviceId, sourceButton);
+		return new(device.DeviceId, sourceButton);
 	}
 
 	public static OutputAxisBinding BindAxis<T>(this T device, Axis axis)
 		where T : OutputDevice
 	{
-		return new OutputAxisBinding(device.DeviceId, axis);
+		return new(device.DeviceId, axis);
 	}
 
 	[OverloadResolutionPriority(2)]

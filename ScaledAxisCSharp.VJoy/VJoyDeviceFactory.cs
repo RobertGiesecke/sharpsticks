@@ -72,7 +72,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 				throw new InvalidOperationException($"Failed reading limits for vJoy axis '{axis}'.");
 			}
 
-			axisLimits.Add(axis, new AxisLimits(min, max));
+			axisLimits.Add(axis, new(min, max));
 		}
 
 		var buttonCount = VJoyNative.GetVJDButtonNumber(deviceId);
@@ -86,6 +86,6 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 			}
 		}
 
-		return new VJoyDevice(deviceId, axisLimits.ToFrozenDictionary());
+		return new(deviceId, axisLimits.ToFrozenDictionary());
 	}
 }

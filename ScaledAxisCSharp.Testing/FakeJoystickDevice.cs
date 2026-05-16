@@ -24,13 +24,13 @@ public sealed class FakeJoystickDevice : JoystickDevice, IFakeDevice
 		int buttonCount = 32,
 		string? instanceName = null)
 	{
-		_DataAvailable = new AutoResetEvent(initialState: false);
+		_DataAvailable = new(initialState: false);
 		_Buttons = new bool[Math.Max(buttonCount, 1)];
 
 		DeviceId = deviceId;
 		Name = name;
 		InstanceName = instanceName ?? name;
-		Capabilities = new JoystickCapabilities((uint)axes.Length, (uint)buttonCount, 0);
+		Capabilities = new((uint)axes.Length, (uint)buttonCount, 0);
 		PhysicalAxes = axes;
 		DataAvailable = _DataAvailable;
 	}
@@ -95,7 +95,7 @@ public sealed class FakeJoystickDevice : JoystickDevice, IFakeDevice
 			}
 		}
 
-		state = new JoystickState(
+		state = new(
 			ToInt(Axis.X), ToInt(Axis.Y), ToInt(Axis.Z),
 			ToInt(Axis.Rx), ToInt(Axis.Ry), ToInt(Axis.Rz),
 			ToInt(Axis.Slider1), ToInt(Axis.Slider2),
@@ -125,7 +125,7 @@ public sealed class FakeJoystickDevice : JoystickDevice, IFakeDevice
 			value = binding.Mode == AxisMode.Signed ? -value : 1.0 - value;
 		}
 
-		return new AxisDebugSample(
+		return new(
 			state.GetAxisValue(binding.Axis),
 			RangeMin: -32767,
 			RangeMax: 32767,

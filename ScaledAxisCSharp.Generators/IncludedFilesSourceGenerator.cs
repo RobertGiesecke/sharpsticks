@@ -836,7 +836,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				continue;
 			}
 
-			builder.Add(new ButtonRename(deviceName, buttonNumber, newName));
+			builder.Add(new(deviceName, buttonNumber, newName));
 		}
 
 		return builder.ToImmutable();
@@ -878,7 +878,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				continue;
 			}
 
-			builder.Add(new DeviceRename(deviceName, newName));
+			builder.Add(new(deviceName, newName));
 		}
 
 		return builder.ToImmutable();
@@ -921,7 +921,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				continue;
 			}
 
-			builder.Add(new AxisRename(deviceName, axisName.Value, newName));
+			builder.Add(new(deviceName, axisName.Value, newName));
 		}
 
 		return builder.ToImmutable();
@@ -1090,7 +1090,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		{
 			if (byType.TryGetValue(target.Type, out var existing))
 			{
-				byType[target.Type] = new DeviceInfoTarget(
+				byType[target.Type] = new(
 					target.Type,
 					existing.Levels | target.Levels,
 					existing.DeviceRenames.IsDefaultOrEmpty ? target.DeviceRenames : existing.DeviceRenames,

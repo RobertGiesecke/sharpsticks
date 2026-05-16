@@ -27,7 +27,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		InstanceGuid = info.InstanceGuid;
 		Name = info.ProductName;
 		InstanceName = info.InstanceName;
-		Capabilities = new JoystickCapabilities(caps.Axes, caps.Buttons, caps.Povs);
+		Capabilities = new(caps.Axes, caps.Buttons, caps.Povs);
 		PhysicalAxes = physicalAxes;
 		_DevicePointer = devicePointer;
 		_AxisRanges = axisRanges;
@@ -109,17 +109,17 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			binding.Invert,
 			binding.Deadzone,
 			out var decoderKind);
-		return new AxisDebugSample(rawValue, range.Min, range.Max, normalized, decoderKind);
+		return new(rawValue, range.Min, range.Max, normalized, decoderKind);
 	}
 
 	private static AxisRange GetFallbackRange(int rawValue)
 	{
 		if (rawValue < AxisRangeMin || rawValue > AxisRangeMax)
 		{
-			return new AxisRange(DefaultAxisRangeMin, DefaultAxisRangeMax);
+			return new(DefaultAxisRangeMin, DefaultAxisRangeMax);
 		}
 
-		return new AxisRange(AxisRangeMin, AxisRangeMax);
+		return new(AxisRangeMin, AxisRangeMax);
 	}
 
 	public static PooledList<DirectInputJoystickDevice> EnumerateConnected()
@@ -212,8 +212,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				return null;
 			}
 
-			dataAvailable = new AutoResetEvent(false);
-			dataAvailable.SafeWaitHandle = new SafeWaitHandle(eventHandle, ownsHandle: true);
+			dataAvailable = new(false);
+			dataAvailable.SafeWaitHandle = new(eventHandle, ownsHandle: true);
 
 			var physicalAxes = axisEntries.ConvertAll(entry => entry.Axis);
 			var axisRanges = ConfigureAxisRanges(devicePointer, axisEntries);
@@ -231,7 +231,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			}
 
 			success = true;
-			return new DirectInputJoystickDevice(
+			return new(
 				info.DeviceId,
 				info,
 				caps,
@@ -285,7 +285,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				continue;
 			}
 
-			axisEntries.Add(new AxisFormatEntry(
+			axisEntries.Add(new(
 				axis.Value,
 				DirectInputNative.GetAxisOffset(axis.Value),
 				deviceObjectInfo.Type));
@@ -299,7 +299,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	{
 		foreach (var axisEntry in axisEntries)
 		{
-			objectFormats.Add(new DirectInputObjectDataFormat
+			objectFormats.Add(new()
 			{
 				GuidPointer = 0,
 				Offset = axisEntry.Offset,
@@ -313,7 +313,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			         .Take(4))
 		{
 			var index = DirectInputNative.GetInstance(pov.Type);
-			objectFormats.Add(new DirectInputObjectDataFormat
+			objectFormats.Add(new()
 			{
 				GuidPointer = 0,
 				Offset = DirectInputNative.GetPovOffset(index),
@@ -327,7 +327,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			         .Take(128))
 		{
 			var index = DirectInputNative.GetInstance(button.Type);
-			objectFormats.Add(new DirectInputObjectDataFormat
+			objectFormats.Add(new()
 			{
 				GuidPointer = 0,
 				Offset = DirectInputNative.GetButtonOffset(index),
@@ -349,11 +349,11 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			if (DirectInputNative.Succeeded(
 				    DirectInputNative.GetRangeProperty(devicePointer, axisEntry.Offset, out var range)))
 			{
-				ranges[axisEntry.Axis] = new AxisRange(range.Min, range.Max);
+				ranges[axisEntry.Axis] = new(range.Min, range.Max);
 			}
 			else
 			{
-				ranges[axisEntry.Axis] = new AxisRange(AxisRangeMin, AxisRangeMax);
+				ranges[axisEntry.Axis] = new(AxisRangeMin, AxisRangeMax);
 			}
 		}
 
@@ -616,7 +616,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				ObjectDataFormats = buffer,
 			};
 
-			return new DataFormatScope(buffer, dataFormat);
+			return new(buffer, dataFormat);
 		}
 	}
 

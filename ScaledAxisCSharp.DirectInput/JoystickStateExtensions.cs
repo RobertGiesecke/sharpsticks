@@ -21,7 +21,7 @@ public static class JoystickStateExtensions
 					buttonBitsHigh |= 1UL << index;
 				}
 
-			return new JoystickState(
+			return new(
 				state.X,
 				state.Y,
 				state.Z,
