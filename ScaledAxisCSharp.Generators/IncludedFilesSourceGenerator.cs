@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Text;
+using Collections.Pooled;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -288,8 +289,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 	{
 		var directInputNames = GetDirectInputDeviceConstantNames(directInputDevices, outputDevices);
 		var deviceIdentifiers = GetDeviceIdentifiers(directInputDevices, directInputNames, deviceRenames);
-		var originalNameSet = new HashSet<string>(directInputNames, StringComparer.Ordinal);
-		var outputDeviceNameSet = new HashSet<string>(
+		using var originalNameSet = new PooledSet<string>(directInputNames, StringComparer.Ordinal);
+		using var outputDeviceNameSet = new PooledSet<string>(
 			outputDevices.Select(static d => $"VJoyDevice{d.DeviceId}"),
 			StringComparer.Ordinal);
 		var indent = new string('\t', indentLevel);
@@ -1001,7 +1002,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 
 		// Base identifiers of output devices (e.g. "VJoyDevice" from "VJoyDevice1")
 		// — DirectInput devices sharing this base are always numbered even when count == 1
-		var outputBaseNames = new HashSet<string>(StringComparer.Ordinal);
+		using var outputBaseNames = new PooledSet<string>(StringComparer.Ordinal);
 		foreach (var od in outputDevices)
 		{
 			var id = $"VJoyDevice{od.DeviceId}";
@@ -1010,8 +1011,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			outputBaseNames.Add(id.Substring(0, end + 1));
 		}
 
-		var usedNames = new HashSet<string>(StringComparer.Ordinal);
-		var groupCounters = new Dictionary<string, int>(StringComparer.Ordinal);
+		using var usedNames = new PooledSet<string>(StringComparer.Ordinal);
+		using var groupCounters = new PooledDictionary<string, int>(StringComparer.Ordinal);
 		var names = new List<string>(devices.Length);
 
 		for (var index = 0; index < devices.Length; index++)
@@ -1082,9 +1083,10 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			: Convert.ToInt32(value.Value);
 	}
 
-	private static IEnumerable<DeviceInfoTarget> CoalesceTargets(ImmutableArray<DeviceInfoTarget> targets)
+	private static ImmutableArray<DeviceInfoTarget> CoalesceTargets(ImmutableArray<DeviceInfoTarget> targets)
 	{
-		var byType = new Dictionary<INamedTypeSymbol, DeviceInfoTarget>(SymbolEqualityComparer.Default);
+		using var byType =
+			new PooledDictionary<INamedTypeSymbol, DeviceInfoTarget>(SymbolEqualityComparer.Default);
 
 		foreach (var target in targets)
 		{
@@ -1103,7 +1105,13 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			}
 		}
 
-		return byType.Values;
+		var result = ImmutableArray.CreateBuilder<DeviceInfoTarget>(byType.Count);
+		foreach (var value in byType.Values)
+		{
+			result.Add(value);
+		}
+
+		return result.MoveToImmutable();
 	}
 
 	private static string ToIdentifier(string value)
