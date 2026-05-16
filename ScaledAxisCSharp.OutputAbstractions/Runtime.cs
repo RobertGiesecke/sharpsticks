@@ -10,6 +10,8 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	private readonly ImmutableArray<OutputButtonWithBindings> _ButtonRoutes;
 	private readonly ImmutableArray<JoystickDevice> _Devices;
 	private readonly ImmutableArray<OutputDevice> _OutputDevices;
+	private readonly MacroEngine? _Macros;
+	private readonly ITimeSource _Time;
 
 	public ImmutableArray<OutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, JoystickDevice> DevicesById { get; }
@@ -20,6 +22,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	{
 		public required OutputDevice OutputDevice { get; init; }
 		public required int TargetButton { get; init; }
+		public required OutputButtonBinding TargetBinding { get; init; }
 		public required ImmutableArray<ButtonBindingWithDeviceId> Bindings { get; init; }
 	}
 
@@ -48,10 +51,14 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		PooledDictionary<int, JoystickDevice> devices,
 		ImmutableArray<ButtonRoute> buttonRoutes,
 		ImmutableArray<AxisRoute> axisRoutes,
+		ImmutableArray<ButtonMacroRoute> macroRoutes,
+		ImmutableArray<OutputButtonBinding> macroOutputButtons,
+		ITimeSource timeSource,
 		ImmutableArray<OutputDevice> outputDevices)
 	{
 		Name = name;
 		_DebugLogger = debugLogger;
+		_Time = timeSource;
 		_Devices = [..devices.Values];
 		DevicesById = devices.ToFrozenDictionary();
 		{
@@ -67,17 +74,38 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		using var outputDeviceIndexes = outputDevices
 			.Select((device, index) => new { device.DeviceId, Index = index })
 			.ToPooledDictionary(t => t.DeviceId, t => t.Index);
+
+		// Macro-only output buttons get an OutputButtonWithBindings entry too
+		// so ApplyButtons can OR the macro engine's held set in for them.
+		using var allOutputButtons = new PooledSet<OutputButtonBinding>();
+		foreach (var route in buttonRoutes)
+		{
+			allOutputButtons.Add(route.OutputBinding);
+		}
+
+		foreach (var macroBinding in macroOutputButtons)
+		{
+			allOutputButtons.Add(macroBinding);
+		}
+
+		using var bindingsByOutput = buttonRoutes
+			.GroupBy(t => t.OutputBinding)
+			.ToPooledDictionary(g => g.Key, g => g.ToArray());
+
 		_ButtonRoutes =
 		[
-			..buttonRoutes.GroupBy(t => t.OutputBinding)
-				.Select(group => new OutputButtonWithBindings
+			..allOutputButtons.Select(binding =>
+			{
+				var sources = bindingsByOutput.GetValueOrDefault(binding, []);
+				return new OutputButtonWithBindings
 				{
 					// ReSharper disable once AccessToDisposedClosure
-					OutputDevice = outputDevices[outputDeviceIndexes[group.Key.OutputDeviceId]],
-					TargetButton = group.Key.ButtonNumber,
+					OutputDevice = outputDevices[outputDeviceIndexes[binding.OutputDeviceId]],
+					TargetButton = binding.ButtonNumber,
+					TargetBinding = binding,
 					Bindings =
 					[
-						..group.Select(t => t.Binding)
+						..sources.Select(t => t.Binding)
 							.Distinct()
 							.Select(t => new ButtonBindingWithDeviceId
 							{
@@ -85,7 +113,8 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 								SourceDeviceIndex = DeviceIndexesById[t.DeviceId],
 							}),
 					],
-				})
+				};
+			}),
 		];
 		_AxisRoutes =
 		[
@@ -106,6 +135,9 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		_OutputDevices = outputDevices;
 		_CurrentStates = new JoystickState?[DevicesById.Count];
 		_LastReportedReadFailure = new();
+		_Macros = macroRoutes.IsEmpty
+			? null
+			: new MacroEngine(macroRoutes, DeviceIndexesById, timeSource);
 	}
 
 
@@ -127,7 +159,8 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 			while (true)
 			{
-				if (WaitHandle.WaitAny(waitHandles) == cancelIndex)
+				var timeout = ComputeWaitTimeoutMs();
+				if (WaitHandle.WaitAny(waitHandles, timeout) == cancelIndex)
 				{
 					break;
 				}
@@ -142,6 +175,23 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 				outputDevice.Dispose();
 			}
 		}
+	}
+
+	private int ComputeWaitTimeoutMs()
+	{
+		if (_Macros?.NextDeadlineTicks is not { } deadline)
+		{
+			return Timeout.Infinite;
+		}
+
+		var remaining = deadline - _Time.GetTimestamp();
+		if (remaining <= 0)
+		{
+			return 0;
+		}
+
+		var ms = remaining * 1000 / _Time.Frequency;
+		return ms > int.MaxValue ? int.MaxValue : (int)ms;
 	}
 
 	public void ProcessFrame(DebugLogger? debugLogger = null)
@@ -170,6 +220,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		var debugLines = shouldLog ? debugLinesScope.Instance : null;
 		debugLines?.Clear();
 
+		_Macros?.Step(currentStates);
 		ApplyButtons(currentStates, debugLines);
 		ApplyAxes(currentStates, debugLines);
 
@@ -215,6 +266,20 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 				isPressed = true;
 				break;
+			}
+
+			if (!isPressed && _Macros is not null && _Macros.IsHeld(route.TargetBinding))
+			{
+				if (debugLines is not null)
+				{
+					debugLines.Append("macro -> output");
+					debugLines.Append(route.OutputDevice.DeviceId);
+					debugLines.Append(':');
+					debugLines.Append(route.TargetButton);
+					debugLines.AppendLine(" = down");
+				}
+
+				isPressed = true;
 			}
 
 			route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
@@ -328,6 +393,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 	public void Dispose()
 	{
+		_Macros?.Dispose();
 		_LastReportedReadFailure.Dispose();
 		DisposeDevices(DevicesById.Values);
 		foreach (var outputDevice in _OutputDevices)

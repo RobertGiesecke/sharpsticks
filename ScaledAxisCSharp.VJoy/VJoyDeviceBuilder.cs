@@ -7,7 +7,8 @@ public static class VJoyDeviceBuilder
 		public static VJoyDevice Open(
 			uint deviceId,
 			IReadOnlyList<ButtonRoute> buttonRoutes,
-			IReadOnlyList<AxisRoute> axisRoutes) =>
-			VJoyDeviceFactory.Instance.Open(deviceId, buttonRoutes, axisRoutes);
+			IReadOnlyList<AxisRoute> axisRoutes,
+			IReadOnlyCollection<int>? macroButtonNumbers = null) =>
+			VJoyDeviceFactory.Instance.Open(deviceId, buttonRoutes, axisRoutes, macroButtonNumbers);
 	}
 }

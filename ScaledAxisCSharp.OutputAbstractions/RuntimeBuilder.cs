@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.OutputAbstractions;
+namespace ScaledAxisCSharp.OutputAbstractions;
 
 public static class RuntimeBuilder
 {
@@ -7,6 +7,7 @@ public static class RuntimeBuilder
 		public required string Name { get; init; }
 		public DebugLogger? DebugLogger { get; init; }
 		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
+		public ITimeSource? TimeSource { get; init; }
 		public required ImmutableArray<JoystickDevice> ConnectedDevices { get; init; }
 		public ImmutableArray<IRoute> Routes { get; init; } = [];
 	}
@@ -17,14 +18,17 @@ public static class RuntimeBuilder
 		{
 			var optionsOutputDeviceFactory = options.OutputDeviceFactory ??
 			                                 throw new ArgumentNullException(nameof(options.OutputDeviceFactory));
+			var timeSource = options.TimeSource ?? StopwatchTimeSource.Instance;
 
 			using var connectedDevicesById = options.ConnectedDevices
 				.ToPooledDictionary(device => device.DeviceId);
 			using var referencedDeviceIds = new PooledSet<int>();
 			using var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToPooledList();
 			using var axisRoutes = options.Routes.OfType<AxisRoute>().ToPooledList();
+			using var macroRoutes = options.Routes.OfType<ButtonMacroRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
+			using var macroOutputs = new PooledSet<OutputButtonBinding>();
 
 			foreach (var mapping in buttonRoutes)
 			{
@@ -69,6 +73,40 @@ public static class RuntimeBuilder
 				referencedOutputDeviceIds.Add(mapping.OutputBinding.OutputDeviceId);
 			}
 
+			foreach (var route in macroRoutes)
+			{
+				if (route.Binding.ButtonNumber < 1)
+				{
+					throw new InvalidOperationException("Source buttons are 1-based.");
+				}
+
+				referencedDeviceIds.Add(route.Binding.DeviceId);
+
+				foreach (var action in route.OnPress)
+				{
+					action.FillOutputs(macroOutputs);
+				}
+
+				foreach (var action in route.OnRelease)
+				{
+					action.FillOutputs(macroOutputs);
+				}
+			}
+
+			foreach (var output in macroOutputs)
+			{
+				if (output.OutputDeviceId < 1)
+				{
+					throw new InvalidOperationException("Output device ids are 1-based.");
+				}
+
+				if (output.ButtonNumber < 1)
+				{
+					throw new InvalidOperationException("Target buttons are 1-based.");
+				}
+
+				referencedOutputDeviceIds.Add(output.OutputDeviceId);
+			}
 
 			var devices = new PooledDictionary<int, JoystickDevice>();
 			try
@@ -99,7 +137,9 @@ public static class RuntimeBuilder
 						// ReSharper disable once AccessToDisposedClosure
 						buttonRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray(),
 						// ReSharper disable once AccessToDisposedClosure
-						axisRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray()))
+						axisRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray(),
+						// ReSharper disable once AccessToDisposedClosure
+						macroOutputs.Where(b => b.OutputDeviceId == deviceId).Select(b => b.ButtonNumber).ToArray()))
 					.ToImmutableArray();
 				try
 				{
@@ -109,6 +149,9 @@ public static class RuntimeBuilder
 						devices,
 						[..buttonRoutes],
 						[..axisRoutes],
+						[..macroRoutes],
+						[..macroOutputs],
+						timeSource,
 						outputDevices);
 				}
 				catch

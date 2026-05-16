@@ -9,12 +9,15 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 	OutputDevice IOutputDeviceFactory.Open(
 		uint deviceId,
 		IReadOnlyCollection<ButtonRoute> buttonRoutes,
-		IReadOnlyCollection<AxisRoute> axisRoutes) => Open(deviceId, buttonRoutes, axisRoutes);
+		IReadOnlyCollection<AxisRoute> axisRoutes,
+		IReadOnlyCollection<int> macroButtonNumbers) =>
+		Open(deviceId, buttonRoutes, axisRoutes, macroButtonNumbers);
 
 	public VJoyDevice Open(
 		uint deviceId,
 		IReadOnlyCollection<ButtonRoute> buttonRoutes,
-		IReadOnlyCollection<AxisRoute> axisRoutes)
+		IReadOnlyCollection<AxisRoute> axisRoutes,
+		IReadOnlyCollection<int>? macroButtonNumbers = null)
 	{
 		if (deviceId < 1)
 		{
@@ -76,7 +79,10 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 		}
 
 		var buttonCount = VJoyNative.GetVJDButtonNumber(deviceId);
-		foreach (var targetButton in buttonRoutes.Select(route => route.OutputBinding.ButtonNumber).Distinct())
+		foreach (var targetButton in buttonRoutes
+			         .Select(route => route.OutputBinding.ButtonNumber)
+			         .Concat(macroButtonNumbers ?? [])
+			         .Distinct())
 		{
 			if (targetButton > buttonCount)
 			{

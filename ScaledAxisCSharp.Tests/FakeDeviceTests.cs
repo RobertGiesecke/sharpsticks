@@ -65,7 +65,7 @@ public sealed class FakeDeviceTests
 		using var fakes = new FakeDeviceManager();
 		var output = fakes.AddOutputDevice().AddAxis(Axis.X).Build();
 
-		var opened = fakes.OutputDeviceFactory.Open(output.DeviceId, [], []);
+		var opened = fakes.OutputDeviceFactory.Open(output.DeviceId, [], [], []);
 
 		Assert.Same(output, opened);
 	}
@@ -77,7 +77,7 @@ public sealed class FakeDeviceTests
 		fakes.AddOutputDevice().AddAxis(Axis.X).Build();   // id 1
 
 		Assert.Throws<InvalidOperationException>(
-			() => fakes.OutputDeviceFactory.Open(deviceId: 99, [], []));
+			() => fakes.OutputDeviceFactory.Open(deviceId: 99, [], [], []));
 	}
 
 	[Fact]

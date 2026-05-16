@@ -34,7 +34,8 @@ public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory, IDisposable
 	OutputDevice IOutputDeviceFactory.Open(
 		uint deviceId,
 		IReadOnlyCollection<ButtonRoute> buttonRoutes,
-		IReadOnlyCollection<AxisRoute> axisRoutes) => Get(deviceId);
+		IReadOnlyCollection<AxisRoute> axisRoutes,
+		IReadOnlyCollection<int> macroButtonNumbers) => Get(deviceId);
 
 	public void Dispose()
 	{

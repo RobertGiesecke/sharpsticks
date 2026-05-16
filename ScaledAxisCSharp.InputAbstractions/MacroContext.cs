@@ -15,7 +15,7 @@ public sealed class MacroContext
 		Frequency = frequency;
 	}
 
-	public long Now { get; internal set; }
+	public long Now { get; private set; }
 	public long Frequency { get; }
 
 	public void Press(OutputButtonBinding button) => _Sink.Press(button);
@@ -27,6 +27,13 @@ public sealed class MacroContext
 	/// </summary>
 	public long DeadlineFromNow(TimeSpan duration) =>
 		Now + (long)(duration.TotalSeconds * Frequency);
+
+	/// <summary>
+	/// Engine-only: refresh <see cref="Now"/> before stepping the next action.
+	/// Action authors should not need this — the value they observe via
+	/// <see cref="Now"/> is always the current frame's tick.
+	/// </summary>
+	public void Refresh(long now) => Now = now;
 }
 
 /// <summary>
