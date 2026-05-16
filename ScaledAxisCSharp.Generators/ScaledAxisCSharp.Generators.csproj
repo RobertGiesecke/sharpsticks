@@ -21,6 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" GeneratePathProperty="true" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all" />
     </ItemGroup>
 
@@ -51,11 +52,22 @@
                  Link="included-runtime\VJoy\VJoyNative.cs" />
     </ItemGroup>
 
-    <Target Name="AddAnalyzerRuntimeFilesToPackage"
-            DependsOnTargets="Build">
+    <ItemGroup>
+        <None Include="$(OutputPath)\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+    </ItemGroup>
+
+
+    <PropertyGroup>
+        <GetTargetPathDependsOn>
+            $(GetTargetPathDependsOn);GetDependencyTargetPaths
+        </GetTargetPathDependsOn>
+    </PropertyGroup>
+
+    <Target Name="GetDependencyTargetPaths">
         <ItemGroup>
-            <TfmSpecificPackageFile Include="$(TargetPath)"
-                                    PackagePath="analyzers/dotnet/cs" />
+            <TargetPathWithTargetPlatformMoniker
+                    Include="$(PkgCollections_Pooled_V2)\lib\netstandard2.1\*.dll"
+                    IncludeRuntimeDependency="false"/>
         </ItemGroup>
     </Target>
 
