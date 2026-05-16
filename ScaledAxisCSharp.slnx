@@ -13,5 +13,7 @@
     <Build Solution="Release|Any CPU" Project="false" />
   </Project>
   <Project Path="ScaledAxisCSharp.OutputAbstractions/ScaledAxisCSharp.OutputAbstractions.csproj" />
+  <Project Path="ScaledAxisCSharp.Testing/ScaledAxisCSharp.Testing.csproj" />
+  <Project Path="ScaledAxisCSharp.Tests/ScaledAxisCSharp.Tests.csproj" />
   <Project Path="ScaledAxisCSharp.VJoy/ScaledAxisCSharp.VJoy.csproj" />
 </Solution>

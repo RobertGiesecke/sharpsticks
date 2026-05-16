@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <PublishAot>false</PublishAot>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj" />
+        <ProjectReference Include="..\ScaledAxisCSharp.OutputAbstractions\ScaledAxisCSharp.OutputAbstractions.csproj" />
+    </ItemGroup>
+
+</Project>
