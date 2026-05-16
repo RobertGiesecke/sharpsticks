@@ -18,8 +18,8 @@ public static class RuntimeExtensions
 		{
 			deviceMap ??= EmptyMap;
 
-			var buttonRoutes = new List<ButtonRoute>();
-			var axisRoutes = new List<AxisRoute>();
+			using var buttonRoutes = new PooledList<ButtonRoute>();
+			using var axisRoutes = new PooledList<AxisRoute>();
 
 			foreach (var mapping in config.ButtonMappings)
 			{
@@ -103,22 +103,25 @@ public static class RuntimeExtensions
 		/// </summary>
 		public void CaptureDevices(IReadOnlyList<JoystickDevice> connectedDevices)
 		{
-			var byId = connectedDevices.ToDictionary(static d => d.DeviceId);
-			var ids = config.EnumerateReferencedDeviceIds().Distinct().OrderBy(static i => i);
+			using var byId = connectedDevices.ToPooledDictionary(static d => d.DeviceId);
 
-			config.Devices = ids
-				.Where(byId.ContainsKey)
-				.Select(id =>
+			var captured = new List<DeviceReference>();
+			foreach (var id in config.EnumerateReferencedDeviceIds().Distinct().OrderBy(static i => i))
+			{
+				if (!byId.TryGetValue(id, out var device))
 				{
-					var device = byId[id];
-					return new DeviceReference
-					{
-						DeviceId = id,
-						Name = device.Name,
-						InstanceGuid = device.InstanceGuid == Guid.Empty ? null : device.InstanceGuid,
-					};
-				})
-				.ToList();
+					continue;
+				}
+
+				captured.Add(new DeviceReference
+				{
+					DeviceId = id,
+					Name = device.Name,
+					InstanceGuid = device.InstanceGuid == Guid.Empty ? null : device.InstanceGuid,
+				});
+			}
+
+			config.Devices = captured;
 		}
 
 		/// <summary>
@@ -141,8 +144,8 @@ public static class RuntimeExtensions
 				return map;
 			}
 
-			var matchedCurrentIds = new HashSet<int>();
-			var unmatched = new List<DeviceReference>(config.Devices);
+			using var matchedCurrentIds = new PooledSet<int>();
+			using var unmatched = new PooledList<DeviceReference>(config.Devices);
 
 			// Tier 1: InstanceGuid exact matches.
 			for (var i = unmatched.Count - 1; i >= 0; i--)
@@ -170,11 +173,11 @@ public static class RuntimeExtensions
 			// Tier 2: same-name groups, paired by ascending DeviceId.
 			foreach (var group in unmatched.GroupBy(static c => c.Name, StringComparer.Ordinal))
 			{
-				var sortedConfigs = group.OrderBy(static c => c.DeviceId).ToList();
-				var sortedCurrents = connectedDevices
+				using var sortedConfigs = group.OrderBy(static c => c.DeviceId).ToPooledList();
+				using var sortedCurrents = connectedDevices
 					.Where(d => d.Name == group.Key && !matchedCurrentIds.Contains(d.DeviceId))
 					.OrderBy(static d => d.DeviceId)
-					.ToList();
+					.ToPooledList();
 
 				for (var i = 0; i < sortedConfigs.Count; i++)
 				{
@@ -205,7 +208,10 @@ public static class RuntimeExtensions
 			IOutputDeviceFactory? outputDeviceFactory = null)
 		{
 			using var connectedDevices = PlatformDefaultInputDevice.EnumerateConnected();
-			var deviceMap = config.ResolveDeviceMap([..connectedDevices.Select<PlatformDefaultInputDevice, JoystickDevice>(d => d)]);
+			using var asJoystickDevices = connectedDevices
+				.Select<PlatformDefaultInputDevice, JoystickDevice>(d => d)
+				.ToPooledList();
+			var deviceMap = config.ResolveDeviceMap(asJoystickDevices);
 
 			return new RuntimeBuilder.BuildOptions
 			{
