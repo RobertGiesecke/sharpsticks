@@ -17,20 +17,38 @@
         <ItemGroup>
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
-            <_ExportedUsings Include="$(RootNamespace)"
-                             Condition="'$(RootNamespace)' != ''"/>
+            <_PartialProps Include="$(_BuildTransitivePartialFile)"
+                           Condition="Exists('$(_BuildTransitivePartialFile)')"/>
+            <_ExportedUsings Include="$(RootNamespace)|"
+                             Condition="'$(RootNamespace)' != ''">
+                <UsingInclude>$(RootNamespace)</UsingInclude>
+                <Alias></Alias>
+                <HasAliasAttribute>false</HasAliasAttribute>
+            </_ExportedUsings>
             <_ExportedAnalyzerProjects Include="@(ScaledAxisCSharpExportAnalyzerProject)"/>
         </ItemGroup>
-        <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
-                 Query="/Project/ItemGroup/Using/@Include"
-                 Condition="'@(_ProjRefProps)' != ''">
-            <Output TaskParameter="Result" ItemName="_ExportedUsings"/>
-        </XmlPeek>
-        <XmlPeek XmlInputPath="$(_BuildTransitivePartialFile)"
-                 Query="/Project/ItemGroup/Using/@Include"
-                 Condition="Exists('$(_BuildTransitivePartialFile)')">
-            <Output TaskParameter="Result" ItemName="_ExportedUsings"/>
-        </XmlPeek>
+        <ReadLinesFromFile File="%(_ProjRefProps.Identity)"
+                           Condition="'@(_ProjRefProps)' != ''">
+            <Output TaskParameter="Lines" ItemName="_ExportedUsingLines"/>
+        </ReadLinesFromFile>
+        <ReadLinesFromFile File="%(_PartialProps.Identity)"
+                           Condition="'@(_PartialProps)' != ''">
+            <Output TaskParameter="Lines" ItemName="_ExportedUsingLines"/>
+        </ReadLinesFromFile>
+        <ItemGroup>
+            <_ParsedExportedUsingLines Include="@(_ExportedUsingLines)">
+                <UsingInclude>$([System.Text.RegularExpressions.Regex]::Match('%(_ExportedUsingLines.Identity)', 'Include=&quot;([^&quot;]+)&quot;').Groups[1].Value)</UsingInclude>
+                <Alias>$([System.Text.RegularExpressions.Regex]::Match('%(_ExportedUsingLines.Identity)', 'Alias=&quot;([^&quot;]*)&quot;').Groups[1].Value)</Alias>
+                <HasAliasAttribute>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ExportedUsingLines.Identity)', 'Alias=&quot;[^&quot;]*&quot;').ToString().ToLowerInvariant())</HasAliasAttribute>
+                <IsUsingLine>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ExportedUsingLines.Identity)', '^\s*&lt;Using\b').ToString().ToLowerInvariant())</IsUsingLine>
+            </_ParsedExportedUsingLines>
+            <_ExportedUsings Include="%(_ParsedExportedUsingLines.UsingInclude)|%(_ParsedExportedUsingLines.Alias)"
+                             Condition="'%(_ParsedExportedUsingLines.IsUsingLine)' == 'true' and '%(_ParsedExportedUsingLines.UsingInclude)' != ''">
+                <UsingInclude>%(_ParsedExportedUsingLines.UsingInclude)</UsingInclude>
+                <Alias>%(_ParsedExportedUsingLines.Alias)</Alias>
+                <HasAliasAttribute>%(_ParsedExportedUsingLines.HasAliasAttribute)</HasAliasAttribute>
+            </_ExportedUsings>
+        </ItemGroup>
         <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
                  Query="/Project/ItemGroup/ScaledAxisCSharpTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
                  Condition="'@(_ProjRefProps)' != ''">
@@ -45,7 +63,10 @@
         <ItemGroup>
             <_PropsFileLines Include="&lt;Project&gt;"/>
             <_PropsFileLines Include="  &lt;ItemGroup&gt;"/>
-            <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.Identity)&quot; /&gt;"/>
+            <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; Alias=&quot;%(_DistinctExportedUsings.Alias)&quot; /&gt;"
+                             Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' == 'true' or '%(_DistinctExportedUsings.Alias)' != ''"/>
+            <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; /&gt;"
+                             Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' != 'true' and '%(_DistinctExportedUsings.Alias)' == ''"/>
             <_PropsFileLines Include="    &lt;ScaledAxisCSharpTransitiveAnalyzerProject Include=&quot;%(_DistinctExportedAnalyzerProjects.Identity)&quot; /&gt;"
                              Condition="'%(_DistinctExportedAnalyzerProjects.Identity)' != ''"/>
             <_PropsFileLines Include="  &lt;/ItemGroup&gt;"/>
@@ -54,7 +75,10 @@
         <ItemGroup>
             <_PackPropsFileLines Include="&lt;Project&gt;"/>
             <_PackPropsFileLines Include="  &lt;ItemGroup&gt;"/>
-            <_PackPropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.Identity)&quot; /&gt;"/>
+            <_PackPropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; Alias=&quot;%(_DistinctExportedUsings.Alias)&quot; /&gt;"
+                                 Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' == 'true' or '%(_DistinctExportedUsings.Alias)' != ''"/>
+            <_PackPropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; /&gt;"
+                                 Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' != 'true' and '%(_DistinctExportedUsings.Alias)' == ''"/>
             <_PackPropsFileLines Include="  &lt;/ItemGroup&gt;"/>
             <_PackPropsFileLines Include="&lt;/Project&gt;"/>
         </ItemGroup>
@@ -79,11 +103,31 @@
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
         </ItemGroup>
-        <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
-                 Query="/Project/ItemGroup/Using/@Include"
-                 Condition="'@(_ProjRefProps)' != ''">
-            <Output TaskParameter="Result" ItemName="Using"/>
-        </XmlPeek>
+        <ReadLinesFromFile File="%(_ProjRefProps.Identity)"
+                           Condition="'@(_ProjRefProps)' != ''">
+            <Output TaskParameter="Lines" ItemName="_ImportedProjectRefUsingLines"/>
+        </ReadLinesFromFile>
+        <ItemGroup>
+            <_ParsedImportedProjectRefUsingLines Include="@(_ImportedProjectRefUsingLines)">
+                <UsingInclude>$([System.Text.RegularExpressions.Regex]::Match('%(_ImportedProjectRefUsingLines.Identity)', 'Include=&quot;([^&quot;]+)&quot;').Groups[1].Value)</UsingInclude>
+                <Alias>$([System.Text.RegularExpressions.Regex]::Match('%(_ImportedProjectRefUsingLines.Identity)', 'Alias=&quot;([^&quot;]*)&quot;').Groups[1].Value)</Alias>
+                <IsUsingLine>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ImportedProjectRefUsingLines.Identity)', '^\s*&lt;Using\b').ToString().ToLowerInvariant())</IsUsingLine>
+            </_ParsedImportedProjectRefUsingLines>
+            <_ImportedProjectRefUsings Include="%(_ParsedImportedProjectRefUsingLines.UsingInclude)|%(_ParsedImportedProjectRefUsingLines.Alias)"
+                                      Condition="'%(_ParsedImportedProjectRefUsingLines.IsUsingLine)' == 'true' and '%(_ParsedImportedProjectRefUsingLines.UsingInclude)' != ''">
+                <UsingInclude>%(_ParsedImportedProjectRefUsingLines.UsingInclude)</UsingInclude>
+                <Alias>%(_ParsedImportedProjectRefUsingLines.Alias)</Alias>
+            </_ImportedProjectRefUsings>
+        </ItemGroup>
+        <RemoveDuplicates Inputs="@(_ImportedProjectRefUsings)">
+            <Output TaskParameter="Filtered" ItemName="_DistinctImportedProjectRefUsings"/>
+        </RemoveDuplicates>
+        <ItemGroup>
+            <Using Include="%(_DistinctImportedProjectRefUsings.UsingInclude)"
+                   Condition="'@(_DistinctImportedProjectRefUsings)' != ''">
+                <Alias>%(_DistinctImportedProjectRefUsings.Alias)</Alias>
+            </Using>
+        </ItemGroup>
     </Target>
 
     <Target Name="ImportProjectRefBuildTransitiveAnalyzers"
