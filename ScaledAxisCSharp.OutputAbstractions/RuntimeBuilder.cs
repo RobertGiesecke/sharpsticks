@@ -20,11 +20,11 @@ public static class RuntimeBuilder
 
 			using var connectedDevicesById = options.ConnectedDevices
 				.ToPooledDictionary(device => device.DeviceId);
-			var referencedDeviceIds = new HashSet<int>();
+			using var referencedDeviceIds = new PooledSet<int>();
 			using var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToPooledList();
 			using var axisRoutes = options.Routes.OfType<AxisRoute>().ToPooledList();
-			var claimedAxes = new HashSet<(uint OutputDeviceId, Axis Axis)>();
-			var referencedOutputDeviceIds = new HashSet<uint>();
+			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
+			using var referencedOutputDeviceIds = new PooledSet<uint>();
 
 			foreach (var mapping in buttonRoutes)
 			{
