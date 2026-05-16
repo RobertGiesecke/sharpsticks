@@ -1,17 +1,19 @@
+using Collections.Pooled;
+
 namespace ScaledAxisCSharp.VJoy;
 
 public sealed class VJoyDevice : OutputDevice
 {
 	private readonly FrozenDictionary<Axis, AxisLimits> _AxisLimits;
-	private readonly Dictionary<Axis, int> _LastAxisValues;
-	private readonly Dictionary<int, bool> _LastButtonValues;
+	private readonly PooledDictionary<Axis, int> _LastAxisValues;
+	private readonly PooledDictionary<int, bool> _LastButtonValues;
 
-	public VJoyDevice(uint deviceId, Dictionary<Axis, AxisLimits> axisLimits)
+	public VJoyDevice(uint deviceId, FrozenDictionary<Axis, AxisLimits> axisLimits)
 		: base(deviceId)
 	{
-		_AxisLimits = axisLimits.ToFrozenDictionary();
-		_LastAxisValues = new Dictionary<Axis, int>(axisLimits.Count);
-		_LastButtonValues = new Dictionary<int, bool>(128);
+		_AxisLimits = axisLimits;
+		_LastAxisValues = new(axisLimits.Count);
+		_LastButtonValues = new(128);
 	}
 
 
@@ -62,5 +64,7 @@ public sealed class VJoyDevice : OutputDevice
 	protected override void OnDispose()
 	{
 		VJoyNative.RelinquishVJD(DeviceId);
+		_LastAxisValues.Dispose();
+		_LastButtonValues.Dispose();
 	}
 }

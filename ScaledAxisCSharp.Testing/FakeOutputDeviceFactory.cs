@@ -1,3 +1,5 @@
+using Collections.Pooled;
+
 namespace ScaledAxisCSharp.Testing;
 
 /// <summary>
@@ -6,9 +8,9 @@ namespace ScaledAxisCSharp.Testing;
 /// indirectly via <see cref="FakeDeviceManager.AddOutputDevice"/>; opening an
 /// id that wasn't registered throws so routing typos fail fast.
 /// </summary>
-public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory
+public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory, IDisposable
 {
-	private readonly Dictionary<uint, FakeOutputDevice> _Devices = new();
+	private readonly PooledDictionary<uint, FakeOutputDevice> _Devices = new();
 
 	public FakeOutputDevice this[uint deviceId] => Get(deviceId);
 
@@ -33,4 +35,9 @@ public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory
 		uint deviceId,
 		IReadOnlyCollection<ButtonRoute> buttonRoutes,
 		IReadOnlyCollection<AxisRoute> axisRoutes) => Get(deviceId);
+
+	public void Dispose()
+	{
+		_Devices.Dispose();
+	}
 }

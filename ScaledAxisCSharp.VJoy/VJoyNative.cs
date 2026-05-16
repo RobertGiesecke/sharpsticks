@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Collections.Pooled;
 
 namespace ScaledAxisCSharp.VJoy;
 
@@ -22,7 +23,9 @@ public static class VJoyNative
 			return IntPtr.Zero;
 		}
 
-		foreach (var candidate in GetCandidatePaths())
+		using var candidatePaths = GetCandidatePaths();
+
+		foreach (var candidate in candidatePaths)
 		{
 			if (string.IsNullOrWhiteSpace(candidate) || !File.Exists(candidate))
 			{
@@ -40,23 +43,34 @@ public static class VJoyNative
 			: IntPtr.Zero;
 	}
 
-	private static IEnumerable<string?> GetCandidatePaths()
+	private static PooledList<string?> GetCandidatePaths()
 	{
-		yield return Environment.GetEnvironmentVariable("VJOY_DLL_PATH");
-		yield return Path.Combine(AppContext.BaseDirectory, "vJoyInterface.dll");
-
-		var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-		var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-
-		if (Environment.Is64BitProcess)
+		var result = new PooledList<string?>();
+		try
 		{
-			yield return Path.Combine(programFiles, "vJoy", "x64", "vJoyInterface.dll");
-			yield return Path.Combine(programFilesX86, "vJoy", "x64", "vJoyInterface.dll");
+			result.Add(Environment.GetEnvironmentVariable("VJOY_DLL_PATH"));
+			result.Add(Path.Combine(AppContext.BaseDirectory, "vJoyInterface.dll"));
+
+			var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+			var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+
+			if (Environment.Is64BitProcess)
+			{
+				result.Add(Path.Combine(programFiles, "vJoy", "x64", "vJoyInterface.dll"));
+				result.Add(Path.Combine(programFilesX86, "vJoy", "x64", "vJoyInterface.dll"));
+			}
+			else
+			{
+				result.Add(Path.Combine(programFilesX86, "vJoy", "x86", "vJoyInterface.dll"));
+				result.Add(Path.Combine(programFiles, "vJoy", "x86", "vJoyInterface.dll"));
+			}
+
+			return result;
 		}
-		else
+		catch
 		{
-			yield return Path.Combine(programFilesX86, "vJoy", "x86", "vJoyInterface.dll");
-			yield return Path.Combine(programFiles, "vJoy", "x86", "vJoyInterface.dll");
+			result.Dispose();
+			throw;
 		}
 	}
 
