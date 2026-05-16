@@ -383,12 +383,16 @@ public sealed class MacroTests : IDisposable
 	public void MacroReleaseThatDoesNotRePress_KeepsOutputSuppressed_UntilDirectBindFalls()
 	{
 		// stick.B1 → out.B1 directly.
-		// stick.B2 → macro: Release(out.B1), Press(out.B3), Wait, Release(out.B3).
-		// After the macro finishes, out.B1 must remain released even though
-		// stick.B1 is still held: only the route group's falling edge clears
-		// the macro's suppression on out.B1.
+		// stick.B2 → OnPress:  Release(out.B1), Press(out.B3), Wait, Release(out.B3).
+		//         → OnRelease: Release(out.B1), Press(out.B4), Wait, Release(out.B4).
+		// out.B1 is never re-pressed by either macro run. Its suppression must
+		// persist through OnPress completion, the stick.B2 falling edge, and
+		// the full OnRelease run — only the route group's falling edge on
+		// stick.B1 clears it. The Release(out.B1) call inside OnRelease is a
+		// no-op against the prior suppression (idempotent within a route).
 		var b1 = _Output.BindButton(1);
 		var b3 = _Output.BindButton(3);
+		var b4 = _Output.BindButton(4);
 		using var runtime = Build(
 			new ButtonRoute(_Stick.BindButton(1), b1),
 			new ButtonMacroRoute
@@ -401,34 +405,57 @@ public sealed class MacroTests : IDisposable
 					Macros.Wait(TimeSpan.FromMilliseconds(50)),
 					Macros.Release(b3),
 				],
+				OnRelease =
+				[
+					Macros.Release(b1),
+					Macros.Press(b4),
+					Macros.Wait(TimeSpan.FromMilliseconds(50)),
+					Macros.Release(b4),
+				],
 			});
 
 		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+		Assert.False(_Output.GetButtonState(3));
+		Assert.False(_Output.GetButtonState(4));
+
 		_Stick.PressButton(1);
 		runtime.ProcessFrame();
 		Assert.True(_Output.GetButtonState(1));
 		Assert.False(_Output.GetButtonState(3));
+		Assert.False(_Output.GetButtonState(4));
 
-		// Macro starts. Release(B1) suppresses out.B1, Press(B3), then Wait.
+		// OnPress starts. Release(B1) suppresses out.B1, Press(B3), then Wait.
 		_Stick.PressButton(2);
 		runtime.ProcessFrame();
 		Assert.False(_Output.GetButtonState(1));
 		Assert.True(_Output.GetButtonState(3));
+		Assert.False(_Output.GetButtonState(4));
 
-		// Time elapses — macro runs the final Release(B3) and finishes. out.B1
+		// Time elapses — OnPress runs the final Release(B3) and finishes. out.B1
 		// was never re-pressed by the macro, so its suppressor stays in place.
 		_Time.Advance(TimeSpan.FromMilliseconds(60));
 		runtime.ProcessFrame();
 		Assert.False(_Output.GetButtonState(1));
 		Assert.False(_Output.GetButtonState(3));
+		Assert.False(_Output.GetButtonState(4));
 
-		// Releasing the macro source (stick.B2) doesn't clear suppression of
-		// out.B1 — only the *direct* route's falling edge does that.
+		// stick.B2 falling edge enqueues OnRelease. Release(B1) is a no-op
+		// against the prior suppression; Press(B4) asserts; then Wait.
 		_Stick.ReleaseButton(2);
 		runtime.ProcessFrame();
 		Assert.False(_Output.GetButtonState(1));
+		Assert.False(_Output.GetButtonState(3));
+		Assert.True(_Output.GetButtonState(4));
 
-		// Stick.B1 is still held. Output stays released across additional frames.
+		// OnRelease's wait elapses — Release(B4) runs.
+		_Time.Advance(TimeSpan.FromMilliseconds(60));
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+		Assert.False(_Output.GetButtonState(3));
+		Assert.False(_Output.GetButtonState(4));
+
+		// stick.B1 still held. Output stays released across additional frames.
 		runtime.ProcessFrame();
 		runtime.ProcessFrame();
 		Assert.False(_Output.GetButtonState(1));
