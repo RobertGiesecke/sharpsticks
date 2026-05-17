@@ -1,4 +1,22 @@
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
+// right stick
+[assembly:RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
+[assembly:RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
+[assembly:RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
+[assembly:RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
+// left stick
+[assembly:RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
+[assembly:RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
+[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
+[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
+[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
+[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, "BrakeLever")]
+// vjoy device
+[assembly:RenameDevice(DeviceNames.VJoyDevice1, "VJoyLeft")]
+[assembly:RenameButton(DeviceNames.VJoyDevice1, 1, "Fire")]
+[assembly:RenameButton(DeviceNames.VJoyDevice1, 79, "CenterHeadTracking")]
+[assembly:RenameButton(DeviceNames.VJoyDevice1, 11, "SwitchToWeaponGroup1")]
+[assembly:RenameButton(DeviceNames.VJoyDevice1, 12, "SwitchToWeaponGroup2")]
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
@@ -54,24 +72,3 @@ BuildAndRunAsConsole(new()
 	],
 	OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance,
 });
-
-// right stick
-[RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
-[RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
-// left stick
-[RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
-[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, "BrakeLever")]
-// vjoy device
-[RenameDevice(DeviceNames.VJoyDevice1, "VJoyLeft")]
-[RenameButton(DeviceNames.VJoyDevice1, 1, "Fire")]
-[RenameButton(DeviceNames.VJoyDevice1, 79, "CenterHeadTracking")]
-[RenameButton(DeviceNames.VJoyDevice1, 11, "SwitchToWeaponGroup1")]
-[RenameButton(DeviceNames.VJoyDevice1, 12, "SwitchToWeaponGroup2")]
-// ReSharper disable once ClassNeverInstantiated.Global
-partial class Devices;
