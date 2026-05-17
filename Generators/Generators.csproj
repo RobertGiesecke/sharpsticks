@@ -53,6 +53,7 @@
 
     <ItemGroup>
         <None Include="$(OutputPath)\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+        <None Include="$(PkgCollections_Pooled_V2)\lib\netstandard2.1\Collections.Pooled.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
     </ItemGroup>
 
 
