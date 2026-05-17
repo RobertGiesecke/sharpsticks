@@ -10,12 +10,21 @@ namespace SharpSticks.OutputAbstractions;
 /// </summary>
 internal sealed class MacroEngine : IDisposable
 {
+	/// <summary>
+	/// Floor on the number of pre-allocated <see cref="MacroSession"/> instances.
+	/// At runtime the pool can only ever drain to one borrow per macro route
+	/// (each route runs at most one session at a time), so a value well above
+	/// typical route counts keeps <see cref="RentSession"/> from ever allocating.
+	/// </summary>
+	internal const int DefaultSessionPoolSize = 100;
+
 	private readonly ImmutableArray<MacroRouteState> _Routes;
 	private readonly ITimeSource _Time;
 	private readonly Action<OutputButtonBinding> _IncPress;
 	private readonly Action<OutputButtonBinding> _DecPress;
 	private readonly Action<OutputButtonBinding> _IncSuppress;
 	private readonly Action<OutputButtonBinding> _DecSuppress;
+	private readonly PooledStack<MacroSession> _SessionPool;
 
 	public MacroEngine(
 		ImmutableArray<ButtonMacroRoute> routes,
@@ -39,6 +48,24 @@ internal sealed class MacroEngine : IDisposable
 				deviceIndexesById[r.Binding.DeviceId],
 				time.Frequency)),
 		];
+
+		var poolSize = Math.Max(DefaultSessionPoolSize, _Routes.Length);
+		_SessionPool = new(poolSize);
+		for (var i = 0; i < poolSize; i++)
+		{
+			_SessionPool.Push(new(this, time.Frequency));
+		}
+	}
+
+	internal MacroSession RentSession() =>
+		_SessionPool.Count > 0
+			? _SessionPool.Pop()
+			: new(this, _Time.Frequency);
+
+	internal void ReturnSession(MacroSession session)
+	{
+		session.Recycle();
+		_SessionPool.Push(session);
 	}
 
 	/// <summary>
@@ -129,6 +156,13 @@ internal sealed class MacroEngine : IDisposable
 		{
 			route.Dispose();
 		}
+
+		while (_SessionPool.Count > 0)
+		{
+			_SessionPool.Pop().Dispose();
+		}
+
+		_SessionPool.Dispose();
 	}
 }
 
@@ -231,7 +265,7 @@ internal sealed class MacroRouteState : IDisposable
 				if (Running is not null)
 				{
 					_Engine.ReleaseAllForRoute(this);
-					Running.Dispose();
+					_Engine.ReturnSession(Running);
 					Running = null;
 				}
 
@@ -252,7 +286,8 @@ internal sealed class MacroRouteState : IDisposable
 				continue;
 			}
 
-			Running = new MacroSession(_Engine, this, actions, _Frequency);
+			Running = _Engine.RentSession();
+			Running.Reset(this, actions);
 			return;
 		}
 	}
@@ -267,7 +302,7 @@ internal sealed class MacroRouteState : IDisposable
 		// Normal completion leaves the route's outstanding presses + suppressions
 		// in place so a macro like [Press(X)] holds X across its end. Cancellation
 		// paths (CancelAndRestart, engine dispose) DO release — see those call sites.
-		Running.Dispose();
+		_Engine.ReturnSession(Running);
 		Running = null;
 	}
 
@@ -275,7 +310,7 @@ internal sealed class MacroRouteState : IDisposable
 	{
 		if (Running is not null)
 		{
-			Running.Dispose();
+			_Engine.ReturnSession(Running);
 			Running = null;
 		}
 
@@ -289,24 +324,48 @@ internal sealed class MacroRouteState : IDisposable
 internal sealed class MacroSession : IDisposable, IMacroOutputSink
 {
 	private readonly MacroEngine _Engine;
-	private readonly MacroRouteState _Route;
-	private readonly PooledStack<MacroFrame> _CallStack;
+	private readonly PooledStack<MacroFrame> _CallStack = new(4);
+	private readonly PooledStack<MacroFrame> _FrameFreePool = new(4);
 	private readonly MacroContext _Ctx;
+	private MacroRouteState? _Route;
 
 	public long? NextStepDeadline { get; private set; }
 
-	public MacroSession(MacroEngine engine, MacroRouteState route,
-		ImmutableArray<IMacroAction> actions, long frequency)
+	public MacroSession(MacroEngine engine, long frequency)
 	{
 		_Engine = engine;
-		_Route = route;
-		_CallStack = new(4);
-		_CallStack.Push(new MacroFrame { Actions = actions });
-		_Ctx = new MacroContext(this, frequency);
+		_Ctx = new(this, frequency);
+		// Pre-seed one MacroFrame so the very first Reset (which pushes one frame
+		// per current macro semantics) never has to allocate. Nested macros that
+		// push deeper would still allocate the extra frames on first nesting.
+		_FrameFreePool.Push(new());
 	}
 
-	void IMacroOutputSink.Press(OutputButtonBinding button) => _Engine.OnPress(_Route, button);
-	void IMacroOutputSink.Release(OutputButtonBinding button) => _Engine.OnRelease(_Route, button);
+	public void Reset(MacroRouteState route, ImmutableArray<IMacroAction> actions)
+	{
+		_Route = route;
+		NextStepDeadline = null;
+		PushFrame(actions);
+	}
+
+	/// <summary>
+	/// Returns the session to its idle state — frames go back to the per-session
+	/// free pool, the route binding is cleared — so the next <see cref="Reset"/>
+	/// reuses the same instance without allocating.
+	/// </summary>
+	public void Recycle()
+	{
+		while (_CallStack.Count > 0)
+		{
+			_FrameFreePool.Push(_CallStack.Pop());
+		}
+
+		_Route = null;
+		NextStepDeadline = null;
+	}
+
+	void IMacroOutputSink.Press(OutputButtonBinding button) => _Engine.OnPress(_Route!, button);
+	void IMacroOutputSink.Release(OutputButtonBinding button) => _Engine.OnRelease(_Route!, button);
 
 	public SessionStepResult Step(long now)
 	{
@@ -327,7 +386,7 @@ internal sealed class MacroSession : IDisposable, IMacroOutputSink
 			var frame = _CallStack.Peek();
 			if (frame.Cursor >= frame.Actions.Length)
 			{
-				_CallStack.Pop();
+				_FrameFreePool.Push(_CallStack.Pop());
 				continue;
 			}
 
@@ -350,14 +409,32 @@ internal sealed class MacroSession : IDisposable, IMacroOutputSink
 		}
 	}
 
+	private void PushFrame(ImmutableArray<IMacroAction> actions)
+	{
+		MacroFrame frame;
+		if (_FrameFreePool.Count > 0)
+		{
+			frame = _FrameFreePool.Pop();
+		}
+		else
+		{
+			frame = new();
+		}
+
+		frame.Actions = actions;
+		frame.Cursor = 0;
+		_CallStack.Push(frame);
+	}
+
 	public void Dispose()
 	{
 		_CallStack.Dispose();
+		_FrameFreePool.Dispose();
 	}
 }
 
 internal sealed class MacroFrame
 {
-	public required ImmutableArray<IMacroAction> Actions { get; init; }
+	public ImmutableArray<IMacroAction> Actions;
 	public int Cursor;
 }

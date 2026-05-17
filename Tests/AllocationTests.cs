@@ -82,13 +82,21 @@ public sealed class AllocationTests : IDisposable
 				_Stick2.SetAxisValue(Axis.X, phase switch { 0 => -0.8, 1 => -0.2, 2 => 0.3, _ => 0.9 });
 				_Stick2.SetAxisValue(Axis.Y, phase switch { 0 => 0.0, 1 => 0.4, 2 => 0.6, _ => 1.0 });
 
-				// Toggle several buttons across phases to exercise:
-				// - ButtonRoute edges (button 1, 2 on Stick1; button 1 on Stick2)
-				// - WhenButtonPressedAxisModifier branch switching (button 1)
-				// We deliberately do NOT toggle the macro-source button here
-				// because MacroSession is allocated per edge (a known cost).
-				if ((i & 1) == 0) { _Stick1.PressButton(1); _Stick1.PressButton(2); _Stick2.PressButton(1); }
-				else              { _Stick1.ReleaseButton(1); _Stick1.ReleaseButton(2); _Stick2.ReleaseButton(1); }
+				// Toggle every source button so we hit:
+				// - ButtonRoute edges (1, 2 on Stick1; 1 on Stick2)
+				// - WhenButtonPressedAxisModifier branch switching (Stick1 button 1)
+				// - ButtonMacroRoute press/release edges (Stick1 button 3) — rents from
+				//   the pre-allocated session pool, so no MacroSession allocations.
+				if ((i & 1) == 0)
+				{
+					_Stick1.PressButton(1); _Stick1.PressButton(2); _Stick1.PressButton(3);
+					_Stick2.PressButton(1);
+				}
+				else
+				{
+					_Stick1.ReleaseButton(1); _Stick1.ReleaseButton(2); _Stick1.ReleaseButton(3);
+					_Stick2.ReleaseButton(1);
+				}
 
 				_Time.Advance(TimeSpan.FromMilliseconds(20));
 				runtime.ProcessFrame();
