@@ -1,43 +1,40 @@
-using static ScaledAxisCSharp.InputAbstractions.Macros;
-
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
-[assembly:RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
-[assembly:RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
-[assembly:RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
-[assembly:RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
+[assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
+[assembly: RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
+
+[assembly: RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
+[assembly: RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
 // left stick
-[assembly:RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
-[assembly:RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
-[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
-[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
-[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
-[assembly:RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, "BrakeLever")]
+[assembly: RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
+[assembly: RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
+
+[assembly: RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
+[assembly: RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
+[assembly: RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
+[assembly: RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, "BrakeLever")]
 // vjoy device
-[assembly:RenameDevice(DeviceNames.VJoyDevice1, "VJoyLeft")]
-[assembly:RenameButton(DeviceNames.VJoyDevice1, 1, "Fire")]
-[assembly:RenameButton(DeviceNames.VJoyDevice1, 79, "CenterHeadTracking")]
+[assembly: RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
+[assembly: RenameButton(DeviceNames.VJoyDevice1, 1, "Fire")]
+[assembly: RenameButton(DeviceNames.VJoyDevice1, 79, "CenterHeadTracking")]
+
+[assembly: RenameAxis(DeviceNames.VJoyDevice1, Axis.X, "Roll")]
+[assembly: RenameAxis(DeviceNames.VJoyDevice1, Axis.Y, "Pitch")]
+[assembly: RenameAxis(DeviceNames.VJoyDevice1, Axis.Z, "Yaw")]
+[assembly: RenameAxis(DeviceNames.VJoyDevice1, Axis.Rz, "BrakeLever")]
+[assembly: RenameAxis(DeviceNames.VJoyDevice1, Axis.Slider1, "ZoomIn")]
+[assembly: RenameAxis(DeviceNames.VJoyDevice1, Axis.Slider2, "ZoomOut")]
+
 [assembly:RenameButton(DeviceNames.VJoyDevice1, 11, "SwitchToWeaponGroup1")]
 [assembly:RenameButton(DeviceNames.VJoyDevice1, 12, "SwitchToWeaponGroup2")]
+[assembly: RenameButton(DeviceNames.VJoyDevice1, 20, "HoldForZoom")]
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new() { Max = 1.0d },
 	PrecisionCurve = new() { Max = 0.184d },
 	ModifierAxis = LeftStick.Axes.BrakeLever,
-};
-
-// 50% when left 2nd stage trigger is pressed, blended otherwise
-var blendedCurveWithPrecisionHold = new WhenButtonPressedAxisModifier
-{
-	Buttons = [LeftStick.Buttons.SecondStageTrigger],
-	WhenPressed = new AxisCurve { Max = 0.5d },
-	WhenNotPressed = modifierBlendCurve,
-};
-
-var axisOptions = new RouteAxisOptions
-{
-	Modifier = blendedCurveWithPrecisionHold,
+	Stateful = true,
 };
 
 BuildAndRunAsConsole(new()
@@ -50,26 +47,46 @@ BuildAndRunAsConsole(new()
 			OnPress =
 			[
 				// lift fire
-				VJoyLeft.Buttons.Fire.Release(),
+				VJoy1.Buttons.Fire.Release(),
 				// switch to weapon group 2
-				VJoyLeft.Buttons.SwitchToWeaponGroup2.Press(),
+				VJoy1.Buttons.SwitchToWeaponGroup2.Press(),
 				WaitFor(TimeSpan.FromMilliseconds(15)),
-				VJoyLeft.Buttons.SwitchToWeaponGroup2.Release(),
+				VJoy1.Buttons.SwitchToWeaponGroup2.Release(),
 			],
 			OnRelease =
 			[
 				// lift fire
-				VJoyLeft.Buttons.Fire.Release(),
+				VJoy1.Buttons.Fire.Release(),
 				// switch to weapon group 1
-				VJoyLeft.Buttons.SwitchToWeaponGroup1.Press(),
+				VJoy1.Buttons.SwitchToWeaponGroup1.Press(),
 				WaitFor(TimeSpan.FromMilliseconds(15)),
-				VJoyLeft.Buttons.SwitchToWeaponGroup1.Release(),
+				VJoy1.Buttons.SwitchToWeaponGroup1.Release(),
 			],
 		}),
-		RightStick.Buttons.Trigger.RouteTo(VJoyLeft.Buttons.Fire),
-		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoyLeft.Buttons.CenterHeadTracking),
-		RightStick.Axes.X.RouteToSameAxisOnOutput(VJoyLeft, options: axisOptions),
-		RightStick.Axes.Y.RouteToSameAxisOnOutput(VJoyLeft, options: axisOptions),
-		RightStick.Axes.Twist.RouteToSameAxisOnOutput(VJoyLeft, options: axisOptions),
+		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
+		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
+		LeftStick.Buttons.BrakeLever.RouteTo(VJoy1.Buttons.HoldForZoom),
+		RightStick.Axes.X.RouteTo(VJoy1.Axes.Roll, modifier: modifierBlendCurve),
+		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: modifierBlendCurve),
+		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: modifierBlendCurve),
+		// passthrough not used in game, only for debug display
+		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever, scale: 2, offset: -1),
+		..LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
+		{
+			IncreaseAxis = VJoy1.Axes.ZoomIn,
+			DecreaseAxis = VJoy1.Axes.ZoomOut,
+			IncreaseRestPosition = 0.5,
+			DecreaseRestPosition = 0.5,
+			InitialValue = 0.0,
+			Gain = 8.0,
+			MinOutput = 0.001,
+			ErrorTolerance = 0.00003,
+			IncreaseEdgeBoost = 5.5,
+			DecreaseEdgeBoost = 5.5,
+			OutputRiseRate = 0.14,
+			OutputFallRate = 0.14,
+			IncreaseRate = 0.035,
+			DecreaseRate = 0.035,
+		}),
 	],
 });
