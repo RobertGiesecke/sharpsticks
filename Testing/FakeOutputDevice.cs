@@ -3,8 +3,9 @@ using Collections.Pooled;
 namespace SharpSticks.Testing;
 
 /// <summary>
-/// In-memory <see cref="OutputDevice"/> that captures every axis/button write.
-/// Tests can inspect the latest value or the full ordered write log.
+/// In-memory <see cref="OutputDevice"/> for deterministic tests. Stores the
+/// latest value per axis / button; inspect via <see cref="GetAxisValue"/> and
+/// <see cref="GetButtonState"/>.
 /// </summary>
 /// <remarks>
 /// When declared axes / button count are supplied (typically via
@@ -17,8 +18,6 @@ public sealed class FakeOutputDevice : OutputDevice, IFakeDevice
 {
 	private readonly PooledDictionary<Axis, double> _Axes;
 	private readonly PooledDictionary<int, bool> _Buttons;
-	private readonly PooledList<AxisWrite> _AxisWrites = [];
-	private readonly PooledList<ButtonWrite> _ButtonWrites = [];
 	private readonly ImmutableHashSet<Axis>? _DeclaredAxes;
 	private readonly int? _ButtonCount;
 
@@ -45,9 +44,7 @@ public sealed class FakeOutputDevice : OutputDevice, IFakeDevice
 				$"Axis '{axis}' was not declared on fake output device {DeviceId}.");
 		}
 
-		var clamped = Math.Clamp(normalizedValue, -1.0, 1.0);
-		_Axes[axis] = clamped;
-		_AxisWrites.Add(new(axis, clamped));
+		_Axes[axis] = Math.Clamp(normalizedValue, -1.0, 1.0);
 	}
 
 	public override void SetButtonState(int buttonNumber, bool pressed)
@@ -62,32 +59,15 @@ public sealed class FakeOutputDevice : OutputDevice, IFakeDevice
 		}
 
 		_Buttons[buttonNumber] = pressed;
-		_ButtonWrites.Add(new(buttonNumber, pressed));
 	}
 
 	public double GetAxisValue(Axis axis) => _Axes.GetValueOrDefault(axis, 0.0);
 
 	public bool GetButtonState(int buttonNumber) => _Buttons.GetValueOrDefault(buttonNumber, false);
 
-	public IReadOnlyList<AxisWrite> AxisWrites => _AxisWrites;
-
-	public IReadOnlyList<ButtonWrite> ButtonWrites => _ButtonWrites;
-
-	public void ClearLog()
-	{
-		_AxisWrites.Clear();
-		_ButtonWrites.Clear();
-	}
-
 	protected override void OnDispose()
 	{
 		_Axes.Dispose();
 		_Buttons.Dispose();
-		_AxisWrites.Dispose();
-		_ButtonWrites.Dispose();
 	}
-
-	public readonly record struct AxisWrite(Axis Axis, double Value);
-
-	public readonly record struct ButtonWrite(int ButtonNumber, bool Pressed);
 }

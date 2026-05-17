@@ -239,39 +239,6 @@ public sealed class FakeDeviceTests
 	}
 
 	[Fact]
-	public void OutputDevice_AxisWrites_CaptureValuesInOrder()
-	{
-		using var fakes = new FakeDeviceManager();
-		var output = fakes.AddOutputDevice().AddAxis(Axis.X).AddButtons(2).Build();
-
-		output.SetAxisValue(Axis.X, 0.1);
-		output.SetAxisValue(Axis.X, 0.2);
-		output.SetButtonState(1, pressed: true);
-		output.SetButtonState(1, pressed: false);
-
-		Assert.Equal(2, output.AxisWrites.Count);
-		Assert.Equal(0.1, output.AxisWrites[0].Value, 1e-9);
-		Assert.Equal(0.2, output.AxisWrites[1].Value, 1e-9);
-
-		Assert.Equal(2, output.ButtonWrites.Count);
-		Assert.True(output.ButtonWrites[0].Pressed);
-		Assert.False(output.ButtonWrites[1].Pressed);
-	}
-
-	[Fact]
-	public void OutputDevice_ClearLog_ClearsHistoryButPreservesLastValue()
-	{
-		using var fakes = new FakeDeviceManager();
-		var output = fakes.AddOutputDevice().AddAxis(Axis.X).Build();
-
-		output.SetAxisValue(Axis.X, 0.7);
-		output.ClearLog();
-
-		Assert.Empty(output.AxisWrites);
-		Assert.Equal(0.7, output.GetAxisValue(Axis.X), 1e-9);
-	}
-
-	[Fact]
 	public void OutputDevice_AfterDispose_WritesThrow()
 	{
 		using var fakes = new FakeDeviceManager();
