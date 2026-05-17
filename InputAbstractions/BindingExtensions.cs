@@ -54,15 +54,31 @@ public static class BindingExtensions
 	public static AxisRoute RouteTo(
 		this AxisBinding binding,
 		OutputAxisBinding outputBinding,
-		RouteAxisOptions? options = null) =>
-		new()
+		RouteAxisOptions? options = null)
+	{
+		var (scale, offset) = ResolveScaleOffset(options);
+		return new()
 		{
 			Source = binding,
 			OutputBinding = outputBinding,
-			Scale = options?.Scale ?? 1.0,
-			Offset = options?.Offset ?? 0.0,
+			Scale = scale,
+			Offset = offset,
 			Modifier = options?.Modifier,
 		};
+	}
+
+	private static (double Scale, double Offset) ResolveScaleOffset(RouteAxisOptions? options)
+	{
+		if (options is not { } o)
+		{
+			return (RouteAxisOptions.DefaultScale, 0.0);
+		}
+
+		return o.Invert ? (-o.Scale, -o.Offset) : (o.Scale, o.Offset);
+	}
+
+	private static (double Scale, double Offset) ResolveScaleOffset(RouteAxisOptions options) =>
+		options.Invert ? (-options.Scale, -options.Offset) : (options.Scale, options.Offset);
 
 	[OverloadResolutionPriority(2)]
 	public static AxisRoute RouteAxis(
@@ -74,6 +90,29 @@ public static class BindingExtensions
 			binding,
 			new(outputDeviceId, outputAxis),
 			options);
+
+	public static AxisRoute MergeWith(
+		this AxisBinding first,
+		AxisBinding second,
+		MergeAxesOptions options)
+	{
+		var (firstScale, firstOffset) = ResolveScaleOffset(options.First);
+		var (secondScale, secondOffset) = ResolveScaleOffset(options.Second);
+		return new()
+		{
+			Source = first,
+			OutputBinding = options.OutputBinding,
+			Scale = firstScale,
+			Offset = firstOffset,
+			Modifier = new MergeAxesModifier(
+				second,
+				secondScale,
+				secondOffset,
+				options.Second?.Modifier,
+				options.First?.Modifier,
+				options.Mode),
+		};
+	}
 
 	public static ImmutableArray<AxisRoute> RouteAbsoluteRelative(
 		this AxisBinding binding,
