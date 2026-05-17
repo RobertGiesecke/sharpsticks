@@ -492,7 +492,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		var innerIndent = memberIndent;
 		var innerMemberIndent = memberIndent + "\t";
 
-		builder.Append(classIndent).Append("public sealed record Typed").AppendLine(deviceIdentifier);
+		builder.Append(classIndent).Append("public sealed record Typed").Append(deviceIdentifier).Append(": IJoystickDevice").AppendLine();
 		builder.Append(classIndent).AppendLine("{");
 
 		builder.Append(innerIndent)
@@ -503,6 +503,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			.Append("public const int DeviceId = DeviceIds.")
 			.Append(deviceOriginalName)
 			.AppendLine(";");
+		builder.Append(innerIndent)
+			.AppendLine("int IJoystickDevice.DeviceId => DeviceId;");
 
 		builder.Append(innerIndent).AppendLine("public TypedAxisBindings Axes { get; } = new();");
 		builder.Append(innerIndent).AppendLine("public TypedButtonBindings Buttons { get; } = new();");
@@ -617,13 +619,15 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		var innerIndent = memberIndent;
 		var innerMemberIndent = memberIndent + "\t";
 
-		builder.Append(indent).Append("public sealed record Typed").AppendLine(vjoyIdentifier);
+		builder.Append(indent).Append("public sealed record Typed").Append(vjoyIdentifier).Append(": IOutputDevice").AppendLine();
 		builder.Append(indent).AppendLine("{");
 
 		builder.Append(innerIndent).Append("public const string DeviceName = DeviceNames.").Append(vjoyOriginalName)
 			.AppendLine(";");
 		builder.Append(innerIndent).Append("public const uint DeviceId = OutputDeviceIds.").Append(vjoyOriginalName)
 			.AppendLine(";");
+		builder.Append(innerIndent)
+			.AppendLine("uint IOutputDevice.DeviceId => DeviceId;");
 
 		builder.Append(innerIndent).AppendLine("public TypedAxisBindings Axes { get; } = new();");
 		builder.Append(innerIndent).AppendLine("public TypedButtonBindings Buttons { get; } = new();");

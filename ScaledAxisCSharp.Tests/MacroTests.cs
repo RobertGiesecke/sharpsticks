@@ -81,7 +81,7 @@ public sealed class MacroTests : IDisposable
 			OnPress =
 			[
 				Macros.Press(target),
-				Macros.Wait(TimeSpan.FromMilliseconds(50)),
+				Macros.WaitFor(TimeSpan.FromMilliseconds(50)),
 				Macros.Release(target),
 			],
 		});
@@ -121,7 +121,7 @@ public sealed class MacroTests : IDisposable
 			OnPress =
 			[
 				Macros.Press(btnA),
-				Macros.Wait(TimeSpan.FromMilliseconds(50)),
+				Macros.WaitFor(TimeSpan.FromMilliseconds(50)),
 				Macros.Release(btnA),
 				Macros.Press(btnB),
 			],
@@ -209,7 +209,7 @@ public sealed class MacroTests : IDisposable
 			OnPress =
 			[
 				Macros.Press(target),
-				Macros.Wait(TimeSpan.FromMilliseconds(50)),
+				Macros.WaitFor(TimeSpan.FromMilliseconds(50)),
 				Macros.Release(target),
 			],
 			Reentry = MacroReentry.DropIfBusy,
@@ -249,7 +249,7 @@ public sealed class MacroTests : IDisposable
 			OnPress =
 			[
 				Macros.Press(target),
-				Macros.Wait(TimeSpan.FromMilliseconds(50)),
+				Macros.WaitFor(TimeSpan.FromMilliseconds(50)),
 				Macros.Release(target),
 			],
 			Reentry = MacroReentry.CancelAndRestart,
@@ -320,7 +320,7 @@ public sealed class MacroTests : IDisposable
 				OnPress =
 				[
 					Macros.Release(target),
-					Macros.Wait(TimeSpan.FromMilliseconds(20)),
+					Macros.WaitFor(TimeSpan.FromMilliseconds(20)),
 					Macros.Press(target),
 				],
 			});
@@ -402,14 +402,14 @@ public sealed class MacroTests : IDisposable
 				[
 					Macros.Release(b1),
 					Macros.Press(b3),
-					Macros.Wait(TimeSpan.FromMilliseconds(50)),
+					Macros.WaitFor(TimeSpan.FromMilliseconds(50)),
 					Macros.Release(b3),
 				],
 				OnRelease =
 				[
 					Macros.Release(b1),
 					Macros.Press(b4),
-					Macros.Wait(TimeSpan.FromMilliseconds(50)),
+					Macros.WaitFor(TimeSpan.FromMilliseconds(50)),
 					Macros.Release(b4),
 				],
 			});

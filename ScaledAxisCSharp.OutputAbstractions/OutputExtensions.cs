@@ -5,13 +5,13 @@ namespace ScaledAxisCSharp.OutputAbstractions;
 public static class OutputExtensions
 {
 	public static OutputButtonBinding BindButton<T>(this T device, int sourceButton)
-		where T : OutputDevice
+		where T : IOutputDevice
 	{
 		return new(device.DeviceId, sourceButton);
 	}
 
 	public static OutputAxisBinding BindAxis<T>(this T device, Axis axis)
-		where T : OutputDevice
+		where T : IOutputDevice
 	{
 		return new(device.DeviceId, axis);
 	}
@@ -19,7 +19,7 @@ public static class OutputExtensions
 	[OverloadResolutionPriority(2)]
 	public static AxisRoute RouteToSameAxisOnOutput(
 		this AxisBinding binding,
-		OutputDevice outputDevice,
+		IOutputDevice outputDevice,
 		double scale = 1.0,
 		double offset = 0.0,
 		IAxisModifier? modifier = null) =>
@@ -28,7 +28,7 @@ public static class OutputExtensions
 	[OverloadResolutionPriority(3)]
 	public static AxisRoute RouteToSameAxisOnOutput(
 		this AxisBinding binding,
-		OutputDevice outputDevice,
+		IOutputDevice outputDevice,
 		RouteAxisOptions? options = null) =>
 		binding.RouteToSameAxisOnOutput(outputDevice.DeviceId, options);
 }

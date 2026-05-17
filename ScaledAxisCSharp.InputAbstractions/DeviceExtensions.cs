@@ -3,13 +3,13 @@
 public static class DeviceExtensions
 {
 	public static AxisBinding BindAxis<T>(this T device, Axis axis)
-		where T : JoystickDevice
+		where T : IJoystickDevice
 	{
 		return new(device.DeviceId, axis, AxisMode.Signed, false, 0.0);
 	}
 
 	public static ButtonBinding BindButton<T>(this T device, int sourceButton)
-		where T : JoystickDevice
+		where T : IJoystickDevice
 	{
 		return new(device.DeviceId, sourceButton);
 	}
@@ -59,7 +59,7 @@ public static class DeviceExtensions
 		this IReadOnlyList<T> devices,
 		IEnumerable<int> deviceIds,
 		IDictionary<int, T> selected)
-		where T : JoystickDevice
+		where T : IJoystickDevice
 	{
 		using var byId = devices.ToPooledDictionary(device => device.DeviceId);
 

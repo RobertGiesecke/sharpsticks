@@ -1,6 +1,6 @@
 namespace ScaledAxisCSharp.InputAbstractions;
 
-public abstract class JoystickDevice : IDisposable
+public abstract class JoystickDevice : IDisposable, IJoystickDevice
 {
 	public required int DeviceId { get; init; }
 	public required string Name { get; init; }

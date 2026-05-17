@@ -1,3 +1,5 @@
+using static ScaledAxisCSharp.InputAbstractions.Macros;
+
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
 [assembly:RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
@@ -48,27 +50,26 @@ BuildAndRunAsConsole(new()
 			OnPress =
 			[
 				// lift fire
-				Macros.Release(VJoyLeft.Buttons.Fire),
+				VJoyLeft.Buttons.Fire.Release(),
 				// switch to weapon group 2
-				Macros.Press(VJoyLeft.Buttons.SwitchToWeaponGroup2),
-				Macros.Wait(TimeSpan.FromMilliseconds(15)),
-				Macros.Release(VJoyLeft.Buttons.SwitchToWeaponGroup2),
+				VJoyLeft.Buttons.SwitchToWeaponGroup2.Press(),
+				WaitFor(TimeSpan.FromMilliseconds(15)),
+				VJoyLeft.Buttons.SwitchToWeaponGroup2.Release(),
 			],
 			OnRelease =
 			[
 				// lift fire
-				Macros.Release(VJoyLeft.Buttons.Fire),
+				VJoyLeft.Buttons.Fire.Release(),
 				// switch to weapon group 1
-				Macros.Press(VJoyLeft.Buttons.SwitchToWeaponGroup1),
-				Macros.Wait(TimeSpan.FromMilliseconds(15)),
-				Macros.Release(VJoyLeft.Buttons.SwitchToWeaponGroup1),
+				VJoyLeft.Buttons.SwitchToWeaponGroup1.Press(),
+				WaitFor(TimeSpan.FromMilliseconds(15)),
+				VJoyLeft.Buttons.SwitchToWeaponGroup1.Release(),
 			],
 		}),
 		RightStick.Buttons.Trigger.RouteTo(VJoyLeft.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoyLeft.Buttons.CenterHeadTracking),
-		RightStick.Axes.X.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyLeft, options: axisOptions),
-		RightStick.Axes.Y.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyLeft, options: axisOptions),
-		RightStick.Axes.Twist.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyLeft, options: axisOptions),
+		RightStick.Axes.X.RouteToSameAxisOnOutput(VJoyLeft, options: axisOptions),
+		RightStick.Axes.Y.RouteToSameAxisOnOutput(VJoyLeft, options: axisOptions),
+		RightStick.Axes.Twist.RouteToSameAxisOnOutput(VJoyLeft, options: axisOptions),
 	],
-	OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance,
 });

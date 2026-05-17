@@ -2,9 +2,9 @@ namespace ScaledAxisCSharp.InputAbstractions;
 
 public static class Macros
 {
-	public static IMacroAction Press(OutputButtonBinding button) => new PressAction(button);
-	public static IMacroAction Release(OutputButtonBinding button) => new ReleaseAction(button);
-	public static IMacroAction Wait(TimeSpan duration) => new WaitAction(duration);
+	public static IMacroAction Press(this OutputButtonBinding button) => new PressAction(button);
+	public static IMacroAction Release(this OutputButtonBinding button) => new ReleaseAction(button);
+	public static IMacroAction WaitFor(TimeSpan duration) => new WaitAction(duration);
 
 	private sealed class PressAction(OutputButtonBinding button) : IMacroAction
 	{

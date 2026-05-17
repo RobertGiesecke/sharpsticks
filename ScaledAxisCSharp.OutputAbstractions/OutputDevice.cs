@@ -2,7 +2,7 @@
 
 namespace ScaledAxisCSharp.OutputAbstractions;
 
-public abstract class OutputDevice : IDisposable
+public abstract class OutputDevice : IDisposable, IOutputDevice
 {
 	protected OutputDevice(uint deviceId)
 	{
