@@ -9,6 +9,17 @@ public abstract class OutputDevice : IDisposable, IOutputDevice
 		DeviceId = deviceId;
 	}
 
+	/// <summary>
+	/// Creates an <see cref="IOutputDevice"/> using the specified <c>DeviceId</c>. This method returns an instance of a lightweight
+	/// <see cref="OutputDeviceWithId"/> that is not a fully-functional <see cref="OutputDevice"/>.
+	/// </summary>
+	/// <param name="deviceId">The device identifier for which an <see cref="OutputDeviceWithId"/> instance is created.</param>
+	/// <returns>An instance of <see cref="OutputDeviceWithId"/> with the specified <c>DeviceId</c>.</returns>
+	public static OutputDeviceWithId WithId(uint deviceId)
+	{
+		return new() { DeviceId = deviceId };
+	}
+
 	protected bool Frozen { get; private set; }
 	protected bool Disposed { get; private set; }
 	public uint DeviceId { get; }
