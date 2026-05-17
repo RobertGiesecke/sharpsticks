@@ -1,6 +1,7 @@
 <Project>
   <Import Condition="'$(SharedPropsLoaded)' != 'true' and exists('$(MSBuildThisFileDirectory)Shared.props')" Project="$(MSBuildThisFileDirectory)Shared.props"/>
   <ItemGroup>
-    <Using Include="static ScaledAxisCSharp.Console.ConsoleExtensions" />
+    <Using Include="static $(PackageRootName).Console.ConsoleExtensions" />
+    <Using Include="static $(PackageRootName).InputAbstractions.Macros" />
   </ItemGroup>
 </Project>

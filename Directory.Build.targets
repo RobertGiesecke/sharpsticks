@@ -12,7 +12,7 @@
             <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
             <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
             <_BuildTransitivePartialFile>$(_BuildTransitiveDir)$(MSBuildProjectName).partial.props</_BuildTransitivePartialFile>
-            <_BuildTransitivePackFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)pack-buildTransitive\$(MSBuildProjectName).props</_BuildTransitivePackFile>
+            <_BuildTransitivePackFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)pack-buildTransitive\$(PackageId).props</_BuildTransitivePackFile>
         </PropertyGroup>
         <ItemGroup>
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
@@ -37,7 +37,7 @@
         </ReadLinesFromFile>
         <ItemGroup>
             <_ParsedExportedUsingLines Include="@(_ExportedUsingLines)">
-                <UsingInclude>$([System.Text.RegularExpressions.Regex]::Match('%(_ExportedUsingLines.Identity)', 'Include=&quot;([^&quot;]+)&quot;').Groups[1].Value)</UsingInclude>
+                <UsingInclude>$([System.Text.RegularExpressions.Regex]::Replace($([System.Text.RegularExpressions.Regex]::Match('%(_ExportedUsingLines.Identity)', 'Include=&quot;([^&quot;]+)&quot;').Groups[1].Value), '\x24\(PackageRootName\)', '$(PackageRootName)'))</UsingInclude>
                 <Alias>$([System.Text.RegularExpressions.Regex]::Match('%(_ExportedUsingLines.Identity)', 'Alias=&quot;([^&quot;]*)&quot;').Groups[1].Value)</Alias>
                 <HasAliasAttribute>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ExportedUsingLines.Identity)', 'Alias=&quot;[^&quot;]*&quot;').ToString().ToLowerInvariant())</HasAliasAttribute>
                 <IsUsingLine>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ExportedUsingLines.Identity)', '^\s*&lt;Using\b').ToString().ToLowerInvariant())</IsUsingLine>
@@ -86,7 +86,7 @@
         <WriteLinesToFile File="$(_BuildTransitiveFile)" Lines="@(_PropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true"/>
         <WriteLinesToFile File="$(_BuildTransitivePackFile)" Lines="@(_PackPropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true"/>
         <ItemGroup>
-            <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(MSBuildProjectName).props"/>
+            <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(PackageId).props"/>
         </ItemGroup>
     </Target>
 
