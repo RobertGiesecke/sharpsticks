@@ -9,26 +9,13 @@ using DirectInput;
 
 internal static unsafe class DeviceCapabilityHelper
 {
-	private static readonly Guid GuidXAxis =
-		new(0xA36D02E0, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-
-	private static readonly Guid GuidYAxis =
-		new(0xA36D02E1, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-
-	private static readonly Guid GuidZAxis =
-		new(0xA36D02E2, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-
-	private static readonly Guid GuidRxAxis =
-		new(0xA36D02F4, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-
-	private static readonly Guid GuidRyAxis =
-		new(0xA36D02F5, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-
-	private static readonly Guid GuidRzAxis =
-		new(0xA36D02E3, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
-
-	private static readonly Guid GuidSlider =
-		new(0xA36D02E4, 0xC9F3, 0x11CF, 0xBF, 0xC7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00);
+	private static Guid GuidXAxis => DirectInputAxisExtensions.XAxisGuid;
+	private static Guid GuidYAxis => DirectInputAxisExtensions.YAxisGuid;
+	private static Guid GuidZAxis => DirectInputAxisExtensions.ZAxisGuid;
+	private static Guid GuidRxAxis => DirectInputAxisExtensions.RxAxisGuid;
+	private static Guid GuidRyAxis => DirectInputAxisExtensions.RyAxisGuid;
+	private static Guid GuidRzAxis => DirectInputAxisExtensions.RzAxisGuid;
+	private static Guid GuidSlider => DirectInputAxisExtensions.SliderGuid;
 
 	internal static bool TryGetCapabilities(
 		nint directInput,
