@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+<!--      <ProjectReference Include="..\Config\Config.csproj" />-->
+      <ProjectReference Include="..\Console\Console.csproj" />
+<!--      <ProjectReference Include="..\DirectInput\DirectInput.csproj" />-->
+<!--      <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />-->
+<!--      <ProjectReference Include="..\VJoy\VJoy.csproj" />-->
+    </ItemGroup>
+
+    <ItemGroup>
+<!--      <PackageReference Include="$(PackageRootName).Console" Version="0.1.0-debug07" />-->
+    </ItemGroup>
+
+</Project>

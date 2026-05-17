@@ -7,7 +7,7 @@
         <NoAutoProps>true</NoAutoProps>
         <PublishAot>false</PublishAot>
         <InvariantGlobalization>false</InvariantGlobalization>
-        <RootNamespace>ScaledAxisCSharp.Generators</RootNamespace>
+        <RootNamespace>$(PackageRootName).Generators</RootNamespace>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <NoWarn>$(NoWarn);RS1035;RS1041;RS2008</NoWarn>
         <IncludeBuildOutput>false</IncludeBuildOutput>
@@ -26,29 +26,29 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="..\ScaledAxisCSharp.InputAbstractions\Axis.cs"
+        <Compile Include="..\InputAbstractions\Axis.cs"
                  Link="included-runtime\InputAbstractions\Axis.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputAxisExtensions.cs"
+        <Compile Include="..\DirectInput\DirectInputAxisExtensions.cs"
                  Link="included-runtime\DirectInput\DirectInputAxisExtensions.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInput8VTable.cs"
+        <Compile Include="..\DirectInput\DirectInput8VTable.cs"
                  Link="included-runtime\DirectInput\DirectInput8VTable.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputDeviceEnumerator.cs"
+        <Compile Include="..\DirectInput\DirectInputDeviceEnumerator.cs"
                  Link="included-runtime\DirectInput\DirectInputDeviceEnumerator.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputDeviceInfo.cs"
+        <Compile Include="..\DirectInput\DirectInputDeviceInfo.cs"
                  Link="included-runtime\DirectInput\DirectInputDeviceInfo.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputDeviceInstanceNative.cs"
+        <Compile Include="..\DirectInput\DirectInputDeviceInstanceNative.cs"
                  Link="included-runtime\DirectInput\DirectInputDeviceInstanceNative.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\DirectInputNative.Enumeration.cs"
+        <Compile Include="..\DirectInput\DirectInputNative.Enumeration.cs"
                  Link="included-runtime\DirectInput\DirectInputNative.Enumeration.cs" />
-        <Compile Include="..\ScaledAxisCSharp.DirectInput\UnknownVTable.cs"
+        <Compile Include="..\DirectInput\UnknownVTable.cs"
                  Link="included-runtime\DirectInput\UnknownVTable.cs" />
-        <Compile Include="..\ScaledAxisCSharp.VJoy\VjdStatus.cs"
+        <Compile Include="..\VJoy\VjdStatus.cs"
                  Link="included-runtime\VJoy\VjdStatus.cs" />
-        <Compile Include="..\ScaledAxisCSharp.VJoy\VJoyDeviceInfo.cs"
+        <Compile Include="..\VJoy\VJoyDeviceInfo.cs"
                  Link="included-runtime\VJoy\VJoyDeviceInfo.cs" />
-        <Compile Include="..\ScaledAxisCSharp.VJoy\VJoyDevices.cs"
+        <Compile Include="..\VJoy\VJoyDevices.cs"
                  Link="included-runtime\VJoy\VJoyDevices.cs" />
-        <Compile Include="..\ScaledAxisCSharp.VJoy\VJoyNative.cs"
+        <Compile Include="..\VJoy\VJoyNative.cs"
                  Link="included-runtime\VJoy\VJoyNative.cs" />
     </ItemGroup>
 

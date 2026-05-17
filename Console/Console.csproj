@@ -6,20 +6,20 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ScaledAxisCSharpExportAnalyzerProject Include="ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"/>
+        <ScaledAxisCSharpExportAnalyzerProject Include="Generators\Generators.csproj"/>
     </ItemGroup>
 
     <Choose>
         <When Condition="'$(UseGeneratorPackageReference)' == 'true'">
             <ItemGroup>
-                <ProjectReference Include="..\ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"
+                <ProjectReference Include="..\Generators\Generators.csproj"
                                   IncludeAssets="analyzers;buildtransitive"
                                   PrivateAssets="contentfiles;build"/>
             </ItemGroup>
         </When>
         <Otherwise>
             <ItemGroup>
-                <ProjectReference Include="..\ScaledAxisCSharp.Generators\ScaledAxisCSharp.Generators.csproj"
+                <ProjectReference Include="..\Generators\Generators.csproj"
                                   OutputItemType="Analyzer"
                                   ReferenceOutputAssembly="false"
                                   PrivateAssets="all"/>
@@ -28,7 +28,7 @@
     </Choose>
 
     <ItemGroup>
-        <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj"/>
+        <ProjectReference Include="..\Config\Config.csproj"/>
     </ItemGroup>
 
 </Project>

@@ -1,5 +1,5 @@
 <Project>
-
+    <Import Condition="'$(SharedPropsLoaded)' != 'true' and exists('$(MSBuildThisFileDirectory)Shared.props')" Project="$(MSBuildThisFileDirectory)Shared.props"/>
     <ItemGroup>
         <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="all"
                           IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"/>

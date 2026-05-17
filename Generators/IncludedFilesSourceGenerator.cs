@@ -13,18 +13,19 @@ namespace ScaledAxisCSharp.Generators;
 [Generator]
 public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 {
+	private const string NamespaceRoot = $"{nameof(ScaledAxisCSharp)}.";
 	private const string ResourcePrefix = "included-files/";
-	private const string GenerateDeviceInfosAttributeMetadataName = "GenerateDeviceInfosAttribute";
-	private const string RenameDeviceAttributeMetadataName = "RenameDeviceAttribute";
-	private const string RenameAxisAttributeMetadataName = "RenameAxis";
-	private const string RenameButtonAttributeMetadataName = "RenameButton";
+	private const string GenerateDeviceInfosAttributeMetadataName = nameof(GenerateDeviceInfosAttribute);
+	private const string RenameDeviceAttributeMetadataName = nameof(RenameDeviceAttribute);
+	private const string RenameAxisAttributeMetadataName = nameof(RenameAxis);
+	private const string RenameButtonAttributeMetadataName = nameof(RenameButton);
 	private const GenerateDeviceInfosLevels GenerateDeviceInfosLevelsDefault = GenerateDeviceInfosLevels.DeviceNames;
 
 	private static readonly DiagnosticDescriptor TypeMustBePartial = new(
 		"SACIG001",
 		"GenerateDeviceInfos target must be partial",
 		"Type '{0}' must be partial to receive generated device info members",
-		"ScaledAxisCSharp.Generators",
+		$"{NamespaceRoot}Generators",
 		DiagnosticSeverity.Error,
 		isEnabledByDefault: true);
 
@@ -32,7 +33,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		"SACIG002",
 		"DirectInput device snapshot unavailable",
 		"DirectInput device info generation could not enumerate devices: {0}",
-		"ScaledAxisCSharp.Generators",
+		$"{NamespaceRoot}Generators",
 		DiagnosticSeverity.Warning,
 		isEnabledByDefault: true);
 
@@ -40,7 +41,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		"SACIG003",
 		"Output device snapshot unavailable",
 		"Output device info generation could not enumerate vJoy devices: {0}",
-		"ScaledAxisCSharp.Generators",
+		$"{NamespaceRoot}Generators",
 		DiagnosticSeverity.Warning,
 		isEnabledByDefault: true);
 

@@ -1,4 +1,5 @@
 <Project>
+    <Import Condition="'$(SharedPropsLoaded)' != 'true' and exists('$(MSBuildThisFileDirectory)Shared.props')" Project="$(MSBuildThisFileDirectory)Shared.props"/>
     <ItemGroup>
         <Using Alias="PlatformDefaultInputDevice" Include="ScaledAxisCSharp.DirectInput.DirectInputJoystickDevice"/>
         <Using Alias="PlatformDefaultOutputDevice" Include="ScaledAxisCSharp.VJoy.VJoyDevice"/>

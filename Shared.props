@@ -1,0 +1,6 @@
+﻿<Project>
+    <PropertyGroup>
+        <SharedPropsLoaded>true</SharedPropsLoaded>
+        <PackageRootName>ScaledAxisCSharp</PackageRootName>
+    </PropertyGroup>
+</Project>

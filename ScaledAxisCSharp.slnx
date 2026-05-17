@@ -4,16 +4,16 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="ScaledAxisCSharp.Config/ScaledAxisCSharp.Config.csproj" />
-  <Project Path="ScaledAxisCSharp.Console/ScaledAxisCSharp.Console.csproj" />
-  <Project Path="ScaledAxisCSharp.DirectInput/ScaledAxisCSharp.DirectInput.csproj" />
-  <Project Path="ScaledAxisCSharp.Generators/ScaledAxisCSharp.Generators.csproj" />
-  <Project Path="ScaledAxisCSharp.InputAbstractions/ScaledAxisCSharp.InputAbstractions.csproj" />
-  <Project Path="ScaledAxisCSharp.ItbMinimal/ScaledAxisCSharp.ItbMinimal.csproj">
+  <Project Path="Config/Config.csproj" />
+  <Project Path="Console/Console.csproj" />
+  <Project Path="DirectInput/DirectInput.csproj" />
+  <Project Path="Generators/Generators.csproj" />
+  <Project Path="InputAbstractions/InputAbstractions.csproj" />
+  <Project Path="ItbMinimal/ItbMinimal.csproj">
     <Build Solution="Release|Any CPU" Project="false" />
   </Project>
-  <Project Path="ScaledAxisCSharp.OutputAbstractions/ScaledAxisCSharp.OutputAbstractions.csproj" />
-  <Project Path="ScaledAxisCSharp.Testing/ScaledAxisCSharp.Testing.csproj" />
-  <Project Path="ScaledAxisCSharp.Tests/ScaledAxisCSharp.Tests.csproj" />
-  <Project Path="ScaledAxisCSharp.VJoy/ScaledAxisCSharp.VJoy.csproj" />
+  <Project Path="OutputAbstractions/OutputAbstractions.csproj" />
+  <Project Path="Testing/Testing.csproj" />
+  <Project Path="Tests/Tests.csproj" />
+  <Project Path="VJoy/VJoy.csproj" />
 </Solution>

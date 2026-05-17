@@ -14,9 +14,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\ScaledAxisCSharp.Config\ScaledAxisCSharp.Config.csproj" />
-        <ProjectReference Include="..\ScaledAxisCSharp.OutputAbstractions\ScaledAxisCSharp.OutputAbstractions.csproj" />
-        <ProjectReference Include="..\ScaledAxisCSharp.Testing\ScaledAxisCSharp.Testing.csproj" />
+        <ProjectReference Include="..\Config\Config.csproj" />
+        <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj" />
+        <ProjectReference Include="..\Testing\Testing.csproj" />
     </ItemGroup>
 
 </Project>

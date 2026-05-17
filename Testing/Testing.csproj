@@ -7,8 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj" />
-        <ProjectReference Include="..\ScaledAxisCSharp.OutputAbstractions\ScaledAxisCSharp.OutputAbstractions.csproj" />
+        <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />
+        <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj" />
     </ItemGroup>
 
 </Project>

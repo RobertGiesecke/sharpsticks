@@ -8,6 +8,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\ScaledAxisCSharp.InputAbstractions\ScaledAxisCSharp.InputAbstractions.csproj" />
+      <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />
     </ItemGroup>
 </Project>
