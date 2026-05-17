@@ -158,6 +158,88 @@ public static class BindingExtensions
 	public static ButtonRoute RouteTo(this ButtonBinding binding, OutputButtonBinding outputBinding) =>
 		new(binding, outputBinding);
 
+	public readonly record struct AxisZoneOptions()
+	{
+		public bool IncludeMax { get; init; } = true;
+		public AxisZoneTriggerMode Mode { get; init; } = AxisZoneTriggerMode.Hold;
+		public TimeSpan PulseDuration { get; init; } = TimeSpan.FromMilliseconds(50);
+	}
+
+	public static AxisToButtonRoute RouteWhenInRange(
+		this AxisBinding axis,
+		double min,
+		double max,
+		OutputButtonBinding output,
+		AxisZoneOptions? options = null)
+	{
+		var o = options ?? new();
+		return new()
+		{
+			Source = axis,
+			OutputBinding = output,
+			Min = min,
+			Max = max,
+			IncludeMax = o.IncludeMax,
+			Mode = o.Mode,
+			PulseDuration = o.PulseDuration,
+		};
+	}
+
+	public readonly record struct AxisZone(double Min, double Max, OutputButtonBinding Output);
+
+	public static IEnumerable<AxisToButtonRoute> RouteZones(
+		this AxisBinding axis,
+		IEnumerable<AxisZone> zones,
+		AxisZoneOptions? options = null)
+	{
+		var o = options ?? new();
+		foreach (var zone in zones)
+		{
+			yield return new()
+			{
+				Source = axis,
+				OutputBinding = zone.Output,
+				Min = zone.Min,
+				Max = zone.Max,
+				IncludeMax = o.IncludeMax,
+				Mode = o.Mode,
+				PulseDuration = o.PulseDuration,
+			};
+		}
+	}
+
+	public static ImmutableArray<AxisToButtonRoute> SplitIntoButtons(
+		this AxisBinding axis,
+		ImmutableArray<OutputButtonBinding> outputs,
+		AxisZoneOptions? options = null)
+	{
+		if (outputs.IsDefaultOrEmpty)
+		{
+			throw new ArgumentException("At least one output button is required.", nameof(outputs));
+		}
+
+		var o = options ?? new();
+		var (lo, hi) = axis.Mode == AxisMode.Unsigned ? (0.0, 1.0) : (-1.0, 1.0);
+		var step = (hi - lo) / outputs.Length;
+		var builder = ImmutableArray.CreateBuilder<AxisToButtonRoute>(outputs.Length);
+		for (var i = 0; i < outputs.Length; i++)
+		{
+			var isLast = i == outputs.Length - 1;
+			builder.Add(new()
+			{
+				Source = axis,
+				OutputBinding = outputs[i],
+				Min = lo + step * i,
+				Max = isLast ? hi : lo + step * (i + 1),
+				IncludeMax = isLast,
+				Mode = o.Mode,
+				PulseDuration = o.PulseDuration,
+			});
+		}
+
+		return builder.MoveToImmutable();
+	}
+
 
 	public readonly record struct ComplexRouteOptions()
 	{

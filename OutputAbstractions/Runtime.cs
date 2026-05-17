@@ -8,6 +8,8 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	private readonly DebugLogger? _DebugLogger;
 	private readonly ImmutableArray<OutputAxisRoute> _AxisRoutes;
 	private readonly ImmutableArray<OutputButtonWithBindings> _ButtonRoutes;
+	private readonly ImmutableArray<OutputAxisToButtonRoute> _AxisToButtonRoutes;
+	private long? _AxisZoneNextDeadlineTicks;
 	private readonly FrozenDictionary<OutputButtonBinding, OutputButtonWithBindings> _ButtonRoutesByBinding;
 	private readonly ImmutableArray<JoystickDevice> _Devices;
 	private readonly ImmutableArray<OutputDevice> _OutputDevices;
@@ -79,6 +81,23 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
 	}
 
+	private sealed class OutputAxisToButtonRoute
+	{
+		public required int SourceDeviceIndex { get; init; }
+		public required JoystickDevice SourceDevice { get; init; }
+		public required AxisBinding Source { get; init; }
+		public required double Min { get; init; }
+		public required double Max { get; init; }
+		public required bool IncludeMax { get; init; }
+		public required AxisZoneTriggerMode Mode { get; init; }
+		public required long PulseDurationTicks { get; init; }
+		public required OutputButtonWithBindings Output { get; init; }
+
+		public bool IsAsserting;
+		public long PulseDeadlineTicks;
+		public bool PulseCooldown;
+	}
+
 	public Runtime(
 		string name,
 		DebugLogger? debugLogger,
@@ -86,7 +105,8 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		ImmutableArray<ButtonRoute> buttonRoutes,
 		ImmutableArray<AxisRoute> axisRoutes,
 		ImmutableArray<ButtonMacroRoute> macroRoutes,
-		ImmutableArray<OutputButtonBinding> macroOutputButtons,
+		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
+		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
 		ImmutableArray<OutputDevice> outputDevices)
 	{
@@ -109,17 +129,17 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 			.Select((device, index) => new { device.DeviceId, Index = index })
 			.ToPooledDictionary(t => t.DeviceId, t => t.Index);
 
-		// Macro-only output buttons get an OutputButtonWithBindings entry too
-		// so ApplyButtons can OR the macro engine's held set in for them.
+		// Macro / axis-zone output buttons get an OutputButtonWithBindings entry
+		// too so ApplyButtons can OR their held sets in for them.
 		using var allOutputButtons = new PooledSet<OutputButtonBinding>();
 		foreach (var route in buttonRoutes)
 		{
 			allOutputButtons.Add(route.OutputBinding);
 		}
 
-		foreach (var macroBinding in macroOutputButtons)
+		foreach (var binding in auxiliaryOutputButtons)
 		{
-			allOutputButtons.Add(macroBinding);
+			allOutputButtons.Add(binding);
 		}
 
 		using var bindingsByOutput = buttonRoutes
@@ -168,6 +188,26 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		];
 		_OutputDevices = outputDevices;
 		_ButtonRoutesByBinding = _ButtonRoutes.ToFrozenDictionary(r => r.TargetBinding);
+		_AxisToButtonRoutes =
+		[
+			..axisToButtonRoutes.Select(route =>
+			{
+				var durationSeconds = route.PulseDuration.TotalSeconds;
+				var durationTicks = (long)(durationSeconds * timeSource.Frequency);
+				return new OutputAxisToButtonRoute
+				{
+					SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
+					SourceDevice = DevicesById[route.Source.DeviceId],
+					Source = route.Source,
+					Min = route.Min,
+					Max = route.Max,
+					IncludeMax = route.IncludeMax,
+					Mode = route.Mode,
+					PulseDurationTicks = durationTicks,
+					Output = _ButtonRoutesByBinding[route.OutputBinding],
+				};
+			})
+		];
 		_CurrentStates = new JoystickState?[DevicesById.Count];
 		_LastReportedReadFailure = new();
 		_Macros = macroRoutes.IsEmpty
@@ -225,12 +265,24 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 	private int ComputeWaitTimeoutMs()
 	{
-		if (_Macros?.NextDeadlineTicks is not { } deadline)
+		long? deadline = null;
+		if (_Macros?.NextDeadlineTicks is { } macroDeadline)
+		{
+			deadline = macroDeadline;
+		}
+
+		if (_AxisZoneNextDeadlineTicks is { } zoneDeadline &&
+		    (deadline is null || zoneDeadline < deadline))
+		{
+			deadline = zoneDeadline;
+		}
+
+		if (deadline is null)
 		{
 			return Timeout.Infinite;
 		}
 
-		var remaining = deadline - _Time.GetTimestamp();
+		var remaining = deadline.Value - _Time.GetTimestamp();
 		if (remaining <= 0)
 		{
 			return 0;
@@ -267,6 +319,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		debugLines?.Clear();
 
 		_Macros?.Step(currentStates);
+		StepAxisZones(currentStates);
 		ApplyButtons(currentStates, debugLines);
 		ApplyAxes(currentStates, debugLines);
 
@@ -274,6 +327,79 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 		{
 			debugLogger.WriteBlock(debugLines);
 		}
+	}
+
+	private void StepAxisZones(JoystickState?[] states)
+	{
+		if (_AxisToButtonRoutes.IsEmpty)
+		{
+			_AxisZoneNextDeadlineTicks = null;
+			return;
+		}
+
+		var now = _Time.GetTimestamp();
+		long? earliestDeadline = null;
+
+		foreach (var route in _AxisToButtonRoutes)
+		{
+			var inRange = false;
+			if (states[route.SourceDeviceIndex] is { } state)
+			{
+				var value = route.SourceDevice.ReadNormalizedAxisValue(state, route.Source);
+				inRange = value >= route.Min &&
+				          (route.IncludeMax ? value <= route.Max : value < route.Max);
+			}
+
+			if (route.Mode == AxisZoneTriggerMode.Hold)
+			{
+				if (inRange && !route.IsAsserting)
+				{
+					route.Output.IncrementPressers();
+					route.IsAsserting = true;
+				}
+				else if (!inRange && route.IsAsserting)
+				{
+					route.Output.DecrementPressers();
+					route.IsAsserting = false;
+				}
+
+				continue;
+			}
+
+			// Pulse mode.
+			if (route.IsAsserting)
+			{
+				if (now >= route.PulseDeadlineTicks)
+				{
+					route.Output.DecrementPressers();
+					route.IsAsserting = false;
+					route.PulseCooldown = inRange;
+				}
+				else if (earliestDeadline is null || route.PulseDeadlineTicks < earliestDeadline)
+				{
+					earliestDeadline = route.PulseDeadlineTicks;
+				}
+			}
+			else if (route.PulseCooldown)
+			{
+				if (!inRange)
+				{
+					route.PulseCooldown = false;
+				}
+			}
+			else if (inRange)
+			{
+				route.Output.IncrementPressers();
+				route.IsAsserting = true;
+				route.PulseDeadlineTicks = now + route.PulseDurationTicks;
+				if (earliestDeadline is null || route.PulseDeadlineTicks < earliestDeadline)
+				{
+					earliestDeadline = route.PulseDeadlineTicks;
+				}
+			}
+		}
+
+		_AxisZoneNextDeadlineTicks = earliestDeadline;
 	}
 
 	private void ApplyButtons(JoystickState?[] states, StringBuilder? debugLines)

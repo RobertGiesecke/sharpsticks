@@ -26,9 +26,10 @@ public static class RuntimeBuilder
 			using var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToPooledList();
 			using var axisRoutes = options.Routes.OfType<AxisRoute>().ToPooledList();
 			using var macroRoutes = options.Routes.OfType<ButtonMacroRoute>().ToPooledList();
+			using var axisToButtonRoutes = options.Routes.OfType<AxisToButtonRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
-			using var macroOutputs = new PooledSet<OutputButtonBinding>();
+			using var auxiliaryOutputButtons = new PooledSet<OutputButtonBinding>();
 
 			foreach (var mapping in buttonRoutes)
 			{
@@ -84,16 +85,44 @@ public static class RuntimeBuilder
 
 				foreach (var action in route.OnPress)
 				{
-					action.FillOutputs(macroOutputs);
+					action.FillOutputs(auxiliaryOutputButtons);
 				}
 
 				foreach (var action in route.OnRelease)
 				{
-					action.FillOutputs(macroOutputs);
+					action.FillOutputs(auxiliaryOutputButtons);
 				}
 			}
 
-			foreach (var output in macroOutputs)
+			foreach (var route in axisToButtonRoutes)
+			{
+				if (route.OutputBinding.OutputDeviceId < 1)
+				{
+					throw new InvalidOperationException("Output device ids are 1-based.");
+				}
+
+				if (route.OutputBinding.ButtonNumber < 1)
+				{
+					throw new InvalidOperationException("Target buttons are 1-based.");
+				}
+
+				if (route.Max < route.Min)
+				{
+					throw new InvalidOperationException(
+						$"AxisToButtonRoute: Max ({route.Max}) must be >= Min ({route.Min}).");
+				}
+
+				if (route.Mode == AxisZoneTriggerMode.Pulse && route.PulseDuration <= TimeSpan.Zero)
+				{
+					throw new InvalidOperationException(
+						"AxisToButtonRoute.PulseDuration must be positive when Mode is Pulse.");
+				}
+
+				referencedDeviceIds.Add(route.Source.DeviceId);
+				auxiliaryOutputButtons.Add(route.OutputBinding);
+			}
+
+			foreach (var output in auxiliaryOutputButtons)
 			{
 				if (output.OutputDeviceId < 1)
 				{
@@ -139,7 +168,7 @@ public static class RuntimeBuilder
 						// ReSharper disable once AccessToDisposedClosure
 						axisRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray(),
 						// ReSharper disable once AccessToDisposedClosure
-						macroOutputs.Where(b => b.OutputDeviceId == deviceId).Select(b => b.ButtonNumber).ToArray()))
+						auxiliaryOutputButtons.Where(b => b.OutputDeviceId == deviceId).Select(b => b.ButtonNumber).ToArray()))
 					.ToImmutableArray();
 				try
 				{
@@ -150,7 +179,8 @@ public static class RuntimeBuilder
 						[..buttonRoutes],
 						[..axisRoutes],
 						[..macroRoutes],
-						[..macroOutputs],
+						[..axisToButtonRoutes],
+						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices);
 				}
