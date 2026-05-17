@@ -1,5 +1,5 @@
 using System;
-using ScaledAxisCSharp.InputAbstractions;
+using SharpSticks.InputAbstractions;
 
 [AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = false)]
 internal sealed class GenerateDeviceInfosAttribute : Attribute

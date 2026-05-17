@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.VJoy;
+﻿namespace SharpSticks.VJoy;
 
 public readonly record struct AxisLimits(int Min, int Max)
 {

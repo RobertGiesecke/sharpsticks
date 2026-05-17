@@ -1,7 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
-namespace ScaledAxisCSharp.Console;
+namespace SharpSticks.Console;
 
 public static class ConsoleExtensions
 {

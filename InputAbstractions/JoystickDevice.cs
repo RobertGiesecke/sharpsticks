@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.InputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 public abstract class JoystickDevice : IDisposable, IJoystickDevice
 {

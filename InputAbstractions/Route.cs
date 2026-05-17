@@ -1,3 +1,3 @@
-﻿namespace ScaledAxisCSharp.InputAbstractions;
+﻿namespace SharpSticks.InputAbstractions;
 
 public interface IRoute;

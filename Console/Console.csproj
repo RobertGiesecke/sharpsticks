@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ScaledAxisCSharpExportAnalyzerProject Include="Generators\Generators.csproj"/>
+        <SharpSticksExportAnalyzerProject Include="Generators\Generators.csproj"/>
     </ItemGroup>
 
     <Choose>

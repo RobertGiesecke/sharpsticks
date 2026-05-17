@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace ScaledAxisCSharp.VJoy;
+namespace SharpSticks.VJoy;
 
 public static class VJoyDevices
 {

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace ScaledAxisCSharp.OutputAbstractions;
+namespace SharpSticks.OutputAbstractions;
 
 public sealed class Runtime : IOutputRuntimeContext, IDisposable
 {

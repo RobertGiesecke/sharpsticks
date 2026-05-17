@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace ScaledAxisCSharp.InputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 [JsonConverter(typeof(JsonStringEnumConverter<Axis>))]
 public enum Axis

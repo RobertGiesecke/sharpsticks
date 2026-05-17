@@ -1,6 +1,6 @@
 using Collections.Pooled;
 
-namespace ScaledAxisCSharp.Testing;
+namespace SharpSticks.Testing;
 
 /// <summary>
 /// In-memory <see cref="JoystickDevice"/> for deterministic tests. Axis values

@@ -1,9 +1,9 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using ScaledAxisCSharp.InputAbstractions;
+using SharpSticks.InputAbstractions;
 
-namespace ScaledAxisCSharp.Generators;
+namespace SharpSticks.Generators;
 
 using DirectInput;
 

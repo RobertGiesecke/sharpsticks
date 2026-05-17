@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.DirectInput;
+﻿namespace SharpSticks.DirectInput;
 
 [StructLayout(LayoutKind.Sequential)]
 internal struct DirectInputDataFormat

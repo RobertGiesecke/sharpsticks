@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.InputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 public readonly record struct AxisDebugSample(
 	int RawValue,

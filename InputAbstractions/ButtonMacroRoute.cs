@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.InputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 /// <summary>
 /// Source-button-driven macro route. Edge-triggers <see cref="OnPress"/> when

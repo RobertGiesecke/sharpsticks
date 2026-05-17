@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Config;
+namespace SharpSticks.Config;
 
 public static class AxisParser
 {

@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Tests;
+namespace SharpSticks.Tests;
 
 /// <summary>
 /// Pure-function coverage of <see cref="AxisCurve"/>. Steepness is tested in

@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 
-namespace ScaledAxisCSharp.DirectInput;
+namespace SharpSticks.DirectInput;
 
 public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 {

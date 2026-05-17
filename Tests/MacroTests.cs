@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Tests;
+namespace SharpSticks.Tests;
 
 /// <summary>
 /// v1 macro coverage: edge-triggered OnPress / OnRelease running through the

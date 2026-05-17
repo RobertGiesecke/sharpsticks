@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Testing;
+namespace SharpSticks.Testing;
 
 /// <summary>
 /// Deterministic <see cref="ITimeSource"/> for tests. Defaults to a tick

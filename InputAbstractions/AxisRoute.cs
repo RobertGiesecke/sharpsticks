@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.InputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 public sealed record AxisRoute : BoundRoute
 {

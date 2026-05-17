@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.InputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 /// <summary>
 /// Per-macro-instance context passed to <see cref="IMacroAction.Step"/>. The

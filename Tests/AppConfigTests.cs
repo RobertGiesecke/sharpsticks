@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Tests;
+namespace SharpSticks.Tests;
 
 /// <summary>
 /// Covers the <see cref="AppConfig"/> surface: JSON round-trips for the

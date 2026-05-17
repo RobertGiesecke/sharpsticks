@@ -1,4 +1,4 @@
-﻿#:package ScaledAxisCSharp.Console@0.1.0-debug09
+﻿#:package SharpSticks.Console@0.1.0-debug09
 //#:project Console/Console.csproj
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]

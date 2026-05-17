@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Tests;
+namespace SharpSticks.Tests;
 
 /// <summary>
 /// Validation of the testing-infrastructure fakes themselves — the things

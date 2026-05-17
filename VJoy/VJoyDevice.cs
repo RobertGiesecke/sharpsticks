@@ -1,6 +1,6 @@
 using Collections.Pooled;
 
-namespace ScaledAxisCSharp.VJoy;
+namespace SharpSticks.VJoy;
 
 public sealed class VJoyDevice : OutputDevice
 {

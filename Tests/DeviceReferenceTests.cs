@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Tests;
+namespace SharpSticks.Tests;
 
 /// <summary>
 /// Covers <see cref="AppConfig.Devices"/>: capture (walk bindings + modifiers

@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace ScaledAxisCSharp.DirectInput;
+namespace SharpSticks.DirectInput;
 
 internal static unsafe partial class DirectInputNative
 {

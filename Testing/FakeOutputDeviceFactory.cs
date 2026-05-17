@@ -1,6 +1,6 @@
 using Collections.Pooled;
 
-namespace ScaledAxisCSharp.Testing;
+namespace SharpSticks.Testing;
 
 /// <summary>
 /// <see cref="IOutputDeviceFactory"/> that hands out pre-registered

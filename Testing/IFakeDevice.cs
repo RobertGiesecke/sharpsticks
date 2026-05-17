@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.Testing;
+﻿namespace SharpSticks.Testing;
 
 public interface IFakeDevice
 {

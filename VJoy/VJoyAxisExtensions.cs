@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace ScaledAxisCSharp.VJoy;
+namespace SharpSticks.VJoy;
 
 public static class VJoyAxisExtensions
 {

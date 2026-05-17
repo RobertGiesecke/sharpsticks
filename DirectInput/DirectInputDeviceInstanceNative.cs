@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace ScaledAxisCSharp.DirectInput;
+namespace SharpSticks.DirectInput;
 
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct DirectInputDeviceInstanceNative

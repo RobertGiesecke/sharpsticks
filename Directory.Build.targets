@@ -25,7 +25,7 @@
                 <Alias></Alias>
                 <HasAliasAttribute>false</HasAliasAttribute>
             </_ExportedUsings>
-            <_ExportedAnalyzerProjects Include="@(ScaledAxisCSharpExportAnalyzerProject)"/>
+            <_ExportedAnalyzerProjects Include="@(SharpSticksExportAnalyzerProject)"/>
         </ItemGroup>
         <ReadLinesFromFile File="%(_ProjRefProps.Identity)"
                            Condition="'@(_ProjRefProps)' != ''">
@@ -50,7 +50,7 @@
             </_ExportedUsings>
         </ItemGroup>
         <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
-                 Query="/Project/ItemGroup/ScaledAxisCSharpTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
+                 Query="/Project/ItemGroup/SharpSticksTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
                  Condition="'@(_ProjRefProps)' != ''">
             <Output TaskParameter="Result" ItemName="_ExportedAnalyzerProjects"/>
         </XmlPeek>
@@ -67,7 +67,7 @@
                              Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' == 'true' or '%(_DistinctExportedUsings.Alias)' != ''"/>
             <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; /&gt;"
                              Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' != 'true' and '%(_DistinctExportedUsings.Alias)' == ''"/>
-            <_PropsFileLines Include="    &lt;ScaledAxisCSharpTransitiveAnalyzerProject Include=&quot;%(_DistinctExportedAnalyzerProjects.Identity)&quot; /&gt;"
+            <_PropsFileLines Include="    &lt;SharpSticksTransitiveAnalyzerProject Include=&quot;%(_DistinctExportedAnalyzerProjects.Identity)&quot; /&gt;"
                              Condition="'%(_DistinctExportedAnalyzerProjects.Identity)' != ''"/>
             <_PropsFileLines Include="  &lt;/ItemGroup&gt;"/>
             <_PropsFileLines Include="&lt;/Project&gt;"/>
@@ -134,7 +134,7 @@
             BeforeTargets="CoreCompile"
             DependsOnTargets="ImportProjectRefBuildTransitiveUsings">
         <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
-                 Query="/Project/ItemGroup/ScaledAxisCSharpTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
+                 Query="/Project/ItemGroup/SharpSticksTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
                  Condition="'@(_ProjRefProps)' != ''">
             <Output TaskParameter="Result" ItemName="_ImportedTransitiveAnalyzerProjects"/>
         </XmlPeek>

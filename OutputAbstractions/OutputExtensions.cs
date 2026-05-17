@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace ScaledAxisCSharp.OutputAbstractions;
+namespace SharpSticks.OutputAbstractions;
 
 public static class OutputExtensions
 {

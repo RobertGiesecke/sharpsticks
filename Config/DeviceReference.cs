@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Config;
+namespace SharpSticks.Config;
 
 /// <summary>
 /// A saved reference to a physical device, used to remap the platform-assigned

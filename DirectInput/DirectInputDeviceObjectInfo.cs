@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.DirectInput;
+﻿namespace SharpSticks.DirectInput;
 
 internal readonly record struct DirectInputDeviceObjectInfo(Guid TypeGuid, uint Offset, uint Type)
 {

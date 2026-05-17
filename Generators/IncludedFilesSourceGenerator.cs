@@ -6,14 +6,14 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using ScaledAxisCSharp.InputAbstractions;
+using SharpSticks.InputAbstractions;
 
-namespace ScaledAxisCSharp.Generators;
+namespace SharpSticks.Generators;
 
 [Generator]
 public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 {
-	private const string NamespaceRoot = $"{nameof(ScaledAxisCSharp)}.";
+	private const string NamespaceRoot = $"{nameof(SharpSticks)}.";
 	private const string ResourcePrefix = "included-files/";
 	private const string GenerateDeviceInfosAttributeMetadataName = nameof(GenerateDeviceInfosAttribute);
 	private const string RenameDeviceAttributeMetadataName = nameof(RenameDeviceAttribute);

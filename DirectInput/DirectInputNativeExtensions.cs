@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.DirectInput;
+﻿namespace SharpSticks.DirectInput;
 
 internal static class DirectInputNativeExtensions
 {

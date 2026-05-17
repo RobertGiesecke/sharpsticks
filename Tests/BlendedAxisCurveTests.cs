@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Tests;
+namespace SharpSticks.Tests;
 
 /// <summary>
 /// Captures the desired behavior of <see cref="BlendedAxisCurve.Stateful"/>:

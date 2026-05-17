@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.OutputAbstractions;
+﻿namespace SharpSticks.OutputAbstractions;
 
 public interface IOutputDevice
 {

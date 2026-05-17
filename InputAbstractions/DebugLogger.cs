@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace ScaledAxisCSharp.InputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 public sealed class DebugLogger
 {

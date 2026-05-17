@@ -1,6 +1,6 @@
-﻿using ScaledAxisCSharp.InputAbstractions;
+﻿using SharpSticks.InputAbstractions;
 
-namespace ScaledAxisCSharp.DirectInput;
+namespace SharpSticks.DirectInput;
 
 public static class DirectInputAxisExtensions
 {

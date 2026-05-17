@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.OutputAbstractions;
+namespace SharpSticks.OutputAbstractions;
 
 /// <summary>
 /// Drives every <see cref="ButtonMacroRoute"/> across frames: edge-detects the

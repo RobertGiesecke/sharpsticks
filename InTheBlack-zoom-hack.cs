@@ -1,7 +1,5 @@
-#:project Console/Console.csproj
-//#:package ScaledAxisCSharp.Console@0.1.0-debug09
-
-using static ScaledAxisCSharp.InputAbstractions.Macros;
+// #:project Console/Console.csproj
+#:package SharpSticks.Console@0.1.0-debug11
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
@@ -79,9 +77,6 @@ BuildAndRunAsConsole(new()
 		{
 			IncreaseAxis = VJoy1.Axes.ZoomIn,
 			DecreaseAxis = VJoy1.Axes.ZoomOut,
-			IncreaseRestPosition = 0.5,
-			DecreaseRestPosition = 0.5,
-			InitialValue = 0.0,
 			Gain = 8.0,
 			MinOutput = 0.001,
 			ErrorTolerance = 0.00003,

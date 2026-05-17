@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Testing;
+namespace SharpSticks.Testing;
 
 /// <summary>
 /// Fluent builder for a <see cref="FakeOutputDevice"/>. Returned by

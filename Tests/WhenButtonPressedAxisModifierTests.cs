@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Tests;
+namespace SharpSticks.Tests;
 
 public sealed class WhenButtonPressedAxisModifierTests : IDisposable
 {

@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
-namespace ScaledAxisCSharp.Config;
+namespace SharpSticks.Config;
 
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(AppConfig))]
@@ -18,7 +18,7 @@ public sealed partial class AppJsonContext : JsonSerializerContext
 	/// Use this when serializing/deserializing configs that may contain modifiers —
 	/// the polymorphism config can't live as <c>[JsonDerivedType]</c> attributes on
 	/// the interface because the derived types live in this assembly and the
-	/// interface lives in <c>ScaledAxisCSharp.InputAbstractions</c>.
+	/// interface lives in <c>SharpSticks.InputAbstractions</c>.
 	/// </summary>
 	private static JsonSerializerOptions? _Polymorphic;
 

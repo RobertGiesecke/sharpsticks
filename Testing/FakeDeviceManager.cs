@@ -1,4 +1,4 @@
-namespace ScaledAxisCSharp.Testing;
+namespace SharpSticks.Testing;
 
 /// <summary>
 /// Disposable owner of every fake input / output device a test creates.

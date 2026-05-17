@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Collections.Pooled;
 
-namespace ScaledAxisCSharp.VJoy;
+namespace SharpSticks.VJoy;
 
 public static class VJoyNative
 {

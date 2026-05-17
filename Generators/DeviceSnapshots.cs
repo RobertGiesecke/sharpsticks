@@ -1,9 +1,9 @@
 using System.Collections.Immutable;
-using ScaledAxisCSharp.DirectInput;
-using ScaledAxisCSharp.InputAbstractions;
-using ScaledAxisCSharp.VJoy;
+using SharpSticks.DirectInput;
+using SharpSticks.InputAbstractions;
+using SharpSticks.VJoy;
 
-namespace ScaledAxisCSharp.Generators;
+namespace SharpSticks.Generators;
 
 internal static class DeviceSnapshots
 {

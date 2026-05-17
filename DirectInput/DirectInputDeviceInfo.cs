@@ -1,4 +1,4 @@
-﻿namespace ScaledAxisCSharp.DirectInput;
+﻿namespace SharpSticks.DirectInput;
 
 public readonly record struct DirectInputDeviceInfo(int DeviceId, Guid InstanceGuid, string ProductName, string InstanceName)
 {

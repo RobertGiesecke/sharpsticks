@@ -1,6 +1,6 @@
 using Collections.Pooled;
 
-namespace ScaledAxisCSharp.Testing;
+namespace SharpSticks.Testing;
 
 /// <summary>
 /// In-memory <see cref="OutputDevice"/> that captures every axis/button write.
