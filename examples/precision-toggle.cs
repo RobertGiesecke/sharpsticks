@@ -1,4 +1,4 @@
-﻿#:package SharpSticks.Console@0.1.0-debug01
+﻿#:package SharpSticks.Console@0.1.0-debug02
 //#:project Console/Console.csproj
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]

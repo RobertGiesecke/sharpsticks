@@ -26,7 +26,7 @@ or download it from <https://code.visualstudio.com/>.
 Create a new `.cs` file (e.g. `your-game.cs`) and open it in VS Code. Put this as the first line — it pulls down the package and everything needed for the editor to give you full IntelliSense over the typed device surface:
 
 ```csharp
-#:package SharpSticks.Console@0.1.0-debug01
+#:package SharpSticks.Console@0.1.0-debug02
 ```
 
 Run it with `dotnet run your-game.cs`.
