@@ -1,7 +1,13 @@
+// #:project Console/Console.csproj
+#:package SharpSticks.Console@0.1.0-pre03
+#:property DebugType=none
+#:property DebugSymbols=false
+#:property StripSymbols=true
+
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new() { Max = 1.0d },
-	PrecisionCurve = new() { Max = 0.184d },
+	PrecisionCurve = new() { Max = 0.2d },
 	ModifierAxis = LeftStick.Axes.BrakeLever,
 	Stateful = true,
 };
