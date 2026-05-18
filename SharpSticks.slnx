@@ -4,16 +4,16 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="Config/Config.csproj" />
-  <Project Path="Console/Console.csproj" />
-  <Project Path="DirectInput/DirectInput.csproj" />
-  <Project Path="Generators/Generators.csproj" />
-  <Project Path="InputAbstractions/InputAbstractions.csproj" />
-  <Project Path="ItbMinimal/ItbMinimal.csproj">
+  <Project Path="src/Config/Config.csproj" />
+  <Project Path="src/Console/Console.csproj" />
+  <Project Path="src/DirectInput/DirectInput.csproj" />
+  <Project Path="src/Generators/Generators.csproj" />
+  <Project Path="src/InputAbstractions/InputAbstractions.csproj" />
+  <Project Path="src/ItbMinimal/ItbMinimal.csproj">
     <Build Solution="Release|Any CPU" Project="false" />
   </Project>
-  <Project Path="OutputAbstractions/OutputAbstractions.csproj" />
-  <Project Path="Testing/Testing.csproj" />
-  <Project Path="Tests/Tests.csproj" />
-  <Project Path="VJoy/VJoy.csproj" />
+  <Project Path="src/OutputAbstractions/OutputAbstractions.csproj" />
+  <Project Path="src/Testing/Testing.csproj" />
+  <Project Path="src/Tests/Tests.csproj" />
+  <Project Path="src/VJoy/VJoy.csproj" />
 </Solution>

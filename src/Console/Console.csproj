@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <SharpSticksExportAnalyzerProject Include="Generators\Generators.csproj"/>
+        <SharpSticksExportAnalyzerProject Include="src\Generators\Generators.csproj"/>
     </ItemGroup>
 
     <Choose>
