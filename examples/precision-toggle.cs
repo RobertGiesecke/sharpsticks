@@ -1,4 +1,4 @@
-﻿#:package SharpSticks.Console@0.1.0-debug09
+﻿#:package SharpSticks.Console@0.1.0-pre05
 //#:project Console/Console.csproj
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
@@ -25,8 +25,8 @@ BuildAndRunAsConsole(new()
 	Routes =
 	[
 		RightStick.Axes.X.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyDevice1, modifier: dualCurveAxis),
-		RightStick.Axes.Y.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyDevice1),
-		RightStick.Axes.Z.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyDevice1),
+		RightStick.Axes.Y.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyDevice1, modifier: dualCurveAxis),
+		RightStick.Axes.Z.RouteToSameAxisOnOutput(OutputDeviceIds.VJoyDevice1, modifier: dualCurveAxis),
 		RightStick.Buttons.Trigger.RouteTo(VJoyDevice1.Buttons.FireWeapon1),
 		RightStick.Buttons.SecondStageTrigger.RouteTo(VJoyDevice1.Buttons.FireWeapon2),
 		RightStick.Buttons.CounterMeasureHatEast.RouteTo(VJoyDevice1.Buttons.FireWeapon2),
