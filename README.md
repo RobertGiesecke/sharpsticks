@@ -30,3 +30,6 @@ Create a new `.cs` file (e.g. `your-game.cs`) and open it in VS Code. Put this a
 ```
 
 Run it with `dotnet run your-game.cs`.
+
+Create a small standalone exe (no dependency on dotnet) with `dotnet publish your-game.cs`.
+
