@@ -1,8 +1,5 @@
 // #:project Console/Console.csproj
-#:package SharpSticks.Console@0.1.0-pre03
-#:property DebugType=none
-#:property DebugSymbols=false
-#:property StripSymbols=true
+#:package SharpSticks.Console@0.1.0-pre05
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
@@ -17,6 +14,7 @@ BuildAndRunAsConsole(new()
 	Name = "ItB minimal + scaled rotations",
 	Routes =
 	[
+		// switch to gimbals while holding cm hat east
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()
 		{
 			OnPress =
@@ -45,6 +43,7 @@ BuildAndRunAsConsole(new()
 		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: modifierBlendCurve),
 		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: modifierBlendCurve),
 		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever, scale: 2, offset: -1),
+		// simulate absolute zoom with 2 virtual relative axes
 		..LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
 		{
 			IncreaseAxis = VJoy1.Axes.ZoomIn,
