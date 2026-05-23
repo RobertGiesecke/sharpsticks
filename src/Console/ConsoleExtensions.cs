@@ -18,7 +18,7 @@ public static class ConsoleExtensions
 	{
 		public static PooledList<JoystickDevice> EnumerateConnectedDevices()
 		{
-			using var list = DirectInputJoystickDevice.EnumerateConnected();
+			using var list = PlatformDefaultInputDevice.EnumerateConnected();
 			return list.ConvertAll<JoystickDevice>(t => t);
 		}
 
@@ -43,7 +43,7 @@ public static class ConsoleExtensions
 		{
 			using var runtimeMapping = Build(buildOptions switch
 			{
-				{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = VJoyDeviceFactory.Instance },
+				{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance },
 				_ => buildOptions,
 			});
 			runtimeMapping.RunAsConsole(debugLogger);

@@ -5,8 +5,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\DirectInput\DirectInput.csproj"/>
-        <ProjectReference Include="..\VJoy\VJoy.csproj"/>
+        <ProjectReference Include="..\PlatformInput\PlatformInput.csproj"/>
+        <ProjectReference Include="..\PlatformOutput\PlatformOutput.csproj"/>
         <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj"/>
     </ItemGroup>
 
