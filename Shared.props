@@ -2,5 +2,6 @@
     <PropertyGroup>
         <SharedPropsLoaded>true</SharedPropsLoaded>
         <PackageRootName>SharpSticks</PackageRootName>
+        <IsAotCompatible>true</IsAotCompatible>
     </PropertyGroup>
 </Project>

@@ -6,6 +6,8 @@
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
         <NoAutoProps>true</NoAutoProps>
         <PublishAot>false</PublishAot>
+        <IsAotCompatible>false</IsAotCompatible>
+        <IsTrimmable>false</IsTrimmable>
         <InvariantGlobalization>false</InvariantGlobalization>
         <RootNamespace>$(PackageRootName).Generators</RootNamespace>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
