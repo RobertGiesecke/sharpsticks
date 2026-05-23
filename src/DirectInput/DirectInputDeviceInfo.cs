@@ -1,12 +1,18 @@
 ﻿namespace SharpSticks.DirectInput;
 
-public readonly record struct DirectInputDeviceInfo(int DeviceId, Guid InstanceGuid, string ProductName, string InstanceName)
+public readonly record struct DirectInputDeviceInfo(
+	int DeviceId,
+	Guid InstanceGuid,
+	Guid ProductGuid,
+	string ProductName,
+	string InstanceName)
 {
 	internal static unsafe DirectInputDeviceInfo FromNative(int deviceId, DirectInputDeviceInstanceNative* native)
 	{
 		return new(
 			deviceId,
 			native->InstanceGuid,
+			native->ProductGuid,
 			ReadNullTerminatedString(native->ProductName, 260),
 			ReadNullTerminatedString(native->InstanceName, 260));
 	}

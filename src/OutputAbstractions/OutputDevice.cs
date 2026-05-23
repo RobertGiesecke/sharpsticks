@@ -24,6 +24,15 @@ public abstract class OutputDevice : IDisposable, IOutputDevice
 	protected bool Disposed { get; private set; }
 	public uint DeviceId { get; }
 
+	/// <summary>
+	/// <c>DeviceId</c> of the input-side device this output also surfaces as, when one
+	/// exists on this platform (vJoy device → DirectInput entry on Windows; uinput
+	/// device → evdev event node on Linux). <c>null</c> when the output has no input
+	/// counterpart or the backend couldn't determine the mapping. Assigned by the
+	/// factory at <see cref="IOutputDeviceFactory.Open"/> time.
+	/// </summary>
+	public int? InputDeviceId { get; internal set; }
+
 	public void Freeze()
 	{
 		Frozen = true;

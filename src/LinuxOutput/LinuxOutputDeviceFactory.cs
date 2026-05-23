@@ -1,4 +1,5 @@
 using System.Text;
+using Collections.Pooled;
 
 namespace SharpSticks.LinuxOutput;
 
@@ -18,18 +19,61 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory, ISupportsOu
 		IReadOnlyCollection<int> macroButtonNumbers) =>
 		LinuxOutputSetup.Run(buttonRoutes, axisRoutes, macroButtonNumbers);
 
-	OutputDevice IOutputDeviceFactory.Open(
-		uint deviceId,
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
-		IReadOnlyCollection<AxisRoute> axisRoutes,
-		IReadOnlyCollection<int> macroButtonNumbers) =>
-		Open(deviceId, buttonRoutes, axisRoutes, macroButtonNumbers);
+	PooledList<OutputDevice> IOutputDeviceFactory.Open(
+		IReadOnlyCollection<OutputDeviceRequest> requests,
+		IReadOnlyList<JoystickDevice> availableInputs)
+	{
+		var devices = new PooledList<OutputDevice>(requests.Count);
+		try
+		{
+			foreach (var request in requests)
+			{
+				devices.Add(OpenOne(request));
+			}
 
-	public LinuxOutputDevice Open(
-		uint deviceId,
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
-		IReadOnlyCollection<AxisRoute> axisRoutes,
-		IReadOnlyCollection<int>? macroButtonNumbers = null)
+			return devices;
+		}
+		catch
+		{
+			foreach (var device in devices)
+			{
+				device.Dispose();
+			}
+
+			devices.Dispose();
+			throw;
+		}
+	}
+
+	/// Public convenience overload returning concrete <see cref="LinuxOutputDevice"/>
+	/// instances. Used by tests / examples that work with the typed factory directly.
+	public PooledList<LinuxOutputDevice> Open(
+		IReadOnlyCollection<OutputDeviceRequest> requests,
+		IReadOnlyList<JoystickDevice>? availableInputs = null)
+	{
+		var devices = new PooledList<LinuxOutputDevice>(requests.Count);
+		try
+		{
+			foreach (var request in requests)
+			{
+				devices.Add(OpenOne(request));
+			}
+
+			return devices;
+		}
+		catch
+		{
+			foreach (var device in devices)
+			{
+				device.Dispose();
+			}
+
+			devices.Dispose();
+			throw;
+		}
+	}
+
+	private static LinuxOutputDevice OpenOne(OutputDeviceRequest request)
 	{
 		var fd = LinuxLibc.Open(
 			LinuxUinput.DevicePath,
@@ -43,15 +87,19 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory, ISupportsOu
 
 		try
 		{
-			DeclareCapabilities(fd, axisRoutes, buttonRoutes, macroButtonNumbers);
-			SetupDevice(fd, deviceId);
+			DeclareCapabilities(fd, request.AxisRoutes, request.ButtonRoutes, request.MacroButtonNumbers);
+			SetupDevice(fd, request.DeviceId);
 			CreateDevice(fd);
 
+			// InputDeviceId stays null on purpose. The matching evdev device only appears
+			// AFTER UI_DEV_CREATE here, but the availableInputs snapshot was taken before
+			// that — so it can't contain our new counterpart. A consumer that wants to
+			// find the new evdev node should re-enumerate inputs after Open returns.
 			return new LinuxOutputDevice(
-				deviceId,
+				request.DeviceId,
 				fd,
-				CollectAxisCodes(axisRoutes),
-				CollectButtonCodes(buttonRoutes, macroButtonNumbers));
+				CollectAxisCodes(request.AxisRoutes),
+				CollectButtonCodes(request.ButtonRoutes, request.MacroButtonNumbers));
 		}
 		catch
 		{

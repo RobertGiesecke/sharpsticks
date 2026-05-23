@@ -15,6 +15,15 @@ public abstract class JoystickDevice : IDisposable, IJoystickDevice
 	/// </summary>
 	public required Guid InstanceGuid { get; init; }
 
+	/// <summary>
+	/// Per-hardware-kind identity. DirectInput's <c>guidProduct</c> (PIDVID-encoded
+	/// VID/PID) on Windows; the same encoding synthesised from
+	/// <c>input_id.vendor</c>/<c>input_id.product</c> on Linux via
+	/// <see cref="ProductGuidEncoder"/>. Two physically identical devices share this
+	/// Guid; use <see cref="InstanceGuid"/> for per-instance identity.
+	/// </summary>
+	public required Guid ProductGuid { get; init; }
+
 	public required JoystickCapabilities Capabilities { get; init; }
 	public required ImmutableArray<Axis> PhysicalAxes { get; init; }
 	public required WaitHandle DataAvailable { get; init; }

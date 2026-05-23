@@ -30,6 +30,7 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		Name = info.ProductName;
 		InstanceName = info.InstanceName;
 		InstanceGuid = info.InstanceGuid;
+		ProductGuid = info.ProductGuid;
 		PhysicalAxes = info.Axes;
 		Capabilities = new(
 			(uint)info.Axes.Length,

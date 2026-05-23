@@ -38,7 +38,9 @@ var buttonRoutes = new[]
 OutputDevice device;
 try
 {
-	device = LinuxOutputDeviceFactory.Instance.Open(deviceId, buttonRoutes, axisRoutes);
+	using var opened = LinuxOutputDeviceFactory.Instance.Open(
+		new[] { new OutputDeviceRequest(deviceId, buttonRoutes, axisRoutes, []) });
+	device = opened[0];
 }
 catch (InvalidOperationException ex)
 {
