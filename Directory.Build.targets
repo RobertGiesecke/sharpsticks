@@ -5,15 +5,35 @@
                           IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"/>
     </ItemGroup>
 
+    <!--
+        Hook GenerateBuildTransitiveProps into the GetTargetPath chain. When any consumer
+        resolves a ProjectReference to us (via ResolveProjectReferences -> GetTargetPath),
+        MSBuild calls GetTargetPath at most once per project per build (the build engine
+        caches the result and returns it to subsequent consumers). That means our
+        GenerateBuildTransitiveProps runs exactly once per build session even with many
+        consumers and parallel project compilation — no concurrent writers, no race.
+    -->
+    <PropertyGroup Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GenerateBuildTransitiveProps</GetTargetPathDependsOn>
+        <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
+        <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
+        <_BuildTransitivePartialFile>$(_BuildTransitiveDir)$(MSBuildProjectName).partial.props</_BuildTransitivePartialFile>
+        <_BuildTransitivePackFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)pack-buildTransitive\$(PackageId).props</_BuildTransitivePackFile>
+    </PropertyGroup>
+
     <Target Name="GenerateBuildTransitiveProps"
-            BeforeTargets="Build;Pack"
             Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
-        <PropertyGroup>
-            <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
-            <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
-            <_BuildTransitivePartialFile>$(_BuildTransitiveDir)$(MSBuildProjectName).partial.props</_BuildTransitivePartialFile>
-            <_BuildTransitivePackFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)pack-buildTransitive\$(PackageId).props</_BuildTransitivePackFile>
-        </PropertyGroup>
+        <!--
+            Recursively materialise our own ProjectReferences' props by calling their
+            GetTargetPath. The same build-engine cache that dedupes our own invocation
+            also dedupes this recursive call. So a depth-first walk happens automatically,
+            with each project's props written once, in dependency order.
+        -->
+        <MSBuild Projects="@(ProjectReference)"
+                 Targets="GetTargetPath"
+                 Properties="Configuration=$(Configuration)"
+                 ContinueOnError="WarnAndContinue"
+                 Condition="'@(ProjectReference)' != ''"/>
         <ItemGroup>
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
@@ -92,13 +112,14 @@
 
 
     <Target Name="ImportProjectRefBuildTransitiveUsings"
-            BeforeTargets="GenerateGlobalUsings">
-        <MSBuild Projects="@(ProjectReference)"
-                 Targets="GenerateBuildTransitiveProps"
-                 Properties="Configuration=$(Configuration)"
-                 BuildInParallel="$(BuildInParallel)"
-                 ContinueOnError="WarnAndContinue"
-                 Condition="'@(ProjectReference)' != ''"/>
+            BeforeTargets="GenerateGlobalUsings"
+            DependsOnTargets="ResolveProjectReferences">
+        <!--
+            No explicit <MSBuild> call here — ResolveProjectReferences already called
+            GetTargetPath on each direct ref, which (via GetTargetPathDependsOn) ran their
+            GenerateBuildTransitiveProps and transitively materialised the whole graph.
+            Their props files are guaranteed written by the time we read them below.
+        -->
         <ItemGroup>
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
