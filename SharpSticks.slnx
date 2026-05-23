@@ -9,6 +9,7 @@
   <Project Path="src/DirectInput/DirectInput.csproj" />
   <Project Path="src/Generators/Generators.csproj" />
   <Project Path="src/InputAbstractions/InputAbstractions.csproj" />
+  <Project Path="src/LinuxInput/LinuxInput.csproj" />
   <Project Path="src/ItbMinimal/ItbMinimal.csproj">
     <Build Solution="Release|Any CPU" Project="false" />
   </Project>
