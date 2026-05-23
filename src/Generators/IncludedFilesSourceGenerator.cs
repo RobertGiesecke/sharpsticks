@@ -496,7 +496,11 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			builder.Append(indent).AppendLine("}");
 		}
 
-		if (HasLevel(levels, GenerateDeviceInfosLevels.TypedDevices))
+		if (!HasLevel(levels, GenerateDeviceInfosLevels.TypedDevices))
+		{
+			return;
+		}
+
 		{
 			for (var index = 0; index < directInputDevices.Length; index++)
 			{
@@ -509,9 +513,9 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				// [RenameAxis(DeviceNames.<RenamedAlias>, ...)] and the corresponding
 				// RenameButton both resolve against the alias the user actually wrote — same
 				// behaviour the output typed-class branch already has via vjoyIdentifier.
-				var axisPropertyNames = BuildAxisPropertyNames(directInputDevices[index].ProductName,
+				using var axisPropertyNames = BuildAxisPropertyNames(directInputDevices[index].ProductName,
 					directInputNames[index], axisRenames, deviceIdentifiers[index]);
-				var buttonPropertyNames = BuildButtonPropertyNames(directInputDevices[index].ProductName,
+				using var buttonPropertyNames = BuildButtonPropertyNames(directInputDevices[index].ProductName,
 					directInputNames[index], buttonRenames, deviceIdentifiers[index]);
 				AppendSeparator(builder, ref wroteMember);
 				AppendTypedDeviceClass(
@@ -531,8 +535,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				var vjoyIdentifier = GetOutputDeviceIdentifier(vjoyBaseName, deviceRenames);
 				var diIdx = directInputNames.IndexOf(vjoyBaseName);
 				var deviceName = diIdx >= 0 ? directInputDevices[diIdx].ProductName : vjoyBaseName;
-				var outputAxisNames = BuildAxisPropertyNames(deviceName, vjoyBaseName, axisRenames, vjoyIdentifier);
-				var outputButtonNames =
+				using var outputAxisNames = BuildAxisPropertyNames(deviceName, vjoyBaseName, axisRenames, vjoyIdentifier);
+				using var outputButtonNames =
 					BuildButtonPropertyNames(deviceName, vjoyBaseName, buttonRenames, vjoyIdentifier);
 				AppendSeparator(builder, ref wroteMember);
 				AppendTypedOutputDeviceClass(builder, vjoyIdentifier, vjoyBaseName, outputDevice.Axes, outputAxisNames,
@@ -588,8 +592,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		string deviceIdentifier,
 		string deviceOriginalName,
 		DirectInputDeviceSnapshot device,
-		Dictionary<Axis, string> axisPropertyNames,
-		Dictionary<int, string> buttonPropertyNames,
+		PooledDictionary<Axis, string> axisPropertyNames,
+		PooledDictionary<int, string> buttonPropertyNames,
 		string indent,
 		string memberIndent)
 	{
@@ -715,9 +719,9 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		string vjoyIdentifier,
 		string vjoyOriginalName,
 		ImmutableArray<Axis> axes,
-		Dictionary<Axis, string> axisPropertyNames,
+		PooledDictionary<Axis, string> axisPropertyNames,
 		uint buttonCount,
-		Dictionary<int, string> buttonPropertyNames,
+		PooledDictionary<int, string> buttonPropertyNames,
 		string indent,
 		string memberIndent)
 	{
@@ -864,13 +868,13 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		return baseName;
 	}
 
-	private static Dictionary<Axis, string> BuildAxisPropertyNames(
+	private static PooledDictionary<Axis, string> BuildAxisPropertyNames(
 		string deviceProductName,
 		string deviceBaseIdentifier,
 		ImmutableArray<AxisRename> axisRenames,
 		string? extraIdentifier = null)
 	{
-		var result = new Dictionary<Axis, string>();
+		var result = new PooledDictionary<Axis, string>(axisRenames.Length);
 		foreach (var rename in axisRenames)
 		{
 			if (rename.DeviceName == deviceProductName || rename.DeviceName == deviceBaseIdentifier
@@ -884,16 +888,16 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		return result;
 	}
 
-	private static string AxisPropertyName(Axis axisName, Dictionary<Axis, string> axisPropertyNames) =>
+	private static string AxisPropertyName(Axis axisName, PooledDictionary<Axis, string> axisPropertyNames) =>
 		axisPropertyNames.GetValueOrDefault(axisName, axisName.ToString());
 
-	private static Dictionary<int, string> BuildButtonPropertyNames(
+	private static PooledDictionary<int, string> BuildButtonPropertyNames(
 		string deviceProductName,
 		string deviceBaseIdentifier,
 		ImmutableArray<ButtonRename> buttonRenames,
 		string? extraIdentifier = null)
 	{
-		var result = new Dictionary<int, string>();
+		var result = new PooledDictionary<int, string>(buttonRenames.Length);
 		foreach (var rename in buttonRenames)
 		{
 			if (rename.DeviceName == deviceProductName || rename.DeviceName == deviceBaseIdentifier

@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 using SharpSticks.DirectInput;
 using SharpSticks.InputAbstractions;
+using SharpSticks.LinuxInput;
 using SharpSticks.VJoy;
 
 namespace SharpSticks.Generators;
@@ -35,6 +37,11 @@ internal static class DeviceSnapshots
 
 	private static (bool, ImmutableArray<DirectInputDeviceSnapshot>, string?) EnumerateDirectInputDevicesCore()
 	{
+		if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+		{
+			return EnumerateLinuxInputDevicesCore();
+		}
+
 		try
 		{
 			var directInput = DirectInputDeviceEnumerator.GetOrCreateContext();
@@ -55,8 +62,44 @@ internal static class DeviceSnapshots
 		}
 	}
 
+	private static (bool, ImmutableArray<DirectInputDeviceSnapshot>, string?) EnumerateLinuxInputDevicesCore()
+	{
+		try
+		{
+			var infos = LinuxInputDeviceEnumerator.EnumerateConnectedDeviceInfos();
+			var builder = ImmutableArray.CreateBuilder<DirectInputDeviceSnapshot>(infos.Length);
+			foreach (var info in infos)
+			{
+				// Reuse the existing DirectInputDeviceSnapshot record shape — same field
+				// meanings on every platform. Linux button count = number of button codes
+				// the kernel reported as supported for that device.
+				builder.Add(new(
+					info.DeviceId,
+					info.ProductName,
+					info.ProductGuid,
+					info.Axes,
+					(uint)info.ButtonCodes.Length));
+			}
+
+			return (true, builder.ToImmutable(), null);
+		}
+		catch (Exception exception) when (IsExpectedEnumerationFailure(exception))
+		{
+			return (false, ImmutableArray<DirectInputDeviceSnapshot>.Empty, GetMessage(exception));
+		}
+	}
+
 	private static (bool, ImmutableArray<VJoyDeviceSnapshot>, string?) EnumerateOutputDevicesCore()
 	{
+		// uinput-on-Linux outputs only exist at runtime once the user's program creates
+		// them — nothing exists at design time, so the generator has no output slots to
+		// enumerate. Skipping with success=true keeps OutputDeviceIds empty rather than
+		// emitting a diagnostic about "vJoy not enabled".
+		if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+		{
+			return (true, ImmutableArray<VJoyDeviceSnapshot>.Empty, null);
+		}
+
 		try
 		{
 			VJoyNative.EnsureLoaded();
