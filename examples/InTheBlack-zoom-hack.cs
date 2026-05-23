@@ -1,5 +1,5 @@
 // #:project Console/Console.csproj
-#:package SharpSticks.Console@0.1.0-debug02
+#:package SharpSticks.Console@0.1.0-debug02.*
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
