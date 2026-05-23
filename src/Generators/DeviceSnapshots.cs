@@ -44,7 +44,7 @@ internal static class DeviceSnapshots
 			{
 				DeviceCapabilityHelper.TryGetCapabilities(
 					directInput, device.InstanceGuid, out var axes, out var buttonCount);
-				builder.Add(new(device.DeviceId, device.ProductName, axes, buttonCount));
+				builder.Add(new(device.DeviceId, device.ProductName, device.ProductGuid, axes, buttonCount));
 			}
 
 			return (true, builder.ToImmutable(), null);
@@ -66,6 +66,9 @@ internal static class DeviceSnapshots
 			}
 
 			var builder = ImmutableArray.CreateBuilder<VJoyDeviceSnapshot>();
+			// Every vJoy device on Windows surfaces under the same DirectInput ProductGuid
+			// (VID 0x1234 / PID 0xBEAD encoded as PIDVID).
+			var vJoyInputProductGuid = ProductGuidEncoder.Encode(vendor: 0x1234, product: 0xBEAD);
 			for (var deviceId = 1u; deviceId <= VJoyDevices.MaxDeviceId; deviceId++)
 			{
 				var status = VJoyNative.GetVJDStatus(deviceId);
@@ -73,7 +76,7 @@ internal static class DeviceSnapshots
 				{
 					var axes = EnumerateVJoyAxes(deviceId);
 					var buttonCount = (uint)Math.Max(0, VJoyNative.GetVJDButtonNumber(deviceId));
-					builder.Add(new(deviceId, axes, buttonCount));
+					builder.Add(new(deviceId, axes, buttonCount, vJoyInputProductGuid));
 				}
 			}
 
@@ -146,7 +149,12 @@ internal static class DeviceSnapshots
 internal readonly record struct DirectInputDeviceSnapshot(
 	int DeviceId,
 	string ProductName,
+	Guid ProductGuid,
 	ImmutableArray<Axis> Axes,
 	uint ButtonCount);
 
-internal readonly record struct VJoyDeviceSnapshot(uint DeviceId, ImmutableArray<Axis> Axes, uint ButtonCount);
+internal readonly record struct VJoyDeviceSnapshot(
+	uint DeviceId,
+	ImmutableArray<Axis> Axes,
+	uint ButtonCount,
+	Guid InputProductGuid);
