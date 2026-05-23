@@ -11,8 +11,6 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 	private readonly int _Fd;
 	private readonly FrozenDictionary<Axis, AxisRange> _AxisRanges;
 	private readonly FrozenDictionary<ushort, int> _ButtonCodeToIndex;
-	private readonly CancellationTokenSource _PollLoopCts = new();
-	private readonly Thread _PollThread;
 	private MutableState _CurrentState;
 	private byte[] _ReadBuffer = new byte[LinuxInputEvent.Size * 64];
 	private bool _Disposed;
@@ -40,8 +38,7 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		DataAvailable = dataAvailable;
 		_CurrentState = default;
 
-		_PollThread = new(PollLoop) { IsBackground = true, Name = $"LinuxInput poll {info.EventPath}" };
-		_PollThread.Start(new PollContext(_Fd, dataAvailable, _PollLoopCts.Token));
+		LinuxInputEventLoop.Register(_Fd, dataAvailable);
 	}
 
 	public override void Dispose()
@@ -52,9 +49,8 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		}
 
 		_Disposed = true;
-		_PollLoopCts.Cancel();
-		LinuxInputNative.Close(_Fd);
-		_PollLoopCts.Dispose();
+		LinuxInputEventLoop.Unregister(_Fd);
+		LinuxLibc.Close(_Fd);
 		((AutoResetEvent)DataAvailable).Dispose();
 	}
 
@@ -88,7 +84,7 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		Span<byte> buffer = _ReadBuffer.AsSpan();
 		while (true)
 		{
-			var bytesRead = LinuxInputNative.Read(_Fd, ref MemoryMarshal.GetReference(buffer), (nuint)buffer.Length);
+			var bytesRead = LinuxLibc.Read(_Fd, ref MemoryMarshal.GetReference(buffer), (nuint)buffer.Length);
 			if (bytesRead <= 0)
 			{
 				return;
@@ -106,10 +102,10 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 	{
 		switch (ev.Type)
 		{
-			case LinuxInputEventCodes.EvAbs:
+			case LinuxEventCodes.EvAbs:
 				ApplyAbsEvent(ev.Code, ev.Value);
 				break;
-			case LinuxInputEventCodes.EvKey:
+			case LinuxEventCodes.EvKey:
 				ApplyKeyEvent(ev.Code, ev.Value);
 				break;
 		}
@@ -119,14 +115,14 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 	{
 		switch (code)
 		{
-			case LinuxInputEventCodes.AbsX: _CurrentState.X = value; break;
-			case LinuxInputEventCodes.AbsY: _CurrentState.Y = value; break;
-			case LinuxInputEventCodes.AbsZ: _CurrentState.Z = value; break;
-			case LinuxInputEventCodes.AbsRx: _CurrentState.Rx = value; break;
-			case LinuxInputEventCodes.AbsRy: _CurrentState.Ry = value; break;
-			case LinuxInputEventCodes.AbsRz: _CurrentState.Rz = value; break;
-			case LinuxInputEventCodes.AbsThrottle: _CurrentState.Slider1 = value; break;
-			case LinuxInputEventCodes.AbsRudder: _CurrentState.Slider2 = value; break;
+			case LinuxEventCodes.AbsX: _CurrentState.X = value; break;
+			case LinuxEventCodes.AbsY: _CurrentState.Y = value; break;
+			case LinuxEventCodes.AbsZ: _CurrentState.Z = value; break;
+			case LinuxEventCodes.AbsRx: _CurrentState.Rx = value; break;
+			case LinuxEventCodes.AbsRy: _CurrentState.Ry = value; break;
+			case LinuxEventCodes.AbsRz: _CurrentState.Rz = value; break;
+			case LinuxEventCodes.AbsThrottle: _CurrentState.Slider1 = value; break;
+			case LinuxEventCodes.AbsRudder: _CurrentState.Slider2 = value; break;
 		}
 	}
 
@@ -243,8 +239,8 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 
 	private static LinuxInputJoystickDevice? OpenDevice(LinuxInputDeviceInfo info)
 	{
-		var fd = LinuxInputNative.Open(info.EventPath,
-			LinuxInputEventCodes.OReadOnly | LinuxInputEventCodes.ONonBlock | LinuxInputEventCodes.OCloseOnExec);
+		var fd = LinuxLibc.Open(info.EventPath,
+			LinuxEventCodes.OReadOnly | LinuxEventCodes.ONonBlock | LinuxEventCodes.OCloseOnExec);
 		if (fd < 0)
 		{
 			return null;
@@ -279,7 +275,7 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		catch
 		{
 			dataAvailable?.Dispose();
-			LinuxInputNative.Close(fd);
+			LinuxLibc.Close(fd);
 			throw;
 		}
 	}
@@ -288,19 +284,19 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 	{
 		var absCode = axis switch
 		{
-			Axis.X => LinuxInputEventCodes.AbsX,
-			Axis.Y => LinuxInputEventCodes.AbsY,
-			Axis.Z => LinuxInputEventCodes.AbsZ,
-			Axis.Rx => LinuxInputEventCodes.AbsRx,
-			Axis.Ry => LinuxInputEventCodes.AbsRy,
-			Axis.Rz => LinuxInputEventCodes.AbsRz,
-			Axis.Slider1 => LinuxInputEventCodes.AbsThrottle,
-			Axis.Slider2 => LinuxInputEventCodes.AbsRudder,
+			Axis.X => LinuxEventCodes.AbsX,
+			Axis.Y => LinuxEventCodes.AbsY,
+			Axis.Z => LinuxEventCodes.AbsZ,
+			Axis.Rx => LinuxEventCodes.AbsRx,
+			Axis.Ry => LinuxEventCodes.AbsRy,
+			Axis.Rz => LinuxEventCodes.AbsRz,
+			Axis.Slider1 => LinuxEventCodes.AbsThrottle,
+			Axis.Slider2 => LinuxEventCodes.AbsRudder,
 			_ => (ushort)0xffff,
 		};
 
 		var info = default(LinuxAbsInfo);
-		if (absCode == 0xffff || LinuxInputNative.IoctlAbsInfo(fd, LinuxInputEventCodes.EviocgAbs(absCode), ref info) < 0)
+		if (absCode == 0xffff || LinuxLibc.IoctlAbsInfo(fd, EvdevIoctls.EviocgAbs(absCode), ref info) < 0)
 		{
 			range = default;
 			return false;
@@ -317,31 +313,6 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 			device.Dispose();
 		}
 	}
-
-	private static void PollLoop(object? rawContext)
-	{
-		var context = (PollContext)rawContext!;
-		var pollFd = new LinuxPollFd { Fd = context.Fd, Events = LinuxInputEventCodes.PollIn };
-
-		while (!context.CancellationToken.IsCancellationRequested)
-		{
-			pollFd.Revents = 0;
-			var result = LinuxInputNative.Poll(ref pollFd, 1, 250);
-			if (result > 0 && (pollFd.Revents & LinuxInputEventCodes.PollIn) != 0)
-			{
-				try
-				{
-					context.DataAvailable.Set();
-				}
-				catch (ObjectDisposedException)
-				{
-					return;
-				}
-			}
-		}
-	}
-
-	private sealed record PollContext(int Fd, AutoResetEvent DataAvailable, CancellationToken CancellationToken);
 
 	private struct MutableState
 	{

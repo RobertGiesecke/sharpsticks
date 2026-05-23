@@ -3,7 +3,6 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <IsAotCompatible>true</IsAotCompatible>
     </PropertyGroup>
 
     <ItemGroup>
@@ -12,6 +11,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj"/>
+        <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj"/>
         <ProjectReference Include="..\LinuxNative\LinuxNative.csproj"/>
     </ItemGroup>
 

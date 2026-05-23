@@ -41,12 +41,54 @@ public static class ConsoleExtensions
 		public static void BuildAndRunAsConsole(BuildOptions buildOptions,
 			DebugLogger? debugLogger = null)
 		{
-			using var runtimeMapping = Build(buildOptions switch
+			var effectiveOptions = buildOptions switch
 			{
 				{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance },
 				_ => buildOptions,
-			});
+			};
+
+			if (TryRunSetupSubcommand(effectiveOptions))
+			{
+				return;
+			}
+
+			using var runtimeMapping = Build(effectiveOptions);
 			runtimeMapping.RunAsConsole(debugLogger);
+		}
+
+		private static bool TryRunSetupSubcommand(BuildOptions options)
+		{
+			var args = Environment.GetCommandLineArgs();
+			if (args.Length < 3 || !string.Equals(args[1], "setup", StringComparison.OrdinalIgnoreCase))
+			{
+				return false;
+			}
+
+			var subcommand = args[2];
+			if (options.OutputDeviceFactory is not ISupportsOutputSetup setupCapable)
+			{
+				System.Console.Error.WriteLine(
+					$"The configured output device factory does not support setup subcommands.");
+				Environment.Exit(2);
+				return true;
+			}
+
+			if (!string.Equals(setupCapable.SetupSubcommandName, subcommand, StringComparison.OrdinalIgnoreCase))
+			{
+				System.Console.Error.WriteLine(
+					$"Unknown setup subcommand '{subcommand}'. " +
+					$"This factory supports: {setupCapable.SetupSubcommandName}");
+				Environment.Exit(2);
+				return true;
+			}
+
+			var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToArray();
+			var axisRoutes = options.Routes.OfType<AxisRoute>().ToArray();
+			// Macro-only output buttons are discovered by walking IMacroAction.FillOutputs;
+			// not extracted here. Setup only needs to validate that buttons declared in
+			// direct routes can be created.
+			setupCapable.RunSetup(buttonRoutes, axisRoutes, []);
+			return true;
 		}
 
 
