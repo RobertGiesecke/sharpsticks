@@ -375,9 +375,15 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		var directInputNames = GetDirectInputDeviceConstantNames(directInputDevices, outputDevices);
 		var deviceIdentifiers = GetDeviceIdentifiers(directInputDevices, directInputNames, deviceRenames);
 		using var originalNameSet = new PooledSet<string>(directInputNames, StringComparer.Ordinal);
-		using var outputDeviceNameSet = new PooledSet<string>(
-			outputDevices.Select(static d => $"VJoyDevice{d.DeviceId}"),
-			StringComparer.Ordinal);
+
+		// Inputs whose ProductGuid matches an output's expected input-side Guid are
+		// "output counterparts" (e.g. vJoy's DirectInput entries). Their names still
+		// appear in DeviceNames so RenameDevice attributes can target them, but they
+		// are excluded from DeviceIds — driving them as inputs makes no sense — and
+		// from TypedDevices, where they're rendered as typed OUTPUT classes instead.
+		using var outputProductGuids = new PooledSet<Guid>(
+			outputDevices.Select(static d => d.InputProductGuid));
+		bool IsOutputCounterpart(int index) => outputProductGuids.Contains(directInputDevices[index].ProductGuid);
 		var indent = new string('\t', indentLevel);
 		var memberIndent = new string('\t', indentLevel + 1);
 		var wroteMember = false;
@@ -421,6 +427,11 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			builder.Append(indent).AppendLine("{");
 			for (var index = 0; index < directInputDevices.Length; index++)
 			{
+				if (IsOutputCounterpart(index))
+				{
+					continue;
+				}
+
 				builder.Append(memberIndent)
 					.Append("public const int ")
 					.Append(directInputNames[index])
@@ -431,6 +442,11 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 
 			for (var index = 0; index < directInputDevices.Length; index++)
 			{
+				if (IsOutputCounterpart(index))
+				{
+					continue;
+				}
+
 				var alias = deviceIdentifiers[index];
 				if (alias != directInputNames[index] && !originalNameSet.Contains(alias))
 				{
@@ -484,15 +500,19 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		{
 			for (var index = 0; index < directInputDevices.Length; index++)
 			{
-				if (outputDeviceNameSet.Contains(directInputNames[index]))
+				if (IsOutputCounterpart(index))
 				{
 					continue;
 				}
 
+				// Pass the renamed identifier (deviceIdentifiers[index]) as extraIdentifier so
+				// [RenameAxis(DeviceNames.<RenamedAlias>, ...)] and the corresponding
+				// RenameButton both resolve against the alias the user actually wrote — same
+				// behaviour the output typed-class branch already has via vjoyIdentifier.
 				var axisPropertyNames = BuildAxisPropertyNames(directInputDevices[index].ProductName,
-					directInputNames[index], axisRenames);
+					directInputNames[index], axisRenames, deviceIdentifiers[index]);
 				var buttonPropertyNames = BuildButtonPropertyNames(directInputDevices[index].ProductName,
-					directInputNames[index], buttonRenames);
+					directInputNames[index], buttonRenames, deviceIdentifiers[index]);
 				AppendSeparator(builder, ref wroteMember);
 				AppendTypedDeviceClass(
 					builder,
@@ -524,7 +544,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			builder.Append(indent).AppendLine("{");
 			for (var index = 0; index < directInputDevices.Length; index++)
 			{
-				if (outputDeviceNameSet.Contains(directInputNames[index]))
+				if (IsOutputCounterpart(index))
 				{
 					continue;
 				}
@@ -1023,21 +1043,32 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 	// (e.g. Devices.DeviceNames.LeftVpcStickWarBRD → "LeftVpcStickWarBRD").
 	private static string? GetStringFromExpression(ExpressionSyntax expr, AttributeData attr, int index)
 	{
+		// Syntax-form first. A const reference like `DeviceNames.VJoyDevice1` and a literal
+		// `"vJoy Device"` would both have the same compile-time string Value ("vJoy Device"),
+		// so two distinct const symbols (VJoyDevice1, VJoyDevice2) referring to devices with
+		// duplicate product names would be indistinguishable if we used the value. The symbol
+		// identifier ("VJoyDevice1") IS the disambiguator — that's why the generator emits
+		// numbered constants in the first place.
+		switch (expr)
+		{
+			case LiteralExpressionSyntax { Token.Value: string literalStr }:
+				return literalStr;
+			case MemberAccessExpressionSyntax memberAccess:
+				return memberAccess.Name.Identifier.ValueText;
+			case IdentifierNameSyntax identifier:
+				return identifier.Identifier.ValueText;
+		}
+
+		// Fallback: the argument is a more complex expression (e.g. ternary, method call)
+		// that the C# compiler still resolved to a constant string. Use the value, accepting
+		// that we lose disambiguation in that case.
 		if (attr.ConstructorArguments.Length > index &&
 		    attr.ConstructorArguments[index].Value is string str)
 		{
 			return str;
 		}
 
-		return expr switch
-		{
-			// String literal: "value"
-			LiteralExpressionSyntax { Token.Value: string literalStr } => literalStr,
-			// Generated const reference: Devices.DeviceNames.LeftVpcStickWarBRD → "LeftVpcStickWarBRD"
-			MemberAccessExpressionSyntax memberAccess => memberAccess.Name.Identifier.ValueText,
-			IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
-			_ => null,
-		};
+		return null;
 	}
 
 	private static Axis? GetAxis(int value) => value switch
