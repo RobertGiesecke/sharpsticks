@@ -10,6 +10,8 @@
   <Project Path="src/Generators/Generators.csproj" />
   <Project Path="src/InputAbstractions/InputAbstractions.csproj" />
   <Project Path="src/LinuxInput/LinuxInput.csproj" />
+  <Project Path="src/LinuxNative/LinuxNative.csproj" />
+  <Project Path="src/LinuxOutput/LinuxOutput.csproj" />
   <Project Path="src/ItbMinimal/ItbMinimal.csproj">
     <Build Solution="Release|Any CPU" Project="false" />
   </Project>

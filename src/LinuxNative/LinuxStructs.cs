@@ -1,10 +1,11 @@
 using System.Runtime.InteropServices;
 
-namespace SharpSticks.LinuxInput;
+namespace SharpSticks.LinuxNative;
 
-/// `struct input_event` on 64-bit Linux. timeval = (long tv_sec, long tv_usec).
+/// <c>struct input_event</c> on 64-bit Linux. timeval = (long tv_sec, long tv_usec).
+/// Used for both reading from evdev devices and writing to uinput devices.
 [StructLayout(LayoutKind.Sequential)]
-internal struct LinuxInputEvent
+public struct LinuxInputEvent
 {
 	public long TvSec;
 	public long TvUsec;
@@ -15,9 +16,9 @@ internal struct LinuxInputEvent
 	public static int Size => sizeof(long) * 2 + sizeof(ushort) * 2 + sizeof(int);
 }
 
-/// `struct input_id`: bus/vendor/product/version.
+/// <c>struct input_id</c>: bus/vendor/product/version. Shared by evdev and uinput.
 [StructLayout(LayoutKind.Sequential)]
-internal struct LinuxInputId
+public struct LinuxInputId
 {
 	public ushort BusType;
 	public ushort Vendor;
@@ -27,9 +28,9 @@ internal struct LinuxInputId
 	public const int Size = sizeof(ushort) * 4;
 }
 
-/// `struct input_absinfo`: min/max/value/fuzz/flat/resolution.
+/// <c>struct input_absinfo</c>: min/max/value/fuzz/flat/resolution. Returned by EVIOCGABS.
 [StructLayout(LayoutKind.Sequential)]
-internal struct LinuxAbsInfo
+public struct LinuxAbsInfo
 {
 	public int Value;
 	public int Minimum;
@@ -41,9 +42,9 @@ internal struct LinuxAbsInfo
 	public const int Size = sizeof(int) * 6;
 }
 
-/// `struct pollfd`.
+/// <c>struct pollfd</c>.
 [StructLayout(LayoutKind.Sequential)]
-internal struct LinuxPollFd
+public struct LinuxPollFd
 {
 	public int Fd;
 	public short Events;

@@ -33,8 +33,8 @@ internal static class LinuxInputDeviceEnumerator
 	internal static bool TryProbeDevice(string path, int deviceId, out LinuxInputDeviceInfo info)
 	{
 		info = default;
-		var fd = LinuxInputNative.Open(path,
-			LinuxInputEventCodes.OReadOnly | LinuxInputEventCodes.ONonBlock | LinuxInputEventCodes.OCloseOnExec);
+		var fd = LinuxLibc.Open(path,
+			LinuxEventCodes.OReadOnly | LinuxEventCodes.ONonBlock | LinuxEventCodes.OCloseOnExec);
 		if (fd < 0)
 		{
 			return false;
@@ -42,8 +42,8 @@ internal static class LinuxInputDeviceEnumerator
 
 		try
 		{
-			Span<byte> keyBits = stackalloc byte[(LinuxInputEventCodes.BtnDigi / 8) + 1];
-			if (!TryGetBits(fd, LinuxInputEventCodes.EvKey, keyBits))
+			Span<byte> keyBits = stackalloc byte[(LinuxEventCodes.BtnDigi / 8) + 1];
+			if (!TryGetBits(fd, LinuxEventCodes.EvKey, keyBits))
 			{
 				return false;
 			}
@@ -53,27 +53,27 @@ internal static class LinuxInputDeviceEnumerator
 				return false;
 			}
 
-			Span<byte> absBits = stackalloc byte[(LinuxInputEventCodes.AbsMax / 8) + 1];
-			TryGetBits(fd, LinuxInputEventCodes.EvAbs, absBits);
+			Span<byte> absBits = stackalloc byte[(LinuxEventCodes.AbsMax / 8) + 1];
+			TryGetBits(fd, LinuxEventCodes.EvAbs, absBits);
 
-			var name = ReadStringIoctl(fd, LinuxInputEventCodes.EviocgName(256));
-			var uniq = ReadStringIoctl(fd, LinuxInputEventCodes.EviocgUniq(256));
+			var name = ReadStringIoctl(fd, EvdevIoctls.EviocgName(256));
+			var uniq = ReadStringIoctl(fd, EvdevIoctls.EviocgUniq(256));
 
 			var inputId = default(LinuxInputId);
-			LinuxInputNative.IoctlInputId(fd, LinuxInputEventCodes.EviocgId, ref inputId);
+			LinuxLibc.IoctlInputId(fd, EvdevIoctls.EviocgId, ref inputId);
 
 			var axes = ImmutableArray.CreateBuilder<Axis>(8);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsX, Axis.X, axes);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsY, Axis.Y, axes);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsZ, Axis.Z, axes);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsRx, Axis.Rx, axes);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsRy, Axis.Ry, axes);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsRz, Axis.Rz, axes);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsThrottle, Axis.Slider1, axes);
-			AddAxisIfPresent(absBits, LinuxInputEventCodes.AbsRudder, Axis.Slider2, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsX, Axis.X, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsY, Axis.Y, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsZ, Axis.Z, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsRx, Axis.Rx, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsRy, Axis.Ry, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsRz, Axis.Rz, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsThrottle, Axis.Slider1, axes);
+			AddAxisIfPresent(absBits, LinuxEventCodes.AbsRudder, Axis.Slider2, axes);
 
 			var buttonCodes = ImmutableArray.CreateBuilder<ushort>(32);
-			for (ushort code = LinuxInputEventCodes.BtnJoystick; code < LinuxInputEventCodes.BtnDigi; code++)
+			for (ushort code = LinuxEventCodes.BtnJoystick; code < LinuxEventCodes.BtnDigi; code++)
 			{
 				if (TestBit(keyBits, code))
 				{
@@ -93,22 +93,22 @@ internal static class LinuxInputDeviceEnumerator
 		}
 		finally
 		{
-			LinuxInputNative.Close(fd);
+			LinuxLibc.Close(fd);
 		}
 	}
 
 	private static bool TryGetBits(int fd, uint evType, Span<byte> bits)
 	{
 		bits.Clear();
-		var result = LinuxInputNative.IoctlBuffer(fd,
-			LinuxInputEventCodes.EviocgBit(evType, (uint)bits.Length),
+		var result = LinuxLibc.IoctlBuffer(fd,
+			EvdevIoctls.EviocgBit(evType, (uint)bits.Length),
 			ref MemoryMarshal.GetReference(bits));
 		return result >= 0;
 	}
 
 	private static bool HasJoystickOrGamepadButton(ReadOnlySpan<byte> keyBits)
 	{
-		for (ushort code = LinuxInputEventCodes.BtnJoystick; code < LinuxInputEventCodes.BtnDigi; code++)
+		for (ushort code = LinuxEventCodes.BtnJoystick; code < LinuxEventCodes.BtnDigi; code++)
 		{
 			if (TestBit(keyBits, code))
 			{
@@ -145,7 +145,7 @@ internal static class LinuxInputDeviceEnumerator
 	private static string ReadStringIoctl(int fd, uint request)
 	{
 		Span<byte> buffer = stackalloc byte[256];
-		var result = LinuxInputNative.IoctlBuffer(fd, request, ref MemoryMarshal.GetReference(buffer));
+		var result = LinuxLibc.IoctlBuffer(fd, request, ref MemoryMarshal.GetReference(buffer));
 		if (result <= 0)
 		{
 			return string.Empty;
