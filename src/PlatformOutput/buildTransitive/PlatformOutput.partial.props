@@ -1,0 +1,7 @@
+<Project>
+    <Import Condition="'$(SharedPropsLoaded)' != 'true' and exists('$(MSBuildThisFileDirectory)Shared.props')" Project="$(MSBuildThisFileDirectory)Shared.props"/>
+    <ItemGroup>
+        <Using Alias="PlatformDefaultOutputDevice" Include="$(PackageRootName).VJoy.VJoyDevice"/>
+        <Using Alias="PlatformDefaultOutputDeviceFactory" Include="$(PackageRootName).VJoy.VJoyDeviceFactory"/>
+    </ItemGroup>
+</Project>
