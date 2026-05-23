@@ -87,6 +87,7 @@ internal static class LinuxInputDeviceEnumerator
 				string.IsNullOrEmpty(name) ? Path.GetFileName(path) : name,
 				string.IsNullOrEmpty(uniq) ? Path.GetFileName(path) : uniq,
 				BuildStableGuid(inputId, uniq, path),
+				ProductGuidEncoder.Encode(inputId.Vendor, inputId.Product),
 				axes.ToImmutable(),
 				buttonCodes.ToImmutable());
 			return true;

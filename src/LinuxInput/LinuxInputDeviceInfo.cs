@@ -7,5 +7,6 @@ public readonly record struct LinuxInputDeviceInfo(
 	string ProductName,
 	string InstanceName,
 	Guid InstanceGuid,
+	Guid ProductGuid,
 	ImmutableArray<Axis> Axes,
 	ImmutableArray<ushort> ButtonCodes);

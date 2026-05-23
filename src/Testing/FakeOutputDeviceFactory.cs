@@ -31,11 +31,18 @@ public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory, IDisposable
 		_Devices[device.DeviceId] = device;
 	}
 
-	OutputDevice IOutputDeviceFactory.Open(
-		uint deviceId,
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
-		IReadOnlyCollection<AxisRoute> axisRoutes,
-		IReadOnlyCollection<int> macroButtonNumbers) => Get(deviceId);
+	PooledList<OutputDevice> IOutputDeviceFactory.Open(
+		IReadOnlyCollection<OutputDeviceRequest> requests,
+		IReadOnlyList<JoystickDevice> availableInputs)
+	{
+		var devices = new PooledList<OutputDevice>(requests.Count);
+		foreach (var request in requests)
+		{
+			devices.Add(Get(request.DeviceId));
+		}
+
+		return devices;
+	}
 
 	public void Dispose()
 	{

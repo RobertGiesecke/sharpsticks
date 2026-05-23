@@ -138,6 +138,7 @@ public static class RuntimeBuilder
 			}
 
 			var devices = new PooledDictionary<int, JoystickDevice>();
+
 			try
 			{
 				foreach (var device in options.ConnectedDevices)
@@ -159,17 +160,9 @@ public static class RuntimeBuilder
 					devices.Add(deviceId, device);
 				}
 
-				var outputDevices = referencedOutputDeviceIds
-					.OrderBy(deviceId => deviceId)
-					.Select<uint, OutputDevice>(deviceId => optionsOutputDeviceFactory.Open(
-						deviceId,
-						// ReSharper disable once AccessToDisposedClosure
-						buttonRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray(),
-						// ReSharper disable once AccessToDisposedClosure
-						axisRoutes.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToArray(),
-						// ReSharper disable once AccessToDisposedClosure
-						auxiliaryOutputButtons.Where(b => b.OutputDeviceId == deviceId).Select(b => b.ButtonNumber).ToArray()))
-					.ToImmutableArray();
+				using var openedOutputs = CreateOutputDeviceList();
+				
+				var outputDevices = openedOutputs.ToImmutableArray();
 				try
 				{
 					return new Runtime(
@@ -207,6 +200,49 @@ public static class RuntimeBuilder
 
 				devices.Dispose();
 				throw;
+			}
+
+			PooledList<OutputDevice> CreateOutputDeviceList()
+			{
+				using var disposables = new PooledList<IDisposable>();
+				try
+				{
+					using var outputRequests = new PooledList<OutputDeviceRequest>(referencedOutputDeviceIds.Count);
+
+					foreach (var deviceId in referencedOutputDeviceIds)
+					{
+						var buttonRoutesForDevice = buttonRoutes
+							.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToPooledList();
+						disposables.Add(buttonRoutesForDevice);
+						var axisRoutesForDevice = axisRoutes
+							.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToPooledList();
+						disposables.Add(axisRoutesForDevice);
+						var macroButtonNumbers = auxiliaryOutputButtons
+							.Where(b => b.OutputDeviceId == deviceId)
+							.Select(b => b.ButtonNumber)
+							.Distinct()
+							.ToPooledList();
+						disposables.Add(macroButtonNumbers);
+						outputRequests.Add(
+							new(
+								deviceId,
+								buttonRoutesForDevice,
+								axisRoutesForDevice,
+								macroButtonNumbers
+							)
+						);
+					}
+
+					outputRequests.Sort((a, b) => a.DeviceId.CompareTo(b.DeviceId));
+					return optionsOutputDeviceFactory.Open(outputRequests, options.ConnectedDevices);
+				}
+				finally
+				{
+					foreach (var disposable in disposables)
+					{
+						disposable.Dispose();
+					}
+				}
 			}
 		}
 	}
