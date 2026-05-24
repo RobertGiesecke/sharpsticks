@@ -66,7 +66,7 @@ public sealed class FakeDeviceTests
 		var output = fakes.AddOutputDevice().AddAxis(Axis.X).Build();
 
 		IOutputDeviceFactory factory = fakes.OutputDeviceFactory;
-		using var opened = factory.Open(
+		using var opened = factory.EnumerateConnectedOutputDevices(
 			new[] { new OutputDeviceRequest(output.DeviceId, [], [], []) },
 			[]);
 
@@ -81,7 +81,7 @@ public sealed class FakeDeviceTests
 
 		IOutputDeviceFactory factory = fakes.OutputDeviceFactory;
 		Assert.Throws<InvalidOperationException>(
-			() => factory.Open(new[] { new OutputDeviceRequest(99, [], [], []) }, []));
+			() => factory.EnumerateConnectedOutputDevices(new[] { new OutputDeviceRequest(99, [], [], []) }, []));
 	}
 
 	[Fact]

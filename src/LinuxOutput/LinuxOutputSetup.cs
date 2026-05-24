@@ -168,7 +168,7 @@ public static class LinuxOutputSetup
 
 			try
 			{
-				using var probe = factory.Open(
+				using var probe = factory.EnumerateConnectedOutputDevices(
 					new[] { new OutputDeviceRequest(deviceId, deviceButtons, deviceAxes, deviceMacroButtons) });
 				System.Console.WriteLine(
 					$"  ✓ output device {deviceId} created + destroyed " +

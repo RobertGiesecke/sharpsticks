@@ -234,7 +234,7 @@ public static class RuntimeBuilder
 					}
 
 					outputRequests.Sort((a, b) => a.DeviceId.CompareTo(b.DeviceId));
-					return optionsOutputDeviceFactory.Open(outputRequests, options.ConnectedDevices);
+					return optionsOutputDeviceFactory.EnumerateConnectedOutputDevices(outputRequests, options.ConnectedDevices);
 				}
 				finally
 				{

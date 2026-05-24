@@ -110,7 +110,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			binding.Mode,
 			binding.Invert,
 			binding.Deadzone,
-			out var decoderKind);
+			out var decoderKind
+		);
 		return new(rawValue, range.Min, range.Max, normalized, decoderKind);
 	}
 
@@ -124,39 +125,14 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		return new(AxisRangeMin, AxisRangeMax);
 	}
 
-	public static PooledList<DirectInputJoystickDevice> EnumerateConnected()
-	{
-		var directInput = DirectInputDeviceEnumerator.GetOrCreateContext();
-		var deviceInfos = DirectInputDeviceEnumerator.EnumerateConnectedDeviceInfos(directInput);
-
-		var devices = new PooledList<DirectInputJoystickDevice>(deviceInfos.Length);
-		try
-		{
-			foreach (var deviceInfo in deviceInfos)
-			{
-				var device = OpenDevice(directInput, deviceInfo);
-				if (device is not null)
-				{
-					devices.Add(device);
-				}
-			}
-
-			return devices;
-		}
-		catch
-		{
-			DisposeAll(devices);
-			devices.Dispose();
-			throw;
-		}
-	}
+	public static PooledList<DirectInputJoystickDevice> EnumerateConnected() => DirectInputJoystickDeviceFactory.Instance.EnumerateConnectedInputDevices();
 
 	public static ImmutableArray<DirectInputDeviceInfo> EnumerateConnectedDeviceInfos()
 	{
 		return DirectInputDeviceEnumerator.EnumerateConnectedDeviceInfos();
 	}
 
-	private static DirectInputJoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info)
+	internal static DirectInputJoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info)
 	{
 		var instanceGuid = info.InstanceGuid;
 		var createResult = DirectInputNative.CreateDevice(directInput, in instanceGuid, out var devicePointer);
@@ -178,7 +154,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			var cooperativeResult = DirectInputNative.SetCooperativeLevel(
 				devicePointer,
 				windowHandle,
-				DirectInputNative.DiSclBackground | DirectInputNative.DiSclNonExclusive);
+				DirectInputNative.DiSclBackground | DirectInputNative.DiSclNonExclusive
+			);
 			if (!DirectInputNative.Succeeded(cooperativeResult))
 			{
 				return null;
@@ -239,9 +216,12 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				info,
 				caps,
 				devicePointer,
-				[..physicalAxes],
+				[
+					..physicalAxes
+				],
 				axisRanges.ToFrozenDictionary(),
-				dataAvailable);
+				dataAvailable
+			);
 		}
 		finally
 		{
@@ -266,7 +246,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			if (!DirectInputNative.Succeeded(enumResult))
 			{
 				throw new InvalidOperationException(
-					$"DirectInput object enumeration failed with HRESULT 0x{enumResult:X8}.");
+					$"DirectInput object enumeration failed with HRESULT 0x{enumResult:X8}."
+				);
 			}
 		}
 		finally
@@ -275,7 +256,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 	}
 
-	private static void BuildAxisFormatEntries(IReadOnlyList<DirectInputDeviceObjectInfo> objects,
+	private static void BuildAxisFormatEntries(
+		IReadOnlyList<DirectInputDeviceObjectInfo> objects,
 		ICollection<AxisFormatEntry> axisEntries)
 	{
 		var sliderIndex = 0;
@@ -288,10 +270,13 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 				continue;
 			}
 
-			axisEntries.Add(new(
-				axis.Value,
-				DirectInputNative.GetAxisOffset(axis.Value),
-				deviceObjectInfo.Type));
+			axisEntries.Add(
+				new(
+					axis.Value,
+					DirectInputNative.GetAxisOffset(axis.Value),
+					deviceObjectInfo.Type
+				)
+			);
 		}
 	}
 
@@ -302,13 +287,15 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	{
 		foreach (var axisEntry in axisEntries)
 		{
-			objectFormats.Add(new()
-			{
-				GuidPointer = 0,
-				Offset = axisEntry.Offset,
-				Type = axisEntry.Type,
-				Flags = 0,
-			});
+			objectFormats.Add(
+				new()
+				{
+					GuidPointer = 0,
+					Offset = axisEntry.Offset,
+					Type = axisEntry.Type,
+					Flags = 0,
+				}
+			);
 		}
 
 		foreach (var pov in objects.Where(objectInfo => objectInfo.TypeGuid == DirectInputNative.GuidPov)
@@ -316,13 +303,15 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			         .Take(4))
 		{
 			var index = DirectInputNative.GetInstance(pov.Type);
-			objectFormats.Add(new()
-			{
-				GuidPointer = 0,
-				Offset = DirectInputNative.GetPovOffset(index),
-				Type = pov.Type,
-				Flags = 0,
-			});
+			objectFormats.Add(
+				new()
+				{
+					GuidPointer = 0,
+					Offset = DirectInputNative.GetPovOffset(index),
+					Type = pov.Type,
+					Flags = 0,
+				}
+			);
 		}
 
 		foreach (var button in objects.Where(objectInfo => objectInfo.TypeGuid == DirectInputNative.GuidButton)
@@ -330,13 +319,15 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			         .Take(128))
 		{
 			var index = DirectInputNative.GetInstance(button.Type);
-			objectFormats.Add(new()
-			{
-				GuidPointer = 0,
-				Offset = DirectInputNative.GetButtonOffset(index),
-				Type = button.Type,
-				Flags = 0,
-			});
+			objectFormats.Add(
+				new()
+				{
+					GuidPointer = 0,
+					Offset = DirectInputNative.GetButtonOffset(index),
+					Type = button.Type,
+					Flags = 0,
+				}
+			);
 		}
 	}
 
@@ -350,7 +341,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			DirectInputNative.SetRangeProperty(devicePointer, axisEntry.Offset, AxisRangeMin, AxisRangeMax);
 
 			if (DirectInputNative.Succeeded(
-				    DirectInputNative.GetRangeProperty(devicePointer, axisEntry.Offset, out var range)))
+				    DirectInputNative.GetRangeProperty(devicePointer, axisEntry.Offset, out var range)
+			    ))
 			{
 				axisRanges[axisEntry.Axis] = new(range.Min, range.Max);
 			}
@@ -571,7 +563,12 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		return (value - deadzone) / (1.0 - deadzone);
 	}
 
-	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
+	[UnmanagedCallersOnly(
+		CallConvs =
+		[
+			typeof(CallConvStdcall)
+		]
+	)]
 	private static int EnumObjectsCallback(DirectInputDeviceObjectInstanceNative* instance, nint referenceData)
 	{
 		var objects = (PooledList<DirectInputDeviceObjectInfo>)GCHandle.FromIntPtr(referenceData).Target!;
@@ -649,7 +646,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			if (exactMatches.Length > 1)
 			{
 				throw new InvalidOperationException(
-					$"Multiple joystick devices match '{selector}'. Use the numeric id from the list command.");
+					$"Multiple joystick devices match '{selector}'. Use the numeric id from the list command."
+				);
 			}
 
 			var partialMatches = devices
@@ -665,7 +663,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 			if (partialMatches.Length > 1)
 			{
 				throw new InvalidOperationException(
-					$"Multiple joystick devices partially match '{selector}'. Use the full name or numeric id from the list command.");
+					$"Multiple joystick devices partially match '{selector}'. Use the full name or numeric id from the list command."
+				);
 			}
 
 			throw new InvalidOperationException($"No DirectInput device matched '{selector}'.");
@@ -681,7 +680,8 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 	}
 
-	private static void DisposeAll(IEnumerable<DirectInputJoystickDevice> devices,
+	internal static void DisposeAll(
+		PooledList<DirectInputJoystickDevice> devices,
 		DirectInputJoystickDevice? except = null)
 	{
 		foreach (var device in devices)

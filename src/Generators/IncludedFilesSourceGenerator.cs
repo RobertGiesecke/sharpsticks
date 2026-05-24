@@ -206,13 +206,13 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		if (!DeviceSnapshots.TryEnumerateDirectInputDevices(out var directInputDevices, out var directInputError))
 		{
 			context.ReportDiagnostic(Diagnostic.Create(DirectInputUnavailable, Location.None, directInputError));
-			directInputDevices = ImmutableArray<DirectInputDeviceSnapshot>.Empty;
+			directInputDevices = ImmutableArray<InputDeviceSnapshot>.Empty;
 		}
 
 		if (!DeviceSnapshots.TryEnumerateOutputDevices(out var outputDevices, out var outputError))
 		{
 			context.ReportDiagnostic(Diagnostic.Create(OutputDevicesUnavailable, Location.None, outputError));
-			outputDevices = ImmutableArray<VJoyDeviceSnapshot>.Empty;
+			outputDevices = ImmutableArray<OutputDeviceSnapshot>.Empty;
 		}
 
 		foreach (var target in CoalesceTargets(targets))
@@ -266,13 +266,13 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		if (!DeviceSnapshots.TryEnumerateDirectInputDevices(out var directInputDevices, out var directInputError))
 		{
 			context.ReportDiagnostic(Diagnostic.Create(DirectInputUnavailable, Location.None, directInputError));
-			directInputDevices = ImmutableArray<DirectInputDeviceSnapshot>.Empty;
+			directInputDevices = ImmutableArray<InputDeviceSnapshot>.Empty;
 		}
 
 		if (!DeviceSnapshots.TryEnumerateOutputDevices(out var outputDevices, out var outputError))
 		{
 			context.ReportDiagnostic(Diagnostic.Create(OutputDevicesUnavailable, Location.None, outputError));
-			outputDevices = ImmutableArray<VJoyDeviceSnapshot>.Empty;
+			outputDevices = ImmutableArray<OutputDeviceSnapshot>.Empty;
 		}
 
 		var builder = new StringBuilder();
@@ -304,8 +304,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		ImmutableArray<DeviceRename> deviceRenames,
 		ImmutableArray<AxisRename> axisRenames,
 		ImmutableArray<ButtonRename> buttonRenames,
-		ImmutableArray<DirectInputDeviceSnapshot> directInputDevices,
-		ImmutableArray<VJoyDeviceSnapshot> outputDevices)
+		ImmutableArray<InputDeviceSnapshot> directInputDevices,
+		ImmutableArray<OutputDeviceSnapshot> outputDevices)
 	{
 		var builder = new StringBuilder();
 		var namespaceName = target.ContainingNamespace.IsGlobalNamespace
@@ -368,8 +368,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		ImmutableArray<DeviceRename> deviceRenames,
 		ImmutableArray<AxisRename> axisRenames,
 		ImmutableArray<ButtonRename> buttonRenames,
-		ImmutableArray<DirectInputDeviceSnapshot> directInputDevices,
-		ImmutableArray<VJoyDeviceSnapshot> outputDevices,
+		ImmutableArray<InputDeviceSnapshot> directInputDevices,
+		ImmutableArray<OutputDeviceSnapshot> outputDevices,
 		int indentLevel)
 	{
 		var directInputNames = GetDirectInputDeviceConstantNames(directInputDevices, outputDevices);
@@ -591,7 +591,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		StringBuilder builder,
 		string deviceIdentifier,
 		string deviceOriginalName,
-		DirectInputDeviceSnapshot device,
+		InputDeviceSnapshot device,
 		PooledDictionary<Axis, string> axisPropertyNames,
 		PooledDictionary<int, string> buttonPropertyNames,
 		string indent,
@@ -838,7 +838,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 	}
 
 	private static string[] GetDeviceIdentifiers(
-		ImmutableArray<DirectInputDeviceSnapshot> devices,
+		ImmutableArray<InputDeviceSnapshot> devices,
 		List<string> baseNames,
 		ImmutableArray<DeviceRename> deviceRenames)
 	{
@@ -1116,8 +1116,8 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 	}
 
 	private static List<string> GetDirectInputDeviceConstantNames(
-		ImmutableArray<DirectInputDeviceSnapshot> devices,
-		ImmutableArray<VJoyDeviceSnapshot> outputDevices)
+		ImmutableArray<InputDeviceSnapshot> devices,
+		ImmutableArray<OutputDeviceSnapshot> outputDevices)
 	{
 		var baseNames = devices.Select(static device => ToIdentifier(device.ProductName)).ToArray();
 		var counts = baseNames
