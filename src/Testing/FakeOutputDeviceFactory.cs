@@ -8,7 +8,7 @@ namespace SharpSticks.Testing;
 /// indirectly via <see cref="FakeDeviceManager.AddOutputDevice"/>; opening an
 /// id that wasn't registered throws so routing typos fail fast.
 /// </summary>
-public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory, IDisposable
+public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory<FakeOutputDevice>, IDisposable
 {
 	private readonly PooledDictionary<uint, FakeOutputDevice> _Devices = new();
 
@@ -17,25 +17,23 @@ public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory, IDisposable
 	public FakeOutputDevice Get(uint deviceId) =>
 		_Devices.TryGetValue(deviceId, out var device)
 			? device
-			: throw new InvalidOperationException(
-				$"No fake output device registered for id {deviceId}.");
+			: throw new InvalidOperationException($"No fake output device registered for id {deviceId}.");
 
 	public void Register(FakeOutputDevice device)
 	{
-		if (_Devices.ContainsKey(device.DeviceId))
+		if (!_Devices.TryAdd(device.DeviceId, device))
 		{
 			throw new InvalidOperationException(
-				$"A fake output device with id {device.DeviceId} is already registered.");
+				$"A fake output device with id {device.DeviceId} is already registered."
+			);
 		}
-
-		_Devices[device.DeviceId] = device;
 	}
 
-	PooledList<OutputDevice> IOutputDeviceFactory.Open(
+	public PooledList<FakeOutputDevice> EnumerateConnectedOutputDevices(
 		IReadOnlyCollection<OutputDeviceRequest> requests,
 		IReadOnlyList<JoystickDevice> availableInputs)
 	{
-		var devices = new PooledList<OutputDevice>(requests.Count);
+		var devices = new PooledList<FakeOutputDevice>(requests.Count);
 		foreach (var request in requests)
 		{
 			devices.Add(Get(request.DeviceId));

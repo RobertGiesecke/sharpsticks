@@ -2,7 +2,7 @@ using Collections.Pooled;
 
 namespace SharpSticks.VJoy;
 
-public sealed class VJoyDeviceFactory : IOutputDeviceFactory
+public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 {
 	public static VJoyDeviceFactory Instance { get; } = new();
 
@@ -12,27 +12,9 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 	/// stable sequential claim from the candidate pool.
 	internal static Guid VJoyProductGuid { get; } = ProductGuidEncoder.Encode(vendor: 0x1234, product: 0xBEAD);
 
-	PooledList<OutputDevice> IOutputDeviceFactory.Open(
-		IReadOnlyCollection<OutputDeviceRequest> requests,
-		IReadOnlyList<JoystickDevice> availableInputs)
-	{
-		var devices = new PooledList<OutputDevice>(requests.Count);
-		try
-		{
-			OpenAll(requests, availableInputs, devices);
-			return devices;
-		}
-		catch
-		{
-			DisposeAll(devices);
-			devices.Dispose();
-			throw;
-		}
-	}
-
 	/// Public convenience overload for callers (tests, examples) that work directly with
 	/// concrete <see cref="VJoyDevice"/> instances.
-	public PooledList<VJoyDevice> Open(
+	public PooledList<VJoyDevice> EnumerateConnectedOutputDevices(
 		IReadOnlyCollection<OutputDeviceRequest> requests,
 		IReadOnlyList<JoystickDevice>? availableInputs = null)
 	{
@@ -59,8 +41,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 		VJoyNative.EnsureLoaded();
 		if (!VJoyNative.VJoyEnabled())
 		{
-			throw new InvalidOperationException(
-				"vJoy is not enabled. Install and configure the vJoy driver first.");
+			throw new InvalidOperationException("vJoy is not enabled. Install and configure the vJoy driver first.");
 		}
 
 		// Pre-filter candidate inputs to vJoy-only entries, sorted by DeviceId. We claim
@@ -118,8 +99,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 
 		if (!VJoyNative.AcquireVJD(deviceId))
 		{
-			throw new InvalidOperationException(
-				$"Failed to acquire vJoy device {deviceId}. Current status: {status}.");
+			throw new InvalidOperationException($"Failed to acquire vJoy device {deviceId}. Current status: {status}.");
 		}
 
 		if (!VJoyNative.ResetVJD(deviceId))
@@ -159,7 +139,8 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 				if (targetButton > buttonCount)
 				{
 					throw new InvalidOperationException(
-						$"Button {targetButton} is not enabled on vJoy device {deviceId}. Device exposes {buttonCount} buttons.");
+						$"Button {targetButton} is not enabled on vJoy device {deviceId}. Device exposes {buttonCount} buttons."
+					);
 				}
 			}
 
@@ -167,7 +148,8 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory
 			var caps = new JoystickCapabilities(
 				NumAxes: (uint)axisLimits.Count,
 				NumButtons: (uint)Math.Max(0, buttonCount),
-				NumPovs: 0);
+				NumPovs: 0
+			);
 			return (device, caps);
 		}
 		catch

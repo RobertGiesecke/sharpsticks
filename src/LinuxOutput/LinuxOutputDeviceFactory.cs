@@ -3,11 +3,11 @@ using Collections.Pooled;
 
 namespace SharpSticks.LinuxOutput;
 
-/// uinput-backed <see cref="IOutputDeviceFactory"/>. <see cref="Open"/> opens
+/// uinput-backed <see cref="IOutputDeviceFactory"/>. <see cref="EnumerateConnectedOutputDevices"/> opens
 /// <c>/dev/uinput</c>, declares every axis and button the runtime told us about (so the
 /// kernel materializes a device with exactly that capability set), and returns a
 /// <see cref="LinuxOutputDevice"/> ready for write traffic.
-public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory, ISupportsOutputSetup
+public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputDevice>, ISupportsOutputSetup
 {
 	public static LinuxOutputDeviceFactory Instance { get; } = new();
 
@@ -19,35 +19,9 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory, ISupportsOu
 		IReadOnlyCollection<int> macroButtonNumbers) =>
 		LinuxOutputSetup.Run(buttonRoutes, axisRoutes, macroButtonNumbers);
 
-	PooledList<OutputDevice> IOutputDeviceFactory.Open(
-		IReadOnlyCollection<OutputDeviceRequest> requests,
-		IReadOnlyList<JoystickDevice> availableInputs)
-	{
-		var devices = new PooledList<OutputDevice>(requests.Count);
-		try
-		{
-			foreach (var request in requests)
-			{
-				devices.Add(OpenOne(request));
-			}
-
-			return devices;
-		}
-		catch
-		{
-			foreach (var device in devices)
-			{
-				device.Dispose();
-			}
-
-			devices.Dispose();
-			throw;
-		}
-	}
-
 	/// Public convenience overload returning concrete <see cref="LinuxOutputDevice"/>
 	/// instances. Used by tests / examples that work with the typed factory directly.
-	public PooledList<LinuxOutputDevice> Open(
+	public PooledList<LinuxOutputDevice> EnumerateConnectedOutputDevices(
 		IReadOnlyCollection<OutputDeviceRequest> requests,
 		IReadOnlyList<JoystickDevice>? availableInputs = null)
 	{

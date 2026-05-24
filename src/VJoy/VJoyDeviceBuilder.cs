@@ -14,7 +14,7 @@ public static class VJoyDeviceBuilder
 			IReadOnlyList<AxisRoute> axisRoutes,
 			IReadOnlyCollection<int>? macroButtonNumbers = null)
 		{
-			using var opened = VJoyDeviceFactory.Instance.Open(
+			using var opened = VJoyDeviceFactory.Instance.EnumerateConnectedOutputDevices(
 				new[] { new OutputDeviceRequest(deviceId, buttonRoutes, axisRoutes, macroButtonNumbers ?? []) });
 			return opened[0];
 		}

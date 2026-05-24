@@ -29,7 +29,7 @@ public abstract class OutputDevice : IDisposable, IOutputDevice
 	/// exists on this platform (vJoy device → DirectInput entry on Windows; uinput
 	/// device → evdev event node on Linux). <c>null</c> when the output has no input
 	/// counterpart or the backend couldn't determine the mapping. Assigned by the
-	/// factory at <see cref="IOutputDeviceFactory.Open"/> time.
+	/// factory at <see cref="IOutputDeviceFactory.EnumerateConnectedOutputDevices"/> time.
 	/// </summary>
 	public int? InputDeviceId { get; internal set; }
 

@@ -9,14 +9,14 @@ namespace SharpSticks.Generators;
 
 internal static class DeviceSnapshots
 {
-	private static readonly Lazy<(bool Success, ImmutableArray<DirectInputDeviceSnapshot> Devices, string? Error)>
+	private static readonly Lazy<(bool Success, ImmutableArray<InputDeviceSnapshot> Devices, string? Error)>
 		DirectInputResult = new(EnumerateDirectInputDevicesCore, isThreadSafe: true);
 
-	private static readonly Lazy<(bool Success, ImmutableArray<VJoyDeviceSnapshot> Devices, string? Error)>
+	private static readonly Lazy<(bool Success, ImmutableArray<OutputDeviceSnapshot> Devices, string? Error)>
 		OutputDevicesResult = new(EnumerateOutputDevicesCore, isThreadSafe: true);
 
 	public static bool TryEnumerateDirectInputDevices(
-		out ImmutableArray<DirectInputDeviceSnapshot> devices,
+		out ImmutableArray<InputDeviceSnapshot> devices,
 		out string? error)
 	{
 		var (success, cachedDevices, cachedError) = DirectInputResult.Value;
@@ -26,7 +26,7 @@ internal static class DeviceSnapshots
 	}
 
 	public static bool TryEnumerateOutputDevices(
-		out ImmutableArray<VJoyDeviceSnapshot> devices,
+		out ImmutableArray<OutputDeviceSnapshot> devices,
 		out string? error)
 	{
 		var (success, cachedDevices, cachedError) = OutputDevicesResult.Value;
@@ -35,7 +35,7 @@ internal static class DeviceSnapshots
 		return success;
 	}
 
-	private static (bool, ImmutableArray<DirectInputDeviceSnapshot>, string?) EnumerateDirectInputDevicesCore()
+	private static (bool, ImmutableArray<InputDeviceSnapshot>, string?) EnumerateDirectInputDevicesCore()
 	{
 		if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
 		{
@@ -46,7 +46,7 @@ internal static class DeviceSnapshots
 		{
 			var directInput = DirectInputDeviceEnumerator.GetOrCreateContext();
 			var result = DirectInputDeviceEnumerator.EnumerateConnectedDeviceInfos(directInput);
-			var builder = ImmutableArray.CreateBuilder<DirectInputDeviceSnapshot>();
+			var builder = ImmutableArray.CreateBuilder<InputDeviceSnapshot>();
 			foreach (var device in result)
 			{
 				DeviceCapabilityHelper.TryGetCapabilities(
@@ -58,16 +58,16 @@ internal static class DeviceSnapshots
 		}
 		catch (Exception exception) when (IsExpectedEnumerationFailure(exception))
 		{
-			return (false, ImmutableArray<DirectInputDeviceSnapshot>.Empty, GetMessage(exception));
+			return (false, ImmutableArray<InputDeviceSnapshot>.Empty, GetMessage(exception));
 		}
 	}
 
-	private static (bool, ImmutableArray<DirectInputDeviceSnapshot>, string?) EnumerateLinuxInputDevicesCore()
+	private static (bool, ImmutableArray<InputDeviceSnapshot>, string?) EnumerateLinuxInputDevicesCore()
 	{
 		try
 		{
 			var infos = LinuxInputDeviceEnumerator.EnumerateConnectedDeviceInfos();
-			var builder = ImmutableArray.CreateBuilder<DirectInputDeviceSnapshot>(infos.Length);
+			var builder = ImmutableArray.CreateBuilder<InputDeviceSnapshot>(infos.Length);
 			foreach (var info in infos)
 			{
 				// Reuse the existing DirectInputDeviceSnapshot record shape — same field
@@ -85,11 +85,11 @@ internal static class DeviceSnapshots
 		}
 		catch (Exception exception) when (IsExpectedEnumerationFailure(exception))
 		{
-			return (false, ImmutableArray<DirectInputDeviceSnapshot>.Empty, GetMessage(exception));
+			return (false, ImmutableArray<InputDeviceSnapshot>.Empty, GetMessage(exception));
 		}
 	}
 
-	private static (bool, ImmutableArray<VJoyDeviceSnapshot>, string?) EnumerateOutputDevicesCore()
+	private static (bool, ImmutableArray<OutputDeviceSnapshot>, string?) EnumerateOutputDevicesCore()
 	{
 		// uinput-on-Linux outputs only exist at runtime once the user's program creates
 		// them — nothing exists at design time, so the generator has no output slots to
@@ -97,7 +97,7 @@ internal static class DeviceSnapshots
 		// emitting a diagnostic about "vJoy not enabled".
 		if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
 		{
-			return (true, ImmutableArray<VJoyDeviceSnapshot>.Empty, null);
+			return (true, ImmutableArray<OutputDeviceSnapshot>.Empty, null);
 		}
 
 		try
@@ -105,10 +105,10 @@ internal static class DeviceSnapshots
 			VJoyNative.EnsureLoaded();
 			if (!VJoyNative.VJoyEnabled())
 			{
-				return (false, ImmutableArray<VJoyDeviceSnapshot>.Empty, "vJoy is not enabled.");
+				return (false, ImmutableArray<OutputDeviceSnapshot>.Empty, "vJoy is not enabled.");
 			}
 
-			var builder = ImmutableArray.CreateBuilder<VJoyDeviceSnapshot>();
+			var builder = ImmutableArray.CreateBuilder<OutputDeviceSnapshot>();
 			// Every vJoy device on Windows surfaces under the same DirectInput ProductGuid
 			// (VID 0x1234 / PID 0xBEAD encoded as PIDVID).
 			var vJoyInputProductGuid = ProductGuidEncoder.Encode(vendor: 0x1234, product: 0xBEAD);
@@ -127,7 +127,7 @@ internal static class DeviceSnapshots
 		}
 		catch (Exception exception) when (IsExpectedEnumerationFailure(exception))
 		{
-			return (false, ImmutableArray<VJoyDeviceSnapshot>.Empty, GetMessage(exception));
+			return (false, ImmutableArray<OutputDeviceSnapshot>.Empty, GetMessage(exception));
 		}
 	}
 
@@ -189,14 +189,14 @@ internal static class DeviceSnapshots
 	}
 }
 
-internal readonly record struct DirectInputDeviceSnapshot(
+internal readonly record struct InputDeviceSnapshot(
 	int DeviceId,
 	string ProductName,
 	Guid ProductGuid,
 	ImmutableArray<Axis> Axes,
 	uint ButtonCount);
 
-internal readonly record struct VJoyDeviceSnapshot(
+internal readonly record struct OutputDeviceSnapshot(
 	uint DeviceId,
 	ImmutableArray<Axis> Axes,
 	uint ButtonCount,

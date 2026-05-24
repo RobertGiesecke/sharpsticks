@@ -35,7 +35,8 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		Capabilities = new(
 			(uint)info.Axes.Length,
 			(uint)Math.Min(info.ButtonCodes.Length, 128),
-			NumPovs: 0);
+			NumPovs: 0
+		);
 		DataAvailable = dataAvailable;
 		_CurrentState = default;
 
@@ -213,35 +214,15 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		return normalized;
 	}
 
-	public static PooledList<LinuxInputJoystickDevice> EnumerateConnected()
-	{
-		var infos = LinuxInputDeviceEnumerator.EnumerateConnectedDeviceInfos();
-		var devices = new PooledList<LinuxInputJoystickDevice>(infos.Length);
-		try
-		{
-			foreach (var info in infos)
-			{
-				var device = OpenDevice(info);
-				if (device is not null)
-				{
-					devices.Add(device);
-				}
-			}
+	public static PooledList<LinuxInputJoystickDevice> EnumerateConnected() =>
+		LinuxInputJoystickDeviceFactory.Instance.EnumerateConnectedInputDevices();
 
-			return devices;
-		}
-		catch
-		{
-			DisposeAll(devices);
-			devices.Dispose();
-			throw;
-		}
-	}
-
-	private static LinuxInputJoystickDevice? OpenDevice(LinuxInputDeviceInfo info)
+	internal static LinuxInputJoystickDevice? OpenDevice(LinuxInputDeviceInfo info)
 	{
-		var fd = LinuxLibc.Open(info.EventPath,
-			LinuxEventCodes.OReadOnly | LinuxEventCodes.ONonBlock | LinuxEventCodes.OCloseOnExec);
+		var fd = LinuxLibc.Open(
+			info.EventPath,
+			LinuxEventCodes.OReadOnly | LinuxEventCodes.ONonBlock | LinuxEventCodes.OCloseOnExec
+		);
 		if (fd < 0)
 		{
 			return null;
@@ -271,7 +252,8 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 				fd,
 				rangesBuilder.ToFrozenDictionary(),
 				buttonMap.ToFrozenDictionary(),
-				dataAvailable);
+				dataAvailable
+			);
 		}
 		catch
 		{
@@ -307,7 +289,7 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 		return true;
 	}
 
-	private static void DisposeAll(IEnumerable<LinuxInputJoystickDevice> devices)
+	internal static void DisposeAll(PooledList<LinuxInputJoystickDevice> devices)
 	{
 		foreach (var device in devices)
 		{
