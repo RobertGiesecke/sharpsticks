@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text;
 using Collections.Pooled;
@@ -13,6 +14,16 @@ namespace SharpSticks.Generators;
 public sealed class DevicesGenerator : IIncrementalGenerator
 {
 	private const string NamespaceRoot = $"{nameof(SharpSticks)}.";
+
+	// Cache last-known-good emissions per RegisterSourceOutput callback. When an edit
+	// transiently makes the SyntaxProvider return zero DeviceInfoTargets (Roslyn briefly
+	// can't resolve `[GenerateDeviceInfos]` mid-edit), the callback fires with an empty
+	// list. Without a re-emit, Roslyn discards the previously-generated source for that
+	// callback — IDEs then show squiggles on `Devices.Typed.*` until the user edits again
+	// and the next run produces non-empty results. Re-emitting from cache keeps the
+	// generated surface in scope across those transient empties.
+	private static readonly ConcurrentDictionary<string, string> LastDeviceInfosEmissions = new(StringComparer.Ordinal);
+	private static readonly ConcurrentDictionary<string, string> LastAssemblyDeviceInfosEmissions = new(StringComparer.Ordinal);
 	private const string GenerateDeviceInfosAttributeMetadataName = nameof(GenerateDeviceInfosAttribute);
 	private const string RenameDeviceAttributeMetadataName = nameof(RenameDeviceAttribute);
 	private const string RenameAxisAttributeMetadataName = nameof(RenameAxis);
@@ -106,6 +117,12 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 	{
 		if (targets.IsDefaultOrEmpty)
 		{
+			GeneratorLog.Log($"GenerateDeviceInfos: empty targets, replaying {LastDeviceInfosEmissions.Count} cached emissions");
+			foreach (var kvp in LastDeviceInfosEmissions)
+			{
+				context.AddSource(kvp.Key, SourceText.From(kvp.Value, Encoding.UTF8));
+			}
+
 			return;
 		}
 
@@ -120,6 +137,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			context.ReportDiagnostic(Diagnostic.Create(OutputDevicesUnavailable, Location.None, outputError));
 			outputDevices = ImmutableArray<OutputDeviceSnapshot>.Empty;
 		}
+
+		var fresh = new Dictionary<string, string>(StringComparer.Ordinal);
 
 		foreach (var target in CoalesceTargets(targets))
 		{
@@ -144,12 +163,25 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			var hintName = GetDeviceInfosHintName(target.Type);
 			GeneratorLog.Log($"AddSource: {hintName} ({source.Length} chars, target={target.Type.ToDisplayString()})");
 			context.AddSource(hintName, SourceText.From(source, Encoding.UTF8));
+			fresh[hintName] = source;
 
 			var fqn = target.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 			var globalUsings = BuildGlobalUsings(fqn, target.Levels);
 			var globalUsingsHintName = hintName.Replace(".DeviceInfos.g.cs", ".GlobalUsings.g.cs");
 			GeneratorLog.Log($"AddSource: {globalUsingsHintName} ({globalUsings.Length} chars)");
 			context.AddSource(globalUsingsHintName, SourceText.From(globalUsings, Encoding.UTF8));
+			fresh[globalUsingsHintName] = globalUsings;
+		}
+
+		ReplaceCache(LastDeviceInfosEmissions, fresh);
+	}
+
+	private static void ReplaceCache(ConcurrentDictionary<string, string> cache, Dictionary<string, string> fresh)
+	{
+		cache.Clear();
+		foreach (var kvp in fresh)
+		{
+			cache[kvp.Key] = kvp.Value;
 		}
 	}
 
@@ -170,6 +202,12 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 	{
 		if (!target.IsPresent || target.Levels == 0)
 		{
+			GeneratorLog.Log($"GenerateAssemblyDeviceInfos: empty target, replaying {LastAssemblyDeviceInfosEmissions.Count} cached emissions");
+			foreach (var kvp in LastAssemblyDeviceInfosEmissions)
+			{
+				context.AddSource(kvp.Key, SourceText.From(kvp.Value, Encoding.UTF8));
+			}
+
 			return;
 		}
 
@@ -210,6 +248,12 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		GeneratorLog.Log($"AddSource: Devices.GlobalUsings.g.cs ({assemblyGlobalUsings.Length} chars)");
 		context.AddSource("Devices.GlobalUsings.g.cs",
 			SourceText.From(assemblyGlobalUsings, Encoding.UTF8));
+
+		ReplaceCache(LastAssemblyDeviceInfosEmissions, new Dictionary<string, string>(StringComparer.Ordinal)
+		{
+			["Devices.AssemblyDeviceInfos.g.cs"] = assemblySource,
+			["Devices.GlobalUsings.g.cs"] = assemblyGlobalUsings,
+		});
 	}
 
 	private static string GenerateDeviceInfosSource(
