@@ -23,4 +23,10 @@ public abstract class CombinedDeviceFactoryBase<TInput, TOutput> : ICombinedDevi
 		IReadOnlyCollection<OutputDeviceRequest> requests,
 		IReadOnlyList<JoystickDevice> availableInputs) =>
 		_OutputDeviceFactory.EnumerateConnectedOutputDevices(requests, availableInputs);
+
+	public ImmutableArray<AvailableInputDevice> EnumerateAvailableInputs() =>
+		_JoystickDeviceFactory.EnumerateAvailableInputs();
+
+	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs() =>
+		_OutputDeviceFactory.EnumerateAvailableOutputs();
 }

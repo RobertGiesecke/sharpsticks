@@ -28,4 +28,32 @@ public sealed class LinuxInputJoystickDeviceFactory : IJoystickDeviceFactory<Lin
 			throw;
 		}
 	}
+
+	public ImmutableArray<AvailableInputDevice> EnumerateAvailableInputs()
+	{
+		try
+		{
+			var infos = LinuxInputDeviceEnumerator.EnumerateConnectedDeviceInfos();
+			var builder = ImmutableArray.CreateBuilder<AvailableInputDevice>(infos.Length);
+			foreach (var info in infos)
+			{
+				builder.Add(new(
+					info.DeviceId,
+					info.ProductName,
+					info.ProductGuid,
+					info.Axes,
+					(uint)info.ButtonCodes.Length));
+			}
+
+			return builder.ToImmutable();
+		}
+		catch (Exception ex) when (IsExpectedEnumerationFailure(ex))
+		{
+			return ImmutableArray<AvailableInputDevice>.Empty;
+		}
+	}
+
+	private static bool IsExpectedEnumerationFailure(Exception exception) =>
+		exception is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException
+			or FileNotFoundException or FileLoadException or InvalidOperationException;
 }
