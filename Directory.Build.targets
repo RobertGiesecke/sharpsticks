@@ -6,6 +6,220 @@
     </ItemGroup>
 
     <!--
+        Inline tasks that walk upstream `.props` and `partial.props` files via XElement
+        rather than line-regex. Conditional <ItemGroup Condition="..."> wrappers around
+        <Using> items are preserved verbatim through the auto-gen pipeline so a consumer's
+        MSBuild evaluates them at its own build time (e.g. host-OS-dependent aliases like
+        PlatformDefaultInputDevice -> DirectInputJoystickDevice / LinuxInputJoystickDevice).
+        Unconditional usings still go through dedup as before.
+    -->
+    <UsingTask TaskName="ParseTransitiveUsings"
+               TaskFactory="RoslynCodeTaskFactory"
+               AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+        <ParameterGroup>
+            <SourceFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true"/>
+            <PackageRootName ParameterType="System.String" Required="true"/>
+            <ParsedUsings ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true"/>
+        </ParameterGroup>
+        <Task>
+            <Using Namespace="System.Collections.Generic"/>
+            <Using Namespace="System.IO"/>
+            <Using Namespace="System.Xml"/>
+            <Code Type="Fragment" Language="cs">
+<![CDATA[
+var items = new List<Microsoft.Build.Framework.ITaskItem>();
+foreach (var file in SourceFiles)
+{
+    var path = file.GetMetadata("FullPath");
+    if (!File.Exists(path))
+    {
+        continue;
+    }
+    var doc = new XmlDocument();
+    try
+    {
+        doc.Load(path);
+    }
+    catch
+    {
+        continue;
+    }
+    var itemGroups = doc.SelectNodes("/Project/ItemGroup");
+    if (itemGroups == null)
+    {
+        continue;
+    }
+    foreach (XmlNode ig in itemGroups)
+    {
+        var igElement = ig as XmlElement;
+        if (igElement == null)
+        {
+            continue;
+        }
+        var condition = igElement.GetAttribute("Condition");
+        foreach (XmlNode child in igElement.ChildNodes)
+        {
+            var u = child as XmlElement;
+            if (u == null || u.LocalName != "Using")
+            {
+                continue;
+            }
+            var include = u.GetAttribute("Include");
+            if (string.IsNullOrEmpty(include))
+            {
+                continue;
+            }
+            // String-concat the "$" so MSBuild doesn't expand $(PackageRootName) inside this
+            // CDATA at task-load time. Without the split, both sides of the Replace would
+            // resolve to "SharpSticks" before the C# even compiles.
+            include = include.Replace("$" + "(PackageRootName)", PackageRootName);
+            var hasAliasAttr = u.HasAttribute("Alias");
+            var alias = hasAliasAttr ? u.GetAttribute("Alias") : string.Empty;
+            var key = include + "|" + alias + "|" + condition;
+            var item = new Microsoft.Build.Utilities.TaskItem(key);
+            item.SetMetadata("UsingInclude", include);
+            item.SetMetadata("Alias", alias);
+            item.SetMetadata("HasAliasAttribute", hasAliasAttr ? "true" : "false");
+            item.SetMetadata("Condition", condition);
+            items.Add(item);
+        }
+    }
+}
+ParsedUsings = items.ToArray();
+]]>
+            </Code>
+        </Task>
+    </UsingTask>
+
+    <UsingTask TaskName="WriteTransitiveProps"
+               TaskFactory="RoslynCodeTaskFactory"
+               AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+        <ParameterGroup>
+            <Usings ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true"/>
+            <SelfNamespace ParameterType="System.String"/>
+            <AnalyzerProjects ParameterType="Microsoft.Build.Framework.ITaskItem[]"/>
+            <OutputFile ParameterType="System.String" Required="true"/>
+        </ParameterGroup>
+        <Task>
+            <Using Namespace="System.Collections.Generic"/>
+            <Using Namespace="System.IO"/>
+            <Using Namespace="System.Linq"/>
+            <Using Namespace="System.Text"/>
+            <Code Type="Fragment" Language="cs">
+<![CDATA[
+System.Func<string, string> escape = s =>
+    s.Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;");
+
+var sb = new StringBuilder();
+sb.AppendLine("<Project>");
+
+// Unconditional ItemGroup: self-namespace, all upstream Using items with no Condition,
+// and the SharpSticksTransitiveAnalyzerProject items (only in the in-tree variant).
+var seen = new HashSet<string>();
+sb.AppendLine("  <ItemGroup>");
+if (!string.IsNullOrEmpty(SelfNamespace) && seen.Add(SelfNamespace + "|"))
+{
+    sb.AppendLine("    <Using Include=\"" + escape(SelfNamespace) + "\" />");
+}
+foreach (var u in Usings)
+{
+    if (!string.IsNullOrEmpty(u.GetMetadata("Condition")))
+    {
+        continue;
+    }
+    var include = u.GetMetadata("UsingInclude");
+    var alias = u.GetMetadata("Alias");
+    var key = include + "|" + alias;
+    if (!seen.Add(key))
+    {
+        continue;
+    }
+    var hasAlias = u.GetMetadata("HasAliasAttribute") == "true";
+    if (hasAlias || !string.IsNullOrEmpty(alias))
+    {
+        sb.AppendLine("    <Using Include=\"" + escape(include) + "\" Alias=\"" + escape(alias) + "\" />");
+    }
+    else
+    {
+        sb.AppendLine("    <Using Include=\"" + escape(include) + "\" />");
+    }
+}
+if (AnalyzerProjects != null)
+{
+    var seenAnalyzers = new HashSet<string>();
+    foreach (var p in AnalyzerProjects)
+    {
+        if (!seenAnalyzers.Add(p.ItemSpec))
+        {
+            continue;
+        }
+        sb.AppendLine("    <SharpSticksTransitiveAnalyzerProject Include=\"" + escape(p.ItemSpec) + "\" />");
+    }
+}
+sb.AppendLine("  </ItemGroup>");
+
+// One <ItemGroup Condition="..."> per unique condition encountered upstream.
+var byCondition = new Dictionary<string, List<Microsoft.Build.Framework.ITaskItem>>(System.StringComparer.Ordinal);
+foreach (var u in Usings)
+{
+    var condition = u.GetMetadata("Condition");
+    if (string.IsNullOrEmpty(condition))
+    {
+        continue;
+    }
+    List<Microsoft.Build.Framework.ITaskItem> list;
+    if (!byCondition.TryGetValue(condition, out list))
+    {
+        list = new List<Microsoft.Build.Framework.ITaskItem>();
+        byCondition[condition] = list;
+    }
+    list.Add(u);
+}
+foreach (var pair in byCondition)
+{
+    sb.AppendLine("  <ItemGroup Condition=\"" + escape(pair.Key) + "\">");
+    var groupSeen = new HashSet<string>();
+    foreach (var u in pair.Value)
+    {
+        var include = u.GetMetadata("UsingInclude");
+        var alias = u.GetMetadata("Alias");
+        var key = include + "|" + alias;
+        if (!groupSeen.Add(key))
+        {
+            continue;
+        }
+        var hasAlias = u.GetMetadata("HasAliasAttribute") == "true";
+        if (hasAlias || !string.IsNullOrEmpty(alias))
+        {
+            sb.AppendLine("    <Using Include=\"" + escape(include) + "\" Alias=\"" + escape(alias) + "\" />");
+        }
+        else
+        {
+            sb.AppendLine("    <Using Include=\"" + escape(include) + "\" />");
+        }
+    }
+    sb.AppendLine("  </ItemGroup>");
+}
+
+sb.Append("</Project>");
+
+var content = sb.ToString();
+if (File.Exists(OutputFile) && File.ReadAllText(OutputFile) == content)
+{
+    return true;
+}
+var dir = Path.GetDirectoryName(OutputFile);
+if (!string.IsNullOrEmpty(dir))
+{
+    Directory.CreateDirectory(dir);
+}
+File.WriteAllText(OutputFile, content);
+]]>
+            </Code>
+        </Task>
+    </UsingTask>
+
+    <!--
         Hook GenerateBuildTransitiveProps into the GetTargetPath chain. When any consumer
         resolves a ProjectReference to us (via ResolveProjectReferences -> GetTargetPath),
         MSBuild calls GetTargetPath at most once per project per build (the build engine
@@ -39,72 +253,31 @@
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
             <_PartialProps Include="$(_BuildTransitivePartialFile)"
                            Condition="Exists('$(_BuildTransitivePartialFile)')"/>
-            <_ExportedUsings Include="$(RootNamespace)|"
-                             Condition="'$(RootNamespace)' != ''">
-                <UsingInclude>$(RootNamespace)</UsingInclude>
-                <Alias></Alias>
-                <HasAliasAttribute>false</HasAliasAttribute>
-            </_ExportedUsings>
             <_ExportedAnalyzerProjects Include="@(SharpSticksExportAnalyzerProject)"/>
         </ItemGroup>
-        <ReadLinesFromFile File="%(_ProjRefProps.Identity)"
-                           Condition="'@(_ProjRefProps)' != ''">
-            <Output TaskParameter="Lines" ItemName="_ExportedUsingLines"/>
-        </ReadLinesFromFile>
-        <ReadLinesFromFile File="%(_PartialProps.Identity)"
-                           Condition="'@(_PartialProps)' != ''">
-            <Output TaskParameter="Lines" ItemName="_ExportedUsingLines"/>
-        </ReadLinesFromFile>
-        <ItemGroup>
-            <_ParsedExportedUsingLines Include="@(_ExportedUsingLines)">
-                <UsingInclude>$([System.Text.RegularExpressions.Regex]::Replace($([System.Text.RegularExpressions.Regex]::Match('%(_ExportedUsingLines.Identity)', 'Include=&quot;([^&quot;]+)&quot;').Groups[1].Value), '\x24\(PackageRootName\)', '$(PackageRootName)'))</UsingInclude>
-                <Alias>$([System.Text.RegularExpressions.Regex]::Match('%(_ExportedUsingLines.Identity)', 'Alias=&quot;([^&quot;]*)&quot;').Groups[1].Value)</Alias>
-                <HasAliasAttribute>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ExportedUsingLines.Identity)', 'Alias=&quot;[^&quot;]*&quot;').ToString().ToLowerInvariant())</HasAliasAttribute>
-                <IsUsingLine>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ExportedUsingLines.Identity)', '^\s*&lt;Using\b').ToString().ToLowerInvariant())</IsUsingLine>
-            </_ParsedExportedUsingLines>
-            <_ExportedUsings Include="%(_ParsedExportedUsingLines.UsingInclude)|%(_ParsedExportedUsingLines.Alias)"
-                             Condition="'%(_ParsedExportedUsingLines.IsUsingLine)' == 'true' and '%(_ParsedExportedUsingLines.UsingInclude)' != ''">
-                <UsingInclude>%(_ParsedExportedUsingLines.UsingInclude)</UsingInclude>
-                <Alias>%(_ParsedExportedUsingLines.Alias)</Alias>
-                <HasAliasAttribute>%(_ParsedExportedUsingLines.HasAliasAttribute)</HasAliasAttribute>
-            </_ExportedUsings>
-        </ItemGroup>
+
+        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps);@(_PartialProps)"
+                               PackageRootName="$(PackageRootName)">
+            <Output TaskParameter="ParsedUsings" ItemName="_ParsedExportedUsings"/>
+        </ParseTransitiveUsings>
+
         <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
                  Query="/Project/ItemGroup/SharpSticksTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
                  Condition="'@(_ProjRefProps)' != ''">
             <Output TaskParameter="Result" ItemName="_ExportedAnalyzerProjects"/>
         </XmlPeek>
-        <RemoveDuplicates Inputs="@(_ExportedUsings)">
-            <Output TaskParameter="Filtered" ItemName="_DistinctExportedUsings"/>
-        </RemoveDuplicates>
         <RemoveDuplicates Inputs="@(_ExportedAnalyzerProjects)">
             <Output TaskParameter="Filtered" ItemName="_DistinctExportedAnalyzerProjects"/>
         </RemoveDuplicates>
-        <ItemGroup>
-            <_PropsFileLines Include="&lt;Project&gt;"/>
-            <_PropsFileLines Include="  &lt;ItemGroup&gt;"/>
-            <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; Alias=&quot;%(_DistinctExportedUsings.Alias)&quot; /&gt;"
-                             Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' == 'true' or '%(_DistinctExportedUsings.Alias)' != ''"/>
-            <_PropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; /&gt;"
-                             Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' != 'true' and '%(_DistinctExportedUsings.Alias)' == ''"/>
-            <_PropsFileLines Include="    &lt;SharpSticksTransitiveAnalyzerProject Include=&quot;%(_DistinctExportedAnalyzerProjects.Identity)&quot; /&gt;"
-                             Condition="'%(_DistinctExportedAnalyzerProjects.Identity)' != ''"/>
-            <_PropsFileLines Include="  &lt;/ItemGroup&gt;"/>
-            <_PropsFileLines Include="&lt;/Project&gt;"/>
-        </ItemGroup>
-        <ItemGroup>
-            <_PackPropsFileLines Include="&lt;Project&gt;"/>
-            <_PackPropsFileLines Include="  &lt;ItemGroup&gt;"/>
-            <_PackPropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; Alias=&quot;%(_DistinctExportedUsings.Alias)&quot; /&gt;"
-                                 Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' == 'true' or '%(_DistinctExportedUsings.Alias)' != ''"/>
-            <_PackPropsFileLines Include="    &lt;Using Include=&quot;%(_DistinctExportedUsings.UsingInclude)&quot; /&gt;"
-                                 Condition="'%(_DistinctExportedUsings.HasAliasAttribute)' != 'true' and '%(_DistinctExportedUsings.Alias)' == ''"/>
-            <_PackPropsFileLines Include="  &lt;/ItemGroup&gt;"/>
-            <_PackPropsFileLines Include="&lt;/Project&gt;"/>
-        </ItemGroup>
+
         <MakeDir Directories="$(_BuildTransitiveDir);$([System.IO.Path]::GetDirectoryName($(_BuildTransitivePackFile)))"/>
-        <WriteLinesToFile File="$(_BuildTransitiveFile)" Lines="@(_PropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true"/>
-        <WriteLinesToFile File="$(_BuildTransitivePackFile)" Lines="@(_PackPropsFileLines)" Overwrite="true" WriteOnlyWhenDifferent="true"/>
+        <WriteTransitiveProps Usings="@(_ParsedExportedUsings)"
+                              SelfNamespace="$(RootNamespace)"
+                              AnalyzerProjects="@(_DistinctExportedAnalyzerProjects)"
+                              OutputFile="$(_BuildTransitiveFile)"/>
+        <WriteTransitiveProps Usings="@(_ParsedExportedUsings)"
+                              SelfNamespace="$(RootNamespace)"
+                              OutputFile="$(_BuildTransitivePackFile)"/>
         <ItemGroup>
             <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(PackageId).props"/>
         </ItemGroup>
@@ -124,29 +297,29 @@
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
         </ItemGroup>
-        <ReadLinesFromFile File="%(_ProjRefProps.Identity)"
-                           Condition="'@(_ProjRefProps)' != ''">
-            <Output TaskParameter="Lines" ItemName="_ImportedProjectRefUsingLines"/>
-        </ReadLinesFromFile>
+
+        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps)"
+                               PackageRootName="$(PackageRootName)">
+            <Output TaskParameter="ParsedUsings" ItemName="_ImportedParsedUsings"/>
+        </ParseTransitiveUsings>
+
+        <!--
+            Two ItemGroups so MSBuild can evaluate the per-item Condition metadata
+            cleanly. The first emits unconditional Usings; the second emits those whose
+            Condition metadata evaluates true for the current build (the third clause
+            inlines the captured Condition string, which MSBuild expands and parses as
+            a Condition expression — that's what gives us host-OS dispatch).
+        -->
         <ItemGroup>
-            <_ParsedImportedProjectRefUsingLines Include="@(_ImportedProjectRefUsingLines)">
-                <UsingInclude>$([System.Text.RegularExpressions.Regex]::Match('%(_ImportedProjectRefUsingLines.Identity)', 'Include=&quot;([^&quot;]+)&quot;').Groups[1].Value)</UsingInclude>
-                <Alias>$([System.Text.RegularExpressions.Regex]::Match('%(_ImportedProjectRefUsingLines.Identity)', 'Alias=&quot;([^&quot;]*)&quot;').Groups[1].Value)</Alias>
-                <IsUsingLine>$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ImportedProjectRefUsingLines.Identity)', '^\s*&lt;Using\b').ToString().ToLowerInvariant())</IsUsingLine>
-            </_ParsedImportedProjectRefUsingLines>
-            <_ImportedProjectRefUsings Include="%(_ParsedImportedProjectRefUsingLines.UsingInclude)|%(_ParsedImportedProjectRefUsingLines.Alias)"
-                                      Condition="'%(_ParsedImportedProjectRefUsingLines.IsUsingLine)' == 'true' and '%(_ParsedImportedProjectRefUsingLines.UsingInclude)' != ''">
-                <UsingInclude>%(_ParsedImportedProjectRefUsingLines.UsingInclude)</UsingInclude>
-                <Alias>%(_ParsedImportedProjectRefUsingLines.Alias)</Alias>
-            </_ImportedProjectRefUsings>
+            <Using Include="%(_ImportedParsedUsings.UsingInclude)"
+                   Condition="'%(_ImportedParsedUsings.Condition)' == '' and '%(_ImportedParsedUsings.UsingInclude)' != ''">
+                <Alias>%(_ImportedParsedUsings.Alias)</Alias>
+            </Using>
         </ItemGroup>
-        <RemoveDuplicates Inputs="@(_ImportedProjectRefUsings)">
-            <Output TaskParameter="Filtered" ItemName="_DistinctImportedProjectRefUsings"/>
-        </RemoveDuplicates>
         <ItemGroup>
-            <Using Include="%(_DistinctImportedProjectRefUsings.UsingInclude)"
-                   Condition="'@(_DistinctImportedProjectRefUsings)' != ''">
-                <Alias>%(_DistinctImportedProjectRefUsings.Alias)</Alias>
+            <Using Include="%(_ImportedParsedUsings.UsingInclude)"
+                   Condition="'%(_ImportedParsedUsings.Condition)' != '' and '%(_ImportedParsedUsings.UsingInclude)' != '' and %(_ImportedParsedUsings.Condition)">
+                <Alias>%(_ImportedParsedUsings.Alias)</Alias>
             </Using>
         </ItemGroup>
     </Target>
