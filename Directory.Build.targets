@@ -143,11 +143,9 @@ File.WriteAllText(OutputFile, content);
              file-based-app `#:project` consumers — which don't run our Directory.Build.props
              chain — pick up the full transitive surface via the SDK's projref props convention. -->
         <_BuildTransitiveInSourcePropsFile Condition="'$(MergePropsWhenNotPacked)' == 'true'">$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveInSourcePropsFile>
-        <!-- Pack output. Own content only; NuGet auto-imports each transitive package's
-             .props in dep order so merging here would just cause duplicate aliases.
-             Path.Combine handles the case where BaseIntermediateOutputPath is absolute
-             (e.g. file-based-app scripts route obj/ into a Temp dir). -->
-        <_BuildTransitivePackFile>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'pack-buildTransitive', '$(PackageId).props'))</_BuildTransitivePackFile>
+        <!-- Pack output filename depends on $(PackageId), which the SDK sets later (after this
+             property group evaluates). The path is computed inside GenerateBuildTransitiveProps
+             where PackageId is guaranteed populated. -->
     </PropertyGroup>
     <PropertyGroup Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
         <!-- Library projects: hook into GetTargetPath so the merged props are written
@@ -186,6 +184,14 @@ File.WriteAllText(OutputFile, content);
             <Output TaskParameter="Filtered" ItemName="_DistinctExportedAnalyzerProjects"/>
         </RemoveDuplicates>
 
+        <!-- Path.Combine handles BaseIntermediateOutputPath being absolute (file-based-app
+             scripts route obj/ to a Temp dir). Fall back to MSBuildProjectName when PackageId
+             is unset (e.g. IsPackable=false projects), so we never emit '<empty>.props'. -->
+        <PropertyGroup>
+            <_PackFileBaseName>$(PackageId)</_PackFileBaseName>
+            <_PackFileBaseName Condition="'$(_PackFileBaseName)' == ''">$(MSBuildProjectName)</_PackFileBaseName>
+            <_BuildTransitivePackFile>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'pack-buildTransitive', '$(_PackFileBaseName).props'))</_BuildTransitivePackFile>
+        </PropertyGroup>
         <MakeDir Directories="$(_BuildTransitiveDir);$([System.IO.Path]::GetDirectoryName($(_BuildTransitivePackFile)))"/>
         <!-- Merged variant (always): own partial.props + verbatim sections from each direct
              projref's own .merged.props, deduped structurally. This is what in-tree
