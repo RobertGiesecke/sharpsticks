@@ -6,7 +6,7 @@ namespace SharpSticks.LinuxInput;
 
 /// evdev-backed <see cref="JoystickDevice"/>. Direct libc P/Invoke; no userspace
 /// library between us and the kernel. NativeAOT-compatible (LibraryImport, no reflection).
-public sealed class LinuxInputJoystickDevice : JoystickDevice
+public sealed class LinuxInputJoystickDevice : JoystickDevice, IJoystickDeviceWithFactory<LinuxInputJoystickDevice>
 {
 	private readonly int _Fd;
 	private readonly FrozenDictionary<Axis, AxisRange> _AxisRanges;
@@ -14,6 +14,9 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice
 	private MutableState _CurrentState;
 	private byte[] _ReadBuffer = new byte[LinuxInputEvent.Size * 64];
 	private bool _Disposed;
+
+	public static LinuxInputJoystickDeviceFactory Factory => LinuxInputJoystickDeviceFactory.Instance;
+	static IJoystickDeviceFactory<LinuxInputJoystickDevice> IJoystickDeviceWithFactory<LinuxInputJoystickDevice>.Factory => Factory;
 
 	[SetsRequiredMembers]
 	private LinuxInputJoystickDevice(

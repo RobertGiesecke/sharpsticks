@@ -3,7 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace SharpSticks.DirectInput;
 
-public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
+public sealed unsafe class DirectInputJoystickDevice : JoystickDevice,
+	IJoystickDeviceWithFactory<DirectInputJoystickDevice>
 {
 	private const int AxisRangeMin = -32767;
 	private const int AxisRangeMax = 32767;
@@ -13,6 +14,11 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 	private readonly FrozenDictionary<Axis, AxisRange> _AxisRanges;
 	private readonly nint _DevicePointer;
 	private bool _Disposed;
+
+	public static DirectInputJoystickDeviceFactory Factory => DirectInputJoystickDeviceFactory.Instance;
+
+	static IJoystickDeviceFactory<DirectInputJoystickDevice> IJoystickDeviceWithFactory<DirectInputJoystickDevice>.
+		Factory => Factory;
 
 	[SetsRequiredMembers]
 	private DirectInputJoystickDevice(
@@ -123,13 +129,6 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 		}
 
 		return new(AxisRangeMin, AxisRangeMax);
-	}
-
-	public static PooledList<DirectInputJoystickDevice> EnumerateConnected() => DirectInputJoystickDeviceFactory.Instance.EnumerateConnectedInputDevices();
-
-	public static ImmutableArray<DirectInputDeviceInfo> EnumerateConnectedDeviceInfos()
-	{
-		return DirectInputDeviceEnumerator.EnumerateConnectedDeviceInfos();
 	}
 
 	internal static DirectInputJoystickDevice? OpenDevice(nint directInput, DirectInputDeviceInfo info)
@@ -620,7 +619,7 @@ public sealed unsafe class DirectInputJoystickDevice : JoystickDevice
 
 	public static DirectInputJoystickDevice ResolveDevice(string selector)
 	{
-		using var devices = EnumerateConnected();
+		using var devices = Factory.EnumerateConnectedInputDevices();
 		DirectInputJoystickDevice? selected = null;
 		try
 		{
