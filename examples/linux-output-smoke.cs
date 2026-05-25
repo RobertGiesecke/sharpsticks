@@ -7,6 +7,7 @@
 
 using SharpSticks.InputAbstractions;
 using SharpSticks.LinuxOutput;
+using SharpSticks.OutputAbstractions;
 
 // Hand-build the route lists the factory expects.
 const uint deviceId = 1;
@@ -14,32 +15,34 @@ var axisRoutes = new[]
 {
 	new AxisRoute
 	{
-		Source = new AxisBinding(DeviceId: 99, Axis: Axis.X),
-		OutputBinding = new OutputAxisBinding(deviceId, Axis.X),
+		Source = new(DeviceId: 99, Axis: Axis.X),
+		OutputBinding = new(deviceId, Axis.X),
 		Modifier = null,
 	},
 	new AxisRoute
 	{
-		Source = new AxisBinding(DeviceId: 99, Axis: Axis.Y),
-		OutputBinding = new OutputAxisBinding(deviceId, Axis.Y),
+		Source = new(DeviceId: 99, Axis: Axis.Y),
+		OutputBinding = new(deviceId, Axis.Y),
 		Modifier = null,
 	},
 };
 var buttonRoutes = new[]
 {
 	new ButtonRoute(
-		new ButtonBinding(DeviceId: 99, ButtonNumber: 1),
-		new OutputButtonBinding(deviceId, ButtonNumber: 1)),
+		new(DeviceId: 99, ButtonNumber: 1),
+		new(deviceId, ButtonNumber: 1)),
 	new ButtonRoute(
-		new ButtonBinding(DeviceId: 99, ButtonNumber: 2),
-		new OutputButtonBinding(deviceId, ButtonNumber: 2)),
+		new(DeviceId: 99, ButtonNumber: 2),
+		new(deviceId, ButtonNumber: 2)),
 };
 
 OutputDevice device;
 try
 {
-	using var opened = LinuxOutputDeviceFactory.Instance.Open(
-		new[] { new OutputDeviceRequest(deviceId, buttonRoutes, axisRoutes, []) });
+	using var opened = LinuxOutputDeviceFactory.Instance.EnumerateConnectedOutputDevices(
+	[
+		new(deviceId, buttonRoutes, axisRoutes, []),
+	]);
 	device = opened[0];
 }
 catch (InvalidOperationException ex)

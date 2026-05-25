@@ -45,8 +45,8 @@ public sealed class DeviceReferenceTests : IDisposable
 						WhenPressed = new AxisCurve { Max = 0.5 },
 						WhenNotPressed = new BlendedAxisCurve
 						{
-							NormalCurve = new() { Max = 1.0 },
-							PrecisionCurve = new() { Max = 0.2 },
+							NormalCurve = new AxisCurve { Max = 1.0 },
+							PrecisionCurve = new AxisCurve { Max = 0.2 },
 							// also device id 2 via the modifier axis
 							ModifierAxis = new(stickB.DeviceId, Axis.Slider1, AxisMode.Unsigned),
 						},
