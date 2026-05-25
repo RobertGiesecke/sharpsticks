@@ -1,6 +1,11 @@
 <Project>
     <Import Condition="'$(SharedPropsLoaded)' != 'true' and exists('$(MSBuildThisFileDirectory)Shared.props')" Project="$(MSBuildThisFileDirectory)Shared.props"/>
-    <ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
         <Using Alias="PlatformDefaultInputDevice" Include="$(PackageRootName).DirectInput.DirectInputJoystickDevice"/>
+        <Using Alias="PlatformDefaultInputDeviceFactory" Include="$(PackageRootName).DirectInput.DirectInputJoystickDeviceFactory"/>
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+        <Using Alias="PlatformDefaultInputDevice" Include="$(PackageRootName).LinuxInput.LinuxInputJoystickDevice"/>
+        <Using Alias="PlatformDefaultInputDeviceFactory" Include="$(PackageRootName).LinuxInput.LinuxInputJoystickDeviceFactory"/>
     </ItemGroup>
 </Project>
