@@ -216,8 +216,10 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			builder.AppendLine("global using static SharpSticks.InputAbstractions.Macros;");
 		}
 
+		var emitted = builder.ToString();
+		GeneratorLog.Log($"AddSource: SharpSticks.PackageGlobalUsings.g.cs ({emitted.Length} chars)");
 		context.AddSource("SharpSticks.PackageGlobalUsings.g.cs",
-			SourceText.From(builder.ToString(), Encoding.UTF8));
+			SourceText.From(emitted, Encoding.UTF8));
 	}
 
 	private static void GenerateDeviceInfos(SourceProductionContext context, ImmutableArray<DeviceInfoTarget> targets)
@@ -259,11 +261,15 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				target.Type, target.Levels,
 				target.DeviceRenames, target.AxisRenames, target.ButtonRenames,
 				directInputDevices, outputDevices);
-			context.AddSource(GetDeviceInfosHintName(target.Type), SourceText.From(source, Encoding.UTF8));
+			var hintName = GetDeviceInfosHintName(target.Type);
+			GeneratorLog.Log($"AddSource: {hintName} ({source.Length} chars, target={target.Type.ToDisplayString()})");
+			context.AddSource(hintName, SourceText.From(source, Encoding.UTF8));
 
 			var fqn = target.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-			context.AddSource(GetDeviceInfosHintName(target.Type).Replace(".DeviceInfos.g.cs", ".GlobalUsings.g.cs"),
-				SourceText.From(BuildGlobalUsings(fqn, target.Levels), Encoding.UTF8));
+			var globalUsings = BuildGlobalUsings(fqn, target.Levels);
+			var globalUsingsHintName = hintName.Replace(".DeviceInfos.g.cs", ".GlobalUsings.g.cs");
+			GeneratorLog.Log($"AddSource: {globalUsingsHintName} ({globalUsings.Length} chars)");
+			context.AddSource(globalUsingsHintName, SourceText.From(globalUsings, Encoding.UTF8));
 		}
 	}
 
@@ -316,10 +322,14 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 
 		builder.AppendLine("}");
 
-		context.AddSource("Devices.AssemblyDeviceInfos.g.cs", SourceText.From(builder.ToString(), Encoding.UTF8));
+		var assemblySource = builder.ToString();
+		GeneratorLog.Log($"AddSource: Devices.AssemblyDeviceInfos.g.cs ({assemblySource.Length} chars)");
+		context.AddSource("Devices.AssemblyDeviceInfos.g.cs", SourceText.From(assemblySource, Encoding.UTF8));
 
+		var assemblyGlobalUsings = BuildGlobalUsings("Devices", target.Levels);
+		GeneratorLog.Log($"AddSource: Devices.GlobalUsings.g.cs ({assemblyGlobalUsings.Length} chars)");
 		context.AddSource("Devices.GlobalUsings.g.cs",
-			SourceText.From(BuildGlobalUsings("Devices", target.Levels), Encoding.UTF8));
+			SourceText.From(assemblyGlobalUsings, Encoding.UTF8));
 	}
 
 	private static string GenerateDeviceInfosSource(
