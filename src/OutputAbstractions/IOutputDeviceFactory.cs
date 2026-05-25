@@ -48,4 +48,9 @@ public interface IOutputDeviceFactory
 	PooledList<OutputDevice> EnumerateConnectedOutputDevices(
 		IReadOnlyCollection<OutputDeviceRequest> requests,
 		IReadOnlyList<JoystickDevice> availableInputs);
+
+	/// Non-claiming metadata snapshot of every available output slot. Used at design
+	/// time (e.g. by the source generator). Backends that materialize devices on demand
+	/// (Linux uinput) return empty.
+	ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs() => ImmutableArray<AvailableOutputDevice>.Empty;
 }

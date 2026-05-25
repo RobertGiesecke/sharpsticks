@@ -30,4 +30,30 @@ public sealed class DirectInputJoystickDeviceFactory : IJoystickDeviceFactory<Di
 			throw;
 		}
 	}
+
+	public ImmutableArray<AvailableInputDevice> EnumerateAvailableInputs()
+	{
+		try
+		{
+			var directInput = DirectInputDeviceEnumerator.GetOrCreateContext();
+			var deviceInfos = DirectInputDeviceEnumerator.EnumerateConnectedDeviceInfos(directInput);
+			var builder = ImmutableArray.CreateBuilder<AvailableInputDevice>(deviceInfos.Length);
+			foreach (var info in deviceInfos)
+			{
+				DirectInputCapabilityReader.TryGetCapabilities(
+					directInput, info.InstanceGuid, out var axes, out var buttonCount);
+				builder.Add(new(info.DeviceId, info.ProductName, info.ProductGuid, axes, buttonCount));
+			}
+
+			return builder.ToImmutable();
+		}
+		catch (Exception ex) when (IsExpectedEnumerationFailure(ex))
+		{
+			return ImmutableArray<AvailableInputDevice>.Empty;
+		}
+	}
+
+	private static bool IsExpectedEnumerationFailure(Exception exception) =>
+		exception is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException
+			or FileNotFoundException or FileLoadException or InvalidOperationException;
 }

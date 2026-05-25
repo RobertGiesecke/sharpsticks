@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Collections.Pooled;
 
 namespace SharpSticks.VJoy;
@@ -11,6 +12,56 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 	/// corresponds to which vJoy slot by (axis count, button count) fingerprint and
 	/// stable sequential claim from the candidate pool.
 	internal static Guid VJoyProductGuid { get; } = ProductGuidEncoder.Encode(vendor: 0x1234, product: 0xBEAD);
+
+	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs()
+	{
+		try
+		{
+			VJoyNative.EnsureLoaded();
+			if (!VJoyNative.VJoyEnabled())
+			{
+				return ImmutableArray<AvailableOutputDevice>.Empty;
+			}
+
+			var builder = ImmutableArray.CreateBuilder<AvailableOutputDevice>();
+			for (var deviceId = 1u; deviceId <= VJoyDevices.MaxDeviceId; deviceId++)
+			{
+				var status = VJoyNative.GetVJDStatus(deviceId);
+				if (status is VjdStatus.Missing or VjdStatus.Unknown)
+				{
+					continue;
+				}
+
+				var axes = EnumerateAxes(deviceId);
+				var buttonCount = (uint)Math.Max(0, VJoyNative.GetVJDButtonNumber(deviceId));
+				builder.Add(new(deviceId, axes, buttonCount, VJoyProductGuid));
+			}
+
+			return builder.ToImmutable();
+		}
+		catch (Exception ex) when (IsExpectedEnumerationFailure(ex))
+		{
+			return ImmutableArray<AvailableOutputDevice>.Empty;
+		}
+	}
+
+	private static ImmutableArray<Axis> EnumerateAxes(uint deviceId)
+	{
+		var builder = ImmutableArray.CreateBuilder<Axis>();
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x30)) builder.Add(Axis.X);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x31)) builder.Add(Axis.Y);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x32)) builder.Add(Axis.Z);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x33)) builder.Add(Axis.Rx);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x34)) builder.Add(Axis.Ry);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x35)) builder.Add(Axis.Rz);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x36)) builder.Add(Axis.Slider1);
+		if (VJoyNative.GetVJDAxisExist(deviceId, 0x37)) builder.Add(Axis.Slider2);
+		return builder.ToImmutable();
+	}
+
+	private static bool IsExpectedEnumerationFailure(Exception exception) =>
+		exception is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException
+			or FileNotFoundException or FileLoadException or InvalidOperationException;
 
 	/// Public convenience overload for callers (tests, examples) that work directly with
 	/// concrete <see cref="VJoyDevice"/> instances.
