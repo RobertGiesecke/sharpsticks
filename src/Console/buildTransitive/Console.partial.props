@@ -1,7 +1,6 @@
 <Project>
-  <Import Condition="'$(SharedPropsLoaded)' != 'true' and exists('$(MSBuildThisFileDirectory)Shared.props')" Project="$(MSBuildThisFileDirectory)Shared.props"/>
   <ItemGroup>
-    <Using Include="static $(PackageRootName).Console.ConsoleExtensions" />
-    <Using Include="static $(PackageRootName).InputAbstractions.Macros" />
+    <Using Include="static SharpSticks.Console.ConsoleExtensions" />
+    <Using Include="static SharpSticks.InputAbstractions.Macros" />
   </ItemGroup>
 </Project>

@@ -18,7 +18,6 @@
                AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
         <ParameterGroup>
             <SourceFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true"/>
-            <PackageRootName ParameterType="System.String" Required="true"/>
             <ParsedUsings ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true"/>
         </ParameterGroup>
         <Task>
@@ -69,10 +68,6 @@ foreach (var file in SourceFiles)
             {
                 continue;
             }
-            // String-concat the "$" so MSBuild doesn't expand $(PackageRootName) inside this
-            // CDATA at task-load time. Without the split, both sides of the Replace would
-            // resolve to "SharpSticks" before the C# even compiles.
-            include = include.Replace("$" + "(PackageRootName)", PackageRootName);
             var hasAliasAttr = u.HasAttribute("Alias");
             var alias = hasAliasAttr ? u.GetAttribute("Alias") : string.Empty;
             var key = include + "|" + alias + "|" + condition;
@@ -256,8 +251,7 @@ File.WriteAllText(OutputFile, content);
             <_ExportedAnalyzerProjects Include="@(SharpSticksExportAnalyzerProject)"/>
         </ItemGroup>
 
-        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps);@(_PartialProps)"
-                               PackageRootName="$(PackageRootName)">
+        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps);@(_PartialProps)">
             <Output TaskParameter="ParsedUsings" ItemName="_ParsedExportedUsings"/>
         </ParseTransitiveUsings>
 
@@ -298,8 +292,7 @@ File.WriteAllText(OutputFile, content);
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
         </ItemGroup>
 
-        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps)"
-                               PackageRootName="$(PackageRootName)">
+        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps)">
             <Output TaskParameter="ParsedUsings" ItemName="_ImportedParsedUsings"/>
         </ParseTransitiveUsings>
 
