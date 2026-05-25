@@ -1,10 +1,35 @@
 <Project>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-        <Using Alias="PlatformDefaultInputDevice" Include="SharpSticks.DirectInput.DirectInputJoystickDevice"/>
-        <Using Alias="PlatformDefaultInputDeviceFactory" Include="SharpSticks.DirectInput.DirectInputJoystickDeviceFactory"/>
-    </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
-        <Using Alias="PlatformDefaultInputDevice" Include="SharpSticks.LinuxInput.LinuxInputJoystickDevice"/>
-        <Using Alias="PlatformDefaultInputDeviceFactory" Include="SharpSticks.LinuxInput.LinuxInputJoystickDeviceFactory"/>
-    </ItemGroup>
+    <Choose>
+        <When Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+            <PropertyGroup>
+                <PlatformDefaultInputDeviceTypeName>DirectInputJoystickDevice</PlatformDefaultInputDeviceTypeName>
+                <PlatformDefaultInputDeviceFullTypeName>SharpSticks.DirectInput.$(PlatformDefaultInputDeviceTypeName)</PlatformDefaultInputDeviceFullTypeName>
+                <PlatformDefaultInputDeviceFactoryTypeName>DirectInputJoystickDeviceFactory</PlatformDefaultInputDeviceFactoryTypeName>
+                <PlatformDefaultInputDeviceFactoryFullTypeName>SharpSticks.DirectInput.$(PlatformDefaultInputDeviceFactoryTypeName)</PlatformDefaultInputDeviceFactoryFullTypeName>
+            </PropertyGroup>
+        </When>
+        <When Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+            <PropertyGroup>
+                <PlatformDefaultInputDeviceTypeName>LinuxInputJoystickDevice</PlatformDefaultInputDeviceTypeName>
+                <PlatformDefaultInputDeviceFullTypeName>SharpSticks.LinuxInput.$(PlatformDefaultInputDeviceTypeName)</PlatformDefaultInputDeviceFullTypeName>
+                <PlatformDefaultInputDeviceFactoryTypeName>LinuxInputJoystickDeviceFactory</PlatformDefaultInputDeviceFactoryTypeName>
+                <PlatformDefaultInputDeviceFactoryFullTypeName>SharpSticks.LinuxInput.$(PlatformDefaultInputDeviceFactoryTypeName)</PlatformDefaultInputDeviceFactoryFullTypeName>
+            </PropertyGroup>
+        </When>
+    </Choose>
+
+    <Choose>
+        <When Condition="'$(PlatformDefaultInputDeviceFullTypeName)' != ''">
+            <ItemGroup>
+                <Using Alias="PlatformDefaultInputDevice" Include="$(PlatformDefaultInputDeviceFullTypeName)"/>
+            </ItemGroup>
+        </When>
+    </Choose>
+    <Choose>
+        <When Condition="'$(PlatformDefaultInputDeviceFactoryFullTypeName)' != ''">
+            <ItemGroup>
+                <Using Alias="PlatformDefaultInputDeviceFactory" Include="$(PlatformDefaultInputDeviceFactoryFullTypeName)"/>
+            </ItemGroup>
+        </When>
+    </Choose>
 </Project>

@@ -31,4 +31,5 @@
         <ProjectReference Include="..\Config\Config.csproj"/>
     </ItemGroup>
 
+    <Import Project="buildTransitive\Console.props" Condition="Exists('buildTransitive\Console.props')" />
 </Project>

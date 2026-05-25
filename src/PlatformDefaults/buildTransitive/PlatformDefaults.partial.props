@@ -1,0 +1,10 @@
+<Project>
+    <Choose>
+        <When Condition="'$(PlatformDefaultInputDeviceFullTypeName)' != '' and '$(PlatformDefaultOutputDeviceFullTypeName)' != ''">
+            <ItemGroup>
+                <Using Alias="PlatformDefaultDeviceFactory" Include="SharpSticks.OutputAbstractions.CombinedDeviceFactory&lt;$(PlatformDefaultInputDeviceFullTypeName), $(PlatformDefaultOutputDeviceFullTypeName)&gt;"/>
+            </ItemGroup>
+        </When>
+    </Choose>
+
+</Project>

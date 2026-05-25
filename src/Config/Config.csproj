@@ -10,10 +10,11 @@
         <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj"/>
     </ItemGroup>
 
-    <Import Project="buildTransitive\Config.partial.props" />
+    <!-- Own partial.props is imported by Directory.Build.props. -->
     <ItemGroup>
       <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" />
       <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="10.0.7" />
     </ItemGroup>
 
+    <Import Project="buildTransitive\Config.props" Condition="Exists('buildTransitive\Config.props')" />
 </Project>

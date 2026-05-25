@@ -16,6 +16,7 @@
     <Build Solution="Release|Any CPU" Project="false" />
   </Project>
   <Project Path="src/OutputAbstractions/OutputAbstractions.csproj" />
+  <Project Path="src/PlatformDefaults/PlatformDefaults.csproj" />
   <Project Path="src/PlatformInput/PlatformInput.csproj" />
   <Project Path="src/PlatformOutput/PlatformOutput.csproj" />
   <Project Path="src/Testing/Testing.csproj" />
