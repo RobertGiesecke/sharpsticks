@@ -128,7 +128,7 @@ public sealed class AxisToButtonRouteTests : IDisposable
 		var b3 = _Output.BindButton(3);
 		var b4 = _Output.BindButton(4);
 
-		using var runtime = Runtime.Build(new()
+		using var runtime = FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
@@ -244,7 +244,7 @@ public sealed class AxisToButtonRouteTests : IDisposable
 			0.5, 0.3, _Output.BindButton(1));
 
 		var ex = Assert.Throws<InvalidOperationException>(() =>
-			Runtime.Build(new()
+			FakesRuntime.Build(new()
 			{
 				Name = "test",
 				ConnectedDevices = _Fakes.InputDevices,
@@ -255,8 +255,8 @@ public sealed class AxisToButtonRouteTests : IDisposable
 		Assert.Contains("Max", ex.Message);
 	}
 
-	private IOutputRuntimeContext Build(params IBoundRoute[] routes) =>
-		Runtime.Build(new()
+	private IFakesOutputRuntimeContext Build(params IBoundRoute[] routes) =>
+		FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,

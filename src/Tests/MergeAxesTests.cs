@@ -109,7 +109,7 @@ public sealed class MergeAxesTests : IDisposable
 		var second = fakes.AddInputDevice("Second").AddAxis(Axis.X).Build();
 		var output = fakes.AddOutputDevice().AddAxis(Axis.X).Build();
 
-		using var runtime = Runtime.Build(new()
+		using var runtime = FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = fakes.InputDevices,
@@ -199,7 +199,7 @@ public sealed class MergeAxesTests : IDisposable
 	public void RouteTo_InvertOption_NegatesPlainAxisRoute()
 	{
 		// Invert lives on RouteAxisOptions so it works for non-merge routes too.
-		using var runtime = Runtime.Build(new()
+		using var runtime = FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
@@ -231,8 +231,8 @@ public sealed class MergeAxesTests : IDisposable
 		Assert.NotNull(route.Modifier);
 	}
 
-	private IOutputRuntimeContext BuildRuntime(MergeAxesOptions options) =>
-		Runtime.Build(new()
+	private IFakesOutputRuntimeContext BuildRuntime(MergeAxesOptions options) =>
+		FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,

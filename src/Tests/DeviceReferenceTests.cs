@@ -275,7 +275,7 @@ public sealed class DeviceReferenceTests : IDisposable
 		config.ResolveDeviceMap(_Fakes.InputDevices, deviceMap);
 		Assert.Equal(stick.DeviceId, deviceMap[configStickId]);
 
-		using var runtime = Runtime.Build(new()
+		using var runtime = FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
@@ -341,7 +341,7 @@ public sealed class DeviceReferenceTests : IDisposable
 		loaded.ResolveDeviceMap(nextSession.InputDevices, map);
 		Assert.Equal(reconnected.DeviceId, map[1]); // config-side id 1 → today's id 2
 
-		using var runtime = Runtime.Build(new()
+		using var runtime = FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = nextSession.InputDevices,

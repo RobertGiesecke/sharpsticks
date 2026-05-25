@@ -374,10 +374,10 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		DecreaseRestPosition = 0.5,
 	};
 
-	private IOutputRuntimeContext BuildRuntime(AbsoluteRelativeAxisOptions options)
+	private IFakesOutputRuntimeContext BuildRuntime(AbsoluteRelativeAxisOptions options)
 	{
 		var routes = _Stick.BindAxis(Axis.X).RouteAbsoluteRelative(options);
-		return Runtime.Build(new()
+		return FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
