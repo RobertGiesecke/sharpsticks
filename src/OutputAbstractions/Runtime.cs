@@ -2,7 +2,10 @@ using System.Text;
 
 namespace SharpSticks.OutputAbstractions;
 
-public sealed class Runtime : IOutputRuntimeContext, IDisposable
+//public sealed class Runtime : IOutputRuntimeContext, IDisposable
+public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext<TInputDevice, TOutputDevice>
+	where TInputDevice : JoystickDevice
+	where TOutputDevice : OutputDevice
 {
 	public string Name { get; }
 	private readonly DebugLogger? _DebugLogger;
@@ -11,15 +14,15 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	private readonly ImmutableArray<OutputAxisToButtonRoute> _AxisToButtonRoutes;
 	private long? _AxisZoneNextDeadlineTicks;
 	private readonly FrozenDictionary<OutputButtonBinding, OutputButtonWithBindings> _ButtonRoutesByBinding;
-	private readonly ImmutableArray<JoystickDevice> _Devices;
-	private readonly ImmutableArray<OutputDevice> _OutputDevices;
+	private readonly ImmutableArray<TInputDevice> _Devices;
+	private readonly ImmutableArray<TOutputDevice> _OutputDevices;
 	private readonly MacroEngine? _Macros;
 	private readonly ITimeSource _Time;
 
-	public ImmutableArray<OutputDevice> OutputDevices => _OutputDevices;
-	public FrozenDictionary<int, JoystickDevice> DevicesById { get; }
+	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
+	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
-	public ImmutableArray<JoystickDevice> Devices => _Devices;
+	public ImmutableArray<TInputDevice> Devices => _Devices;
 
 	private record struct OutputButtonState
 	{
@@ -36,7 +39,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	/// </summary>
 	private sealed class OutputButtonWithBindings
 	{
-		public required OutputDevice OutputDevice { get; init; }
+		public required TOutputDevice OutputDevice { get; init; }
 		public required int TargetButton { get; init; }
 		public required OutputButtonBinding TargetBinding { get; init; }
 		public required ImmutableArray<ButtonBindingWithDeviceId> Bindings { get; init; }
@@ -70,9 +73,9 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 
 	private sealed class OutputAxisRoute
 	{
-		public required OutputDevice OutputDevice { get; init; }
+		public required TOutputDevice OutputDevice { get; init; }
 		public required int SourceDeviceIndex { get; init; }
-		public required JoystickDevice SourceDevice { get; init; }
+		public required TInputDevice SourceDevice { get; init; }
 		public required AxisBinding Source { get; init; }
 		public required Axis OutputAxis { get; init; }
 		public required double Scale { get; init; }
@@ -84,7 +87,7 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	private sealed class OutputAxisToButtonRoute
 	{
 		public required int SourceDeviceIndex { get; init; }
-		public required JoystickDevice SourceDevice { get; init; }
+		public required TInputDevice SourceDevice { get; init; }
 		public required AxisBinding Source { get; init; }
 		public required double Min { get; init; }
 		public required double Max { get; init; }
@@ -101,14 +104,14 @@ public sealed class Runtime : IOutputRuntimeContext, IDisposable
 	public Runtime(
 		string name,
 		DebugLogger? debugLogger,
-		PooledDictionary<int, JoystickDevice> devices,
+		PooledDictionary<int, TInputDevice> devices,
 		ImmutableArray<ButtonRoute> buttonRoutes,
 		ImmutableArray<AxisRoute> axisRoutes,
 		ImmutableArray<ButtonMacroRoute> macroRoutes,
 		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
-		ImmutableArray<OutputDevice> outputDevices)
+		ImmutableArray<TOutputDevice> outputDevices)
 	{
 		Name = name;
 		_DebugLogger = debugLogger;

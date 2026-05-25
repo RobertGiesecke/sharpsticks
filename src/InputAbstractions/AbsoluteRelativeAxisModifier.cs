@@ -17,7 +17,8 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 	{
 	}
 
-	public IRuntimeAxisModifier CreateModifierRuntimeContext(IRuntimeContext context) =>
+	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
+		where TInputDevice : JoystickDevice =>
 		new RuntimeModifier(_SharedState, _Direction, _RestPosition);
 
 	internal sealed class SharedState

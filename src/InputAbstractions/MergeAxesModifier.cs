@@ -32,8 +32,9 @@ internal sealed class MergeAxesModifier : IAxisModifier
 		_FirstModifier?.FillDevices(deviceIds);
 	}
 
-	public IRuntimeAxisModifier CreateModifierRuntimeContext(IRuntimeContext context) =>
-		new RuntimeModifier(
+	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
+		where TInputDevice : JoystickDevice =>
+		new RuntimeModifier<TInputDevice>(
 			context.DevicesById[_Second.DeviceId],
 			context.DeviceIndexesById[_Second.DeviceId],
 			_Second,
@@ -43,8 +44,8 @@ internal sealed class MergeAxesModifier : IAxisModifier
 			_FirstModifier?.CreateModifierRuntimeContext(context),
 			_Mode);
 
-	private sealed class RuntimeModifier(
-		JoystickDevice secondDevice,
+	private sealed class RuntimeModifier<TInputDevice>(
+		TInputDevice secondDevice,
 		int secondDeviceIndex,
 		AxisBinding secondSource,
 		double secondScale,
@@ -52,6 +53,7 @@ internal sealed class MergeAxesModifier : IAxisModifier
 		IRuntimeAxisModifier? secondModifier,
 		IRuntimeAxisModifier? firstModifier,
 		MergeMode mode) : IRuntimeAxisModifier
+		where TInputDevice : JoystickDevice
 	{
 		public double Apply(double input, JoystickState?[] states)
 		{

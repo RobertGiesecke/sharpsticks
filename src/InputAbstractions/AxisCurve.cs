@@ -27,7 +27,8 @@ public sealed record AxisCurve : IAxisModifier
 	{
 	}
 
-	public IRuntimeAxisModifier CreateModifierRuntimeContext(IRuntimeContext context)
+	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
+		where TInputDevice : JoystickDevice
 	{
 		return this switch
 		{
