@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Generator-ItbMinimal": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "../ItbMinimal/ItbMinimal.csproj"
+    }
+  }
+}
