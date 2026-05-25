@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <!--
+        Meta package: pulls in both PlatformInput and PlatformOutput so a single
+        ProjectReference / #:package brings host-OS-correct input + output backends.
+        The namespace usings + PlatformDefault* aliases propagate transitively
+        through the auto-generated buildTransitive props.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\PlatformInput\PlatformInput.csproj"/>
+        <ProjectReference Include="..\PlatformOutput\PlatformOutput.csproj"/>
+    </ItemGroup>
+</Project>

@@ -4,10 +4,18 @@
         <TargetFramework>net10.0</TargetFramework>
     </PropertyGroup>
 
-    <ItemGroup>
+    <!--
+        Build-host OS picks which backend ships through PlatformOutput.
+        Cross-OS targeting (build on Linux for Windows, or vice versa) is out of
+        scope; the partial.props aliases mirror this same condition.
+    -->
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
         <ProjectReference Include="..\VJoy\VJoy.csproj"/>
     </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+        <ProjectReference Include="..\LinuxOutput\LinuxOutput.csproj"/>
+    </ItemGroup>
 
-    <Import Project="buildTransitive\PlatformOutput.partial.props"/>
+    <!-- Own partial.props is imported by Directory.Build.props. -->
 
 </Project>

@@ -6,12 +6,13 @@
     </ItemGroup>
 
     <!--
-        Inline tasks that walk upstream `.props` and `partial.props` files via XElement
-        rather than line-regex. Conditional <ItemGroup Condition="..."> wrappers around
-        <Using> items are preserved verbatim through the auto-gen pipeline so a consumer's
-        MSBuild evaluates them at its own build time (e.g. host-OS-dependent aliases like
-        PlatformDefaultInputDevice -> DirectInputJoystickDevice / LinuxInputJoystickDevice).
-        Unconditional usings still go through dedup as before.
+        ParseTransitiveUsings — XmlDocument-based extraction of top-level <Using>
+        items from upstream .props and own partial.props. Used by the live in-tree
+        ImportProjectRefBuildTransitiveUsings target. It only finds <Using> elements
+        directly under <Project>/<ItemGroup>, so aliases nested inside <Choose>/<When>
+        in a partial.props don't reach the live owner via this path — those work for
+        NuGet consumers (whose MSBuild evaluates the merged .props natively) but not
+        for in-tree projref consumers without a top-level <ItemGroup> alongside.
     -->
     <UsingTask TaskName="ParseTransitiveUsings"
                TaskFactory="RoslynCodeTaskFactory"
@@ -39,9 +40,10 @@ foreach (var file in SourceFiles)
     {
         doc.Load(path);
     }
-    catch
+    catch (System.Xml.XmlException xmlEx)
     {
-        continue;
+        Log.LogError("ParseTransitiveUsings: failed to parse '" + path + "': " + xmlEx.Message);
+        return false;
     }
     var itemGroups = doc.SelectNodes("/Project/ItemGroup");
     if (itemGroups == null)
@@ -86,119 +88,110 @@ ParsedUsings = items.ToArray();
         </Task>
     </UsingTask>
 
+    <!--
+        Emit the consumer-facing build-transitive props by merging the top-level
+        Project children from each direct projref's auto-gen .props and this project's
+        own partial.props. Duplicates are removed by structural XML equality (each
+        element's serialized form via SaveOptions.OmitDuplicateNamespaces), so the
+        same upstream content reached through multiple ProjectReference chains shows
+        up once. When SkipUpstreamMerge is true (pack variant) only the own partial
+        contributes — NuGet auto-imports every transitive package's .props separately.
+    -->
     <UsingTask TaskName="WriteTransitiveProps"
                TaskFactory="RoslynCodeTaskFactory"
                AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
         <ParameterGroup>
-            <Usings ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true"/>
+            <UpstreamPropsFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]"/>
+            <SelfPartialPropsFile ParameterType="System.String"/>
             <SelfNamespace ParameterType="System.String"/>
             <AnalyzerProjects ParameterType="Microsoft.Build.Framework.ITaskItem[]"/>
+            <SkipUpstreamMerge ParameterType="System.Boolean"/>
             <OutputFile ParameterType="System.String" Required="true"/>
         </ParameterGroup>
         <Task>
             <Using Namespace="System.Collections.Generic"/>
             <Using Namespace="System.IO"/>
-            <Using Namespace="System.Linq"/>
-            <Using Namespace="System.Text"/>
+            <Using Namespace="System.Xml.Linq"/>
+            <!--language=C#-->
             <Code Type="Fragment" Language="cs">
 <![CDATA[
-System.Func<string, string> escape = s =>
-    s.Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;");
+var seen = new HashSet<string>(System.StringComparer.Ordinal);
+var merged = new List<XElement>();
 
-var sb = new StringBuilder();
-sb.AppendLine("<Project>");
-
-// Unconditional ItemGroup: self-namespace, all upstream Using items with no Condition,
-// and the SharpSticksTransitiveAnalyzerProject items (only in the in-tree variant).
-var seen = new HashSet<string>();
-sb.AppendLine("  <ItemGroup>");
-if (!string.IsNullOrEmpty(SelfNamespace) && seen.Add(SelfNamespace + "|"))
+System.Action<string> addElementsFrom = filePath =>
 {
-    sb.AppendLine("    <Using Include=\"" + escape(SelfNamespace) + "\" />");
+    if (!File.Exists(filePath))
+    {
+        return;
+    }
+    XDocument doc;
+    try
+    {
+        doc = XDocument.Load(filePath);
+    }
+    catch (System.Xml.XmlException xmlEx)
+    {
+        Log.LogError("WriteTransitiveProps: failed to parse '" + filePath + "': " + xmlEx.Message);
+        return;
+    }
+    if (doc.Root == null)
+    {
+        return;
+    }
+    foreach (var child in doc.Root.Elements())
+    {
+        var key = child.ToString(SaveOptions.OmitDuplicateNamespaces);
+        if (seen.Add(key))
+        {
+            merged.Add(new XElement(child));
+        }
+    }
+};
+
+if (!SkipUpstreamMerge && UpstreamPropsFiles != null)
+{
+    foreach (var src in UpstreamPropsFiles)
+    {
+        addElementsFrom(src.GetMetadata("FullPath"));
+    }
 }
-foreach (var u in Usings)
+
+if (!string.IsNullOrEmpty(SelfPartialPropsFile))
 {
-    if (!string.IsNullOrEmpty(u.GetMetadata("Condition")))
-    {
-        continue;
-    }
-    var include = u.GetMetadata("UsingInclude");
-    var alias = u.GetMetadata("Alias");
-    var key = include + "|" + alias;
-    if (!seen.Add(key))
-    {
-        continue;
-    }
-    var hasAlias = u.GetMetadata("HasAliasAttribute") == "true";
-    if (hasAlias || !string.IsNullOrEmpty(alias))
-    {
-        sb.AppendLine("    <Using Include=\"" + escape(include) + "\" Alias=\"" + escape(alias) + "\" />");
-    }
-    else
-    {
-        sb.AppendLine("    <Using Include=\"" + escape(include) + "\" />");
-    }
+    addElementsFrom(SelfPartialPropsFile);
+}
+
+// Self-namespace and analyzer items always go in (whether merging upstream or not).
+// They form a header ItemGroup at the top of the output.
+var headerItems = new List<XElement>();
+if (!string.IsNullOrEmpty(SelfNamespace))
+{
+    headerItems.Add(new XElement("Using", new XAttribute("Include", SelfNamespace)));
 }
 if (AnalyzerProjects != null)
 {
     var seenAnalyzers = new HashSet<string>();
     foreach (var p in AnalyzerProjects)
     {
-        if (!seenAnalyzers.Add(p.ItemSpec))
+        if (seenAnalyzers.Add(p.ItemSpec))
         {
-            continue;
+            headerItems.Add(new XElement("SharpSticksTransitiveAnalyzerProject",
+                new XAttribute("Include", p.ItemSpec)));
         }
-        sb.AppendLine("    <SharpSticksTransitiveAnalyzerProject Include=\"" + escape(p.ItemSpec) + "\" />");
     }
 }
-sb.AppendLine("  </ItemGroup>");
 
-// One <ItemGroup Condition="..."> per unique condition encountered upstream.
-var byCondition = new Dictionary<string, List<Microsoft.Build.Framework.ITaskItem>>(System.StringComparer.Ordinal);
-foreach (var u in Usings)
+var outputDoc = new XDocument(new XElement("Project"));
+if (headerItems.Count > 0)
 {
-    var condition = u.GetMetadata("Condition");
-    if (string.IsNullOrEmpty(condition))
-    {
-        continue;
-    }
-    List<Microsoft.Build.Framework.ITaskItem> list;
-    if (!byCondition.TryGetValue(condition, out list))
-    {
-        list = new List<Microsoft.Build.Framework.ITaskItem>();
-        byCondition[condition] = list;
-    }
-    list.Add(u);
+    outputDoc.Root.Add(new XElement("ItemGroup", headerItems));
 }
-foreach (var pair in byCondition)
+foreach (var el in merged)
 {
-    sb.AppendLine("  <ItemGroup Condition=\"" + escape(pair.Key) + "\">");
-    var groupSeen = new HashSet<string>();
-    foreach (var u in pair.Value)
-    {
-        var include = u.GetMetadata("UsingInclude");
-        var alias = u.GetMetadata("Alias");
-        var key = include + "|" + alias;
-        if (!groupSeen.Add(key))
-        {
-            continue;
-        }
-        var hasAlias = u.GetMetadata("HasAliasAttribute") == "true";
-        if (hasAlias || !string.IsNullOrEmpty(alias))
-        {
-            sb.AppendLine("    <Using Include=\"" + escape(include) + "\" Alias=\"" + escape(alias) + "\" />");
-        }
-        else
-        {
-            sb.AppendLine("    <Using Include=\"" + escape(include) + "\" />");
-        }
-    }
-    sb.AppendLine("  </ItemGroup>");
+    outputDoc.Root.Add(el);
 }
 
-sb.Append("</Project>");
-
-var content = sb.ToString();
+var content = outputDoc.ToString(SaveOptions.OmitDuplicateNamespaces);
 if (File.Exists(OutputFile) && File.ReadAllText(OutputFile) == content)
 {
     return true;
@@ -246,14 +239,8 @@ File.WriteAllText(OutputFile, content);
         <ItemGroup>
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
-            <_PartialProps Include="$(_BuildTransitivePartialFile)"
-                           Condition="Exists('$(_BuildTransitivePartialFile)')"/>
             <_ExportedAnalyzerProjects Include="@(SharpSticksExportAnalyzerProject)"/>
         </ItemGroup>
-
-        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps);@(_PartialProps)">
-            <Output TaskParameter="ParsedUsings" ItemName="_ParsedExportedUsings"/>
-        </ParseTransitiveUsings>
 
         <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
                  Query="/Project/ItemGroup/SharpSticksTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
@@ -265,12 +252,19 @@ File.WriteAllText(OutputFile, content);
         </RemoveDuplicates>
 
         <MakeDir Directories="$(_BuildTransitiveDir);$([System.IO.Path]::GetDirectoryName($(_BuildTransitivePackFile)))"/>
-        <WriteTransitiveProps Usings="@(_ParsedExportedUsings)"
+        <!-- In-tree variant: merge upstream sections (verbatim) + own partial. ProjectReference
+             consumers in this repo see the full transitive chain via this file. -->
+        <WriteTransitiveProps UpstreamPropsFiles="@(_ProjRefProps)"
+                              SelfPartialPropsFile="$(_BuildTransitivePartialFile)"
                               SelfNamespace="$(RootNamespace)"
                               AnalyzerProjects="@(_DistinctExportedAnalyzerProjects)"
+                              SkipUpstreamMerge="false"
                               OutputFile="$(_BuildTransitiveFile)"/>
-        <WriteTransitiveProps Usings="@(_ParsedExportedUsings)"
+        <!-- Pack variant: own partial only. NuGet auto-imports each dependency package's
+             pack .props separately, so merging here would only cause duplicate aliases. -->
+        <WriteTransitiveProps SelfPartialPropsFile="$(_BuildTransitivePartialFile)"
                               SelfNamespace="$(RootNamespace)"
+                              SkipUpstreamMerge="true"
                               OutputFile="$(_BuildTransitivePackFile)"/>
         <ItemGroup>
             <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(PackageId).props"/>
@@ -281,34 +275,25 @@ File.WriteAllText(OutputFile, content);
     <Target Name="ImportProjectRefBuildTransitiveUsings"
             BeforeTargets="GenerateGlobalUsings"
             DependsOnTargets="ResolveProjectReferences">
-        <!--
-            No explicit <MSBuild> call here — ResolveProjectReferences already called
-            GetTargetPath on each direct ref, which (via GetTargetPathDependsOn) ran their
-            GenerateBuildTransitiveProps and transitively materialised the whole graph.
-            Their props files are guaranteed written by the time we read them below.
-        -->
         <ItemGroup>
             <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
                            Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
         </ItemGroup>
 
-        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps)">
+        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps)"
+                               Condition="'@(_ProjRefProps)' != ''">
             <Output TaskParameter="ParsedUsings" ItemName="_ImportedParsedUsings"/>
         </ParseTransitiveUsings>
 
-        <!--
-            Two ItemGroups so MSBuild can evaluate the per-item Condition metadata
-            cleanly. The first emits unconditional Usings; the second emits those whose
-            Condition metadata evaluates true for the current build (the third clause
-            inlines the captured Condition string, which MSBuild expands and parses as
-            a Condition expression — that's what gives us host-OS dispatch).
-        -->
+        <!-- Unconditional Using items from upstream .props. -->
         <ItemGroup>
             <Using Include="%(_ImportedParsedUsings.UsingInclude)"
                    Condition="'%(_ImportedParsedUsings.Condition)' == '' and '%(_ImportedParsedUsings.UsingInclude)' != ''">
                 <Alias>%(_ImportedParsedUsings.Alias)</Alias>
             </Using>
         </ItemGroup>
+        <!-- Conditional Using items (e.g. OS-conditional ItemGroups); MSBuild expands
+             the captured Condition metadata into the Using element's Condition. -->
         <ItemGroup>
             <Using Include="%(_ImportedParsedUsings.UsingInclude)"
                    Condition="'%(_ImportedParsedUsings.Condition)' != '' and '%(_ImportedParsedUsings.UsingInclude)' != '' and %(_ImportedParsedUsings.Condition)">
@@ -320,6 +305,10 @@ File.WriteAllText(OutputFile, content);
     <Target Name="ImportProjectRefBuildTransitiveAnalyzers"
             BeforeTargets="CoreCompile"
             DependsOnTargets="ImportProjectRefBuildTransitiveUsings">
+        <ItemGroup>
+            <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
+                           Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
+        </ItemGroup>
         <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
                  Query="/Project/ItemGroup/SharpSticksTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
                  Condition="'@(_ProjRefProps)' != ''">
