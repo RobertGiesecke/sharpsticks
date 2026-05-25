@@ -28,10 +28,9 @@
 
     <ItemGroup>
         <!--
-            Generator consumes input/output backends only through PlatformDefaults' typed
-            facade (PlatformDefaultDeviceFactory). The analyzer is OS-pinned to the build
-            host's OS: backends for the *other* OS aren't reachable through PlatformDefaults
-            and therefore aren't shipped to analyzers/dotnet/cs in the nupkg.
+            Generator consumes input/output backends through PlatformDefaults' two concrete
+            factories (Windows/Linux*DefaultDeviceFactory). Both backends ship in the
+            analyzer asset folder; DeviceSnapshots dispatches at runtime via OSPlatform.
         -->
         <ProjectReference Include="..\PlatformDefaults\PlatformDefaults.csproj" PrivateAssets="all" />
     </ItemGroup>

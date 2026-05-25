@@ -6,6 +6,7 @@ public interface ICombinedDeviceFactory :
 { }
 
 public interface ICombinedDeviceFactory<TInput, TOutput> :
+	ICombinedDeviceFactory,
 	IJoystickDeviceFactory<TInput>,
 	IOutputDeviceFactory<TOutput>
 	where TInput : JoystickDevice

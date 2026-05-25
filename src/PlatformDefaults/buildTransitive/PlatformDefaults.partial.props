@@ -1,2 +1,26 @@
 <Project>
+    <!--
+        The Choose runs at the consumer's MSBuild evaluation time, so a single PlatformDefaults
+        nupkg works on either OS — the alias points at whichever concrete *DefaultDeviceFactory
+        the consumer's host is. Both factory types live in SharpSticks.PlatformDefaults.dll.
+    -->
+    <Choose>
+        <When Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+            <PropertyGroup>
+                <PlatformDefaultDeviceFactoryFullTypeName>SharpSticks.PlatformDefaults.WindowsDefaultDeviceFactory</PlatformDefaultDeviceFactoryFullTypeName>
+            </PropertyGroup>
+        </When>
+        <When Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+            <PropertyGroup>
+                <PlatformDefaultDeviceFactoryFullTypeName>SharpSticks.PlatformDefaults.LinuxDefaultDeviceFactory</PlatformDefaultDeviceFactoryFullTypeName>
+            </PropertyGroup>
+        </When>
+    </Choose>
+    <Choose>
+        <When Condition="'$(PlatformDefaultDeviceFactoryFullTypeName)' != ''">
+            <ItemGroup>
+                <Using Alias="PlatformDefaultDeviceFactory" Include="$(PlatformDefaultDeviceFactoryFullTypeName)"/>
+            </ItemGroup>
+        </When>
+    </Choose>
 </Project>

@@ -5,17 +5,15 @@
     </PropertyGroup>
 
     <!--
-        Build-host OS picks which backend ships through PlatformInput.
-        Cross-OS targeting (build on Linux for Windows, or vice versa) is out of
-        scope; the partial.props aliases mirror this same condition.
+        Both backends ship unconditionally. The concrete WindowsDefaultDeviceFactory and
+        LinuxDefaultDeviceFactory in PlatformDefaults each bind to a single backend, but
+        both need to be loadable so the buildTransitive props can pick one at consumer-
+        evaluation time. P/Invokes inside an unused backend never get called, so loading
+        e.g. LinuxInput.dll on Windows is harmless.
     -->
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <ItemGroup>
         <ProjectReference Include="..\DirectInput\DirectInput.csproj"/>
-    </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
         <ProjectReference Include="..\LinuxInput\LinuxInput.csproj"/>
     </ItemGroup>
-
-    <!-- Own partial.props is imported by Directory.Build.props. -->
 
 </Project>

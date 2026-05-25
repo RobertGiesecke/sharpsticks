@@ -5,17 +5,11 @@
     </PropertyGroup>
 
     <!--
-        Build-host OS picks which backend ships through PlatformOutput.
-        Cross-OS targeting (build on Linux for Windows, or vice versa) is out of
-        scope; the partial.props aliases mirror this same condition.
+        Both backends ship unconditionally; see PlatformInput.csproj for the rationale.
     -->
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <ItemGroup>
         <ProjectReference Include="..\VJoy\VJoy.csproj"/>
-    </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
         <ProjectReference Include="..\LinuxOutput\LinuxOutput.csproj"/>
     </ItemGroup>
-
-    <!-- Own partial.props is imported by Directory.Build.props. -->
 
 </Project>
