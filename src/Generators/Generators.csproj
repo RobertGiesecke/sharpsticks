@@ -27,16 +27,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\PlatformInput\PlatformInput.csproj" PrivateAssets="all" />
-        <ProjectReference Include="..\PlatformOutput\PlatformOutput.csproj" PrivateAssets="all" />
         <!--
-            LinuxInput referenced directly (not via PlatformInput) so its DLL + LinuxNative's
-            ship in analyzers/dotnet/cs/ regardless of which OS PlatformInput's meta layer
-            picks at restore time. The analyzer host is whatever OS the dev is on; we need
-            both backends available so the OS-dispatch in DeviceSnapshots can call into the
-            right one at design time.
+            Generator consumes input/output backends only through PlatformDefaults' typed
+            facade (PlatformDefaultDeviceFactory). The analyzer is OS-pinned to the build
+            host's OS: backends for the *other* OS aren't reachable through PlatformDefaults
+            and therefore aren't shipped to analyzers/dotnet/cs in the nupkg.
         -->
-        <ProjectReference Include="..\LinuxInput\LinuxInput.csproj" PrivateAssets="all" />
+        <ProjectReference Include="..\PlatformDefaults\PlatformDefaults.csproj" PrivateAssets="all" />
     </ItemGroup>
 
     <PropertyGroup>

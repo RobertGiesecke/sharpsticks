@@ -29,10 +29,10 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		DiagnosticSeverity.Error,
 		isEnabledByDefault: true);
 
-	private static readonly DiagnosticDescriptor DirectInputUnavailable = new(
+	private static readonly DiagnosticDescriptor InputDevicesUnavailable = new(
 		"SACIG002",
-		"DirectInput device snapshot unavailable",
-		"DirectInput device info generation could not enumerate devices: {0}",
+		"Input device snapshot unavailable",
+		"Input device info generation could not enumerate devices: {0}",
 		$"{NamespaceRoot}Generators",
 		DiagnosticSeverity.Warning,
 		isEnabledByDefault: true);
@@ -40,7 +40,7 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 	private static readonly DiagnosticDescriptor OutputDevicesUnavailable = new(
 		"SACIG003",
 		"Output device snapshot unavailable",
-		"Output device info generation could not enumerate vJoy devices: {0}",
+		"Output device info generation could not enumerate output devices: {0}",
 		$"{NamespaceRoot}Generators",
 		DiagnosticSeverity.Warning,
 		isEnabledByDefault: true);
@@ -203,9 +203,9 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			return;
 		}
 
-		if (!DeviceSnapshots.TryEnumerateDirectInputDevices(out var directInputDevices, out var directInputError))
+		if (!DeviceSnapshots.TryEnumerateInputDevices(out var directInputDevices, out var directInputError))
 		{
-			context.ReportDiagnostic(Diagnostic.Create(DirectInputUnavailable, Location.None, directInputError));
+			context.ReportDiagnostic(Diagnostic.Create(InputDevicesUnavailable, Location.None, directInputError));
 			directInputDevices = ImmutableArray<InputDeviceSnapshot>.Empty;
 		}
 
@@ -263,9 +263,9 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 			return;
 		}
 
-		if (!DeviceSnapshots.TryEnumerateDirectInputDevices(out var directInputDevices, out var directInputError))
+		if (!DeviceSnapshots.TryEnumerateInputDevices(out var directInputDevices, out var directInputError))
 		{
-			context.ReportDiagnostic(Diagnostic.Create(DirectInputUnavailable, Location.None, directInputError));
+			context.ReportDiagnostic(Diagnostic.Create(InputDevicesUnavailable, Location.None, directInputError));
 			directInputDevices = ImmutableArray<InputDeviceSnapshot>.Empty;
 		}
 
