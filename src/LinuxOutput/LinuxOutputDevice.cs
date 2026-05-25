@@ -3,7 +3,7 @@ namespace SharpSticks.LinuxOutput;
 /// uinput-backed <see cref="OutputDevice"/>. The factory has already configured the device's
 /// axes and buttons via ioctl and called UI_DEV_CREATE; this class just <c>write()</c>s
 /// <c>input_event</c> bursts to push state changes through the kernel.
-public sealed class LinuxOutputDevice : OutputDevice
+public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<LinuxOutputDevice>
 {
 	internal const int AxisRangeMin = -32767;
 	internal const int AxisRangeMax = 32767;
@@ -13,6 +13,9 @@ public sealed class LinuxOutputDevice : OutputDevice
 	private readonly FrozenDictionary<int, ushort> _ButtonCodes;
 	private readonly PooledDictionary<Axis, int> _LastAxisValues;
 	private readonly PooledDictionary<int, bool> _LastButtonValues;
+
+	public static LinuxOutputDeviceFactory Factory => LinuxOutputDeviceFactory.Instance;
+	static IOutputDeviceFactory<LinuxOutputDevice> IOutputDeviceWithFactory<LinuxOutputDevice>.Factory => Factory;
 
 	internal LinuxOutputDevice(
 		uint deviceId,

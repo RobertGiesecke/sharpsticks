@@ -2,11 +2,14 @@ using Collections.Pooled;
 
 namespace SharpSticks.VJoy;
 
-public sealed class VJoyDevice : OutputDevice
+public sealed class VJoyDevice : OutputDevice, IOutputDeviceWithFactory<VJoyDevice>
 {
 	private readonly FrozenDictionary<Axis, AxisLimits> _AxisLimits;
 	private readonly PooledDictionary<Axis, int> _LastAxisValues;
 	private readonly PooledDictionary<int, bool> _LastButtonValues;
+
+	public static VJoyDeviceFactory Factory => VJoyDeviceFactory.Instance;
+	static IOutputDeviceFactory<VJoyDevice> IOutputDeviceWithFactory<VJoyDevice>.Factory => Factory;
 
 	public VJoyDevice(uint deviceId, FrozenDictionary<Axis, AxisLimits> axisLimits)
 		: base(deviceId)
