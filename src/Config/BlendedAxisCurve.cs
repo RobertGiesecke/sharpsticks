@@ -22,18 +22,20 @@ public sealed record BlendedAxisCurve : IAxisModifier
 	// axes that never quite reach 0.
 	public double RestThreshold { get; init; } = 1e-3;
 
-	public IRuntimeAxisModifier CreateModifierRuntimeContext(IRuntimeContext context) =>
-		new RuntimeModifier(this, context);
+	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context) 
+		where TInputDevice : JoystickDevice =>
+		new RuntimeModifier<TInputDevice>(this, context);
 
 	public void FillDevices(ICollection<int> deviceIds)
 	{
 		deviceIds.Add(ModifierAxis.DeviceId);
 	}
 
-	private sealed class RuntimeModifier : IRuntimeAxisModifier
+	private sealed class RuntimeModifier<TInputDevice> : IRuntimeAxisModifier
+		where TInputDevice : JoystickDevice
 	{
 		private readonly int _ModifierAxisDeviceIndex;
-		private readonly JoystickDevice _ModifierAxisDevice;
+		private readonly TInputDevice _ModifierAxisDevice;
 		private readonly IRuntimeAxisModifier _NormalCurve;
 		private readonly IRuntimeAxisModifier _PrecisionCurve;
 		private readonly BlendedAxisCurve _Source;
@@ -42,7 +44,7 @@ public sealed record BlendedAxisCurve : IAxisModifier
 		private double _LastInput;
 		private double _LastOutput;
 
-		public RuntimeModifier(BlendedAxisCurve source, IRuntimeContext runtimeContext)
+		public RuntimeModifier(BlendedAxisCurve source, IRuntimeContext<TInputDevice> runtimeContext)
 		{
 			_Source = source;
 			_NormalCurve = _Source.NormalCurve.CreateModifierRuntimeContext(runtimeContext);

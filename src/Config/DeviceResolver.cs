@@ -2,13 +2,18 @@
 
 public static class DeviceResolver
 {
-	public static AxisBinding ResolveAxisBinding(IReadOnlyList<JoystickDevice> devices, DeviceAxisSource source)
+	public static AxisBinding ResolveAxisBinding<TInputDevice>(
+		IReadOnlyList<TInputDevice> devices,
+		DeviceAxisSource source)
+		where TInputDevice : JoystickDevice
 	{
 		var device = devices.ResolveDevice(source.DeviceName);
 		return device.BindAxis(source.Axis);
 	}
 
-	public static ButtonBinding ResolveButtonBinding(IReadOnlyList<JoystickDevice> devices, DeviceButtonSource source)
+	public static ButtonBinding ResolveButtonBinding<TInputDevice>(IReadOnlyList<TInputDevice> devices,
+		DeviceButtonSource source)
+		where TInputDevice : JoystickDevice
 	{
 		if (source.Button < 1)
 		{

@@ -32,10 +32,11 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 		}
 	}
 
-	private static void OpenAll<TDevice>(
+	private static void OpenAll<TInputDevice, TDevice>(
 		IReadOnlyCollection<OutputDeviceRequest> requests,
-		IReadOnlyList<JoystickDevice>? availableInputs,
+		IReadOnlyList<TInputDevice>? availableInputs,
 		PooledList<TDevice> destination)
+		where TInputDevice : JoystickDevice
 		where TDevice : OutputDevice
 	{
 		VJoyNative.EnsureLoaded();
@@ -58,9 +59,11 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 		}
 	}
 
-	private static PooledList<JoystickDevice> BuildCandidatePool(IReadOnlyList<JoystickDevice>? availableInputs)
+	private static PooledList<TInputDevice> BuildCandidatePool<TInputDevice>(
+		IReadOnlyList<TInputDevice>? availableInputs)
+		where TInputDevice : JoystickDevice
 	{
-		var pool = new PooledList<JoystickDevice>(availableInputs?.Count ?? 0);
+		var pool = new PooledList<TInputDevice>(availableInputs?.Count ?? 0);
 		if (availableInputs is null)
 		{
 			return pool;
@@ -162,7 +165,9 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 	/// Walk the (already filtered + sorted) pool front-to-back, claim the first entry
 	/// whose <see cref="JoystickCapabilities"/> matches this output's caps, remove it.
 	/// Returns null when no candidate is left or none matches the caps fingerprint.
-	private static int? ClaimMatchingInput(JoystickCapabilities caps, PooledList<JoystickDevice> candidatePool)
+	private static int? ClaimMatchingInput<TInputDevice>(JoystickCapabilities caps,
+		PooledList<TInputDevice> candidatePool)
+		where TInputDevice : JoystickDevice
 	{
 		for (var i = 0; i < candidatePool.Count; i++)
 		{

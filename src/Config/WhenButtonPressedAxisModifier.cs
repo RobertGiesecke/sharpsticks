@@ -20,7 +20,8 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 	// stateful branch drops the latched state.
 	public WhenButtonPressedStateful Stateful { get; init; } = WhenButtonPressedStateful.None;
 
-	private sealed class RuntimeModifier : IRuntimeAxisModifier
+	private sealed class RuntimeModifier<TInputDevice> : IRuntimeAxisModifier
+		where TInputDevice : JoystickDevice
 	{
 		private readonly IRuntimeAxisModifier? _WhenPressed;
 		private readonly IRuntimeAxisModifier? _WhenNotPressed;
@@ -37,7 +38,7 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 			public required int SourceDeviceIndex { get; init; }
 		}
 
-		public RuntimeModifier(IRuntimeContext context, WhenButtonPressedAxisModifier source)
+		public RuntimeModifier(IRuntimeContext<TInputDevice> context, WhenButtonPressedAxisModifier source)
 		{
 			_WhenPressed = source.WhenPressed?.CreateModifierRuntimeContext(context);
 			_WhenNotPressed = source.WhenNotPressed?.CreateModifierRuntimeContext(context);
@@ -111,8 +112,9 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 			modifier?.Apply(input, states) ?? input;
 	}
 
-	public IRuntimeAxisModifier CreateModifierRuntimeContext(IRuntimeContext context) =>
-		new RuntimeModifier(context, this);
+	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
+		where TInputDevice : JoystickDevice =>
+		new RuntimeModifier<TInputDevice>(context, this);
 
 	public void FillDevices(ICollection<int> deviceIds)
 	{
