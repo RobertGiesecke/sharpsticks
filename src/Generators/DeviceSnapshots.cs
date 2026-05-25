@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 using SharpSticks.InputAbstractions;
 using SharpSticks.OutputAbstractions;
 using SharpSticks.PlatformDefaults;
@@ -33,11 +34,20 @@ internal static class DeviceSnapshots
 		return success;
 	}
 
+	// Resolve the concrete factory at runtime — the analyzer DLL is precompiled but
+	// runs on either OS, so we can't rely on the PlatformDefaultDeviceFactory alias
+	// (which the consumer's .props evaluates, not the analyzer's build). Lazy-touching
+	// only the active OS's factory keeps the other backend's static init off the stack.
+	private static ICombinedDeviceFactory GetFactory() =>
+		RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+			? LinuxDefaultDeviceFactory.Instance
+			: WindowsDefaultDeviceFactory.Instance;
+
 	private static (bool, ImmutableArray<InputDeviceSnapshot>, string?) EnumerateInputDevicesCore()
 	{
 		try
 		{
-			var available = PlatformDefaultDeviceFactory.Instance.EnumerateAvailableInputs();
+			var available = GetFactory().EnumerateAvailableInputs();
 			var builder = ImmutableArray.CreateBuilder<InputDeviceSnapshot>(available.Length);
 			foreach (var device in available)
 			{
@@ -56,7 +66,7 @@ internal static class DeviceSnapshots
 	{
 		try
 		{
-			var available = PlatformDefaultDeviceFactory.Instance.EnumerateAvailableOutputs();
+			var available = GetFactory().EnumerateAvailableOutputs();
 			var builder = ImmutableArray.CreateBuilder<OutputDeviceSnapshot>(available.Length);
 			foreach (var slot in available)
 			{

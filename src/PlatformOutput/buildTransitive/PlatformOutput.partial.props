@@ -6,7 +6,6 @@
                 <PlatformDefaultOutputDeviceFullTypeName>SharpSticks.VJoy.$(PlatformDefaultOutputDeviceTypeName)</PlatformDefaultOutputDeviceFullTypeName>
                 <PlatformDefaultOutputDeviceFactoryTypeName>VJoyDeviceFactory</PlatformDefaultOutputDeviceFactoryTypeName>
                 <PlatformDefaultOutputDeviceFactoryFullTypeName>SharpSticks.VJoy.$(PlatformDefaultOutputDeviceFactoryTypeName)</PlatformDefaultOutputDeviceFactoryFullTypeName>
-                <DefineConstants>$(DefineConstants);SHARPSTICKS_COMPILED_FOR_WINDOWS</DefineConstants>
             </PropertyGroup>
         </When>
         <When Condition="$([MSBuild]::IsOSPlatform('Linux'))">
@@ -15,7 +14,6 @@
                 <PlatformDefaultOutputDeviceFullTypeName>SharpSticks.LinuxOutput.$(PlatformDefaultOutputDeviceTypeName)</PlatformDefaultOutputDeviceFullTypeName>
                 <PlatformDefaultOutputDeviceFactoryTypeName>LinuxOutputDeviceFactory</PlatformDefaultOutputDeviceFactoryTypeName>
                 <PlatformDefaultOutputDeviceFactoryFullTypeName>SharpSticks.LinuxOutput.$(PlatformDefaultOutputDeviceFactoryTypeName)</PlatformDefaultOutputDeviceFactoryFullTypeName>
-                <DefineConstants>$(DefineConstants);SHARPSTICKS_COMPILED_FOR_LINUX</DefineConstants>
             </PropertyGroup>
         </When>
     </Choose>
@@ -25,9 +23,6 @@
             <ItemGroup>
                 <Using Alias="PlatformDefaultOutputDevice" Include="$(PlatformDefaultOutputDeviceFullTypeName)"/>
             </ItemGroup>
-            <PropertyGroup>
-                <DefineConstants>$(DefineConstants);SHARPSTICKS_HAS_OUTPUT_DEVICE_TYPE</DefineConstants>
-            </PropertyGroup>
         </When>
     </Choose>
     <Choose>
