@@ -3,6 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <UseGeneratorPackageReference Condition="'$(UseGeneratorPackageReference)' == ''">true</UseGeneratorPackageReference>
+        <MergePropsWhenNotPacked>true</MergePropsWhenNotPacked>
     </PropertyGroup>
 
     <ItemGroup>
@@ -31,6 +32,4 @@
         <ProjectReference Include="..\Config\Config.csproj"/>
         <ProjectReference Include="..\PlatformDefaults\PlatformDefaults.csproj" />
     </ItemGroup>
-
-    <Import Project="buildTransitive\Console.props" Condition="Exists('buildTransitive\Console.props')" />
 </Project>

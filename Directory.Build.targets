@@ -6,89 +6,6 @@
     </ItemGroup>
 
     <!--
-        ParseTransitiveUsings — XmlDocument-based extraction of top-level <Using>
-        items from upstream .props and own partial.props. Used by the live in-tree
-        ImportProjectRefBuildTransitiveUsings target. It only finds <Using> elements
-        directly under <Project>/<ItemGroup>, so aliases nested inside <Choose>/<When>
-        in a partial.props don't reach the live owner via this path — those work for
-        NuGet consumers (whose MSBuild evaluates the merged .props natively) but not
-        for in-tree projref consumers without a top-level <ItemGroup> alongside.
-    -->
-    <UsingTask TaskName="ParseTransitiveUsings"
-               TaskFactory="RoslynCodeTaskFactory"
-               AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
-        <ParameterGroup>
-            <SourceFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true"/>
-            <ParsedUsings ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true"/>
-        </ParameterGroup>
-        <Task>
-            <Using Namespace="System.Collections.Generic"/>
-            <Using Namespace="System.IO"/>
-            <Using Namespace="System.Xml"/>
-            <Code Type="Fragment" Language="cs">
-<![CDATA[
-var items = new List<Microsoft.Build.Framework.ITaskItem>();
-foreach (var file in SourceFiles)
-{
-    var path = file.GetMetadata("FullPath");
-    if (!File.Exists(path))
-    {
-        continue;
-    }
-    var doc = new XmlDocument();
-    try
-    {
-        doc.Load(path);
-    }
-    catch (System.Xml.XmlException xmlEx)
-    {
-        Log.LogError("ParseTransitiveUsings: failed to parse '" + path + "': " + xmlEx.Message);
-        return false;
-    }
-    var itemGroups = doc.SelectNodes("/Project/ItemGroup");
-    if (itemGroups == null)
-    {
-        continue;
-    }
-    foreach (XmlNode ig in itemGroups)
-    {
-        var igElement = ig as XmlElement;
-        if (igElement == null)
-        {
-            continue;
-        }
-        var condition = igElement.GetAttribute("Condition");
-        foreach (XmlNode child in igElement.ChildNodes)
-        {
-            var u = child as XmlElement;
-            if (u == null || u.LocalName != "Using")
-            {
-                continue;
-            }
-            var include = u.GetAttribute("Include");
-            if (string.IsNullOrEmpty(include))
-            {
-                continue;
-            }
-            var hasAliasAttr = u.HasAttribute("Alias");
-            var alias = hasAliasAttr ? u.GetAttribute("Alias") : string.Empty;
-            var key = include + "|" + alias + "|" + condition;
-            var item = new Microsoft.Build.Utilities.TaskItem(key);
-            item.SetMetadata("UsingInclude", include);
-            item.SetMetadata("Alias", alias);
-            item.SetMetadata("HasAliasAttribute", hasAliasAttr ? "true" : "false");
-            item.SetMetadata("Condition", condition);
-            items.Add(item);
-        }
-    }
-}
-ParsedUsings = items.ToArray();
-]]>
-            </Code>
-        </Task>
-    </UsingTask>
-
-    <!--
         Emit the consumer-facing build-transitive props by merging the top-level
         Project children from each direct projref's auto-gen .props and this project's
         own partial.props. Duplicates are removed by structural XML equality (each
@@ -215,16 +132,33 @@ File.WriteAllText(OutputFile, content);
         GenerateBuildTransitiveProps runs exactly once per build session even with many
         consumers and parallel project compilation — no concurrent writers, no race.
     -->
-    <PropertyGroup Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
-        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GenerateBuildTransitiveProps</GetTargetPathDependsOn>
+    <PropertyGroup Condition="'$(NoAutoProps)' != 'true'">
         <_BuildTransitiveDir>$(MSBuildProjectDirectory)\buildTransitive\</_BuildTransitiveDir>
-        <_BuildTransitiveFile>$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveFile>
         <_BuildTransitivePartialFile>$(_BuildTransitiveDir)$(MSBuildProjectName).partial.props</_BuildTransitivePartialFile>
-        <_BuildTransitivePackFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)pack-buildTransitive\$(PackageId).props</_BuildTransitivePackFile>
+        <!-- Always written, always merged. In-tree consumers Import this (via Directory.Build.props)
+             so MSBuild evaluates the full <Choose>/<PropertyGroup> chain natively. -->
+        <_BuildTransitiveMergedFile>$(_BuildTransitiveDir)$(MSBuildProjectName).merged.props</_BuildTransitiveMergedFile>
+        <!-- When MergePropsWhenNotPacked=true (opt-in per project, e.g. Console), additionally
+             write the merged content to an in-source <Name>.props next to .merged.props so that
+             file-based-app `#:project` consumers — which don't run our Directory.Build.props
+             chain — pick up the full transitive surface via the SDK's projref props convention. -->
+        <_BuildTransitiveInSourcePropsFile Condition="'$(MergePropsWhenNotPacked)' == 'true'">$(_BuildTransitiveDir)$(MSBuildProjectName).props</_BuildTransitiveInSourcePropsFile>
+        <!-- Pack output. Own content only; NuGet auto-imports each transitive package's
+             .props in dep order so merging here would just cause duplicate aliases.
+             Path.Combine handles the case where BaseIntermediateOutputPath is absolute
+             (e.g. file-based-app scripts route obj/ into a Temp dir). -->
+        <_BuildTransitivePackFile>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'pack-buildTransitive', '$(PackageId).props'))</_BuildTransitivePackFile>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
+        <!-- Library projects: hook into GetTargetPath so the merged props are written
+             whenever a consumer resolves the projref. Exe projects are leaves and use
+             a BeforeTargets hook instead (see target below). -->
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GenerateBuildTransitiveProps</GetTargetPathDependsOn>
     </PropertyGroup>
 
     <Target Name="GenerateBuildTransitiveProps"
-            Condition="'$(OutputType)' != 'Exe' and '$(NoAutoProps)' != 'true'">
+            BeforeTargets="GenerateGlobalUsings"
+            Condition="'$(NoAutoProps)' != 'true'">
         <!--
             Recursively materialise our own ProjectReferences' props by calling their
             GetTargetPath. The same build-engine cache that dedupes our own invocation
@@ -237,14 +171,15 @@ File.WriteAllText(OutputFile, content);
                  ContinueOnError="WarnAndContinue"
                  Condition="'@(ProjectReference)' != ''"/>
         <ItemGroup>
-            <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
-                           Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
+            <!-- Read each direct projref's already-merged .merged.props as the merge input. -->
+            <_ProjRefMergedProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).merged.props"
+                                 Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).merged.props')"/>
             <_ExportedAnalyzerProjects Include="@(SharpSticksExportAnalyzerProject)"/>
         </ItemGroup>
 
-        <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
+        <XmlPeek XmlInputPath="%(_ProjRefMergedProps.Identity)"
                  Query="/Project/ItemGroup/SharpSticksTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
-                 Condition="'@(_ProjRefProps)' != ''">
+                 Condition="'@(_ProjRefMergedProps)' != ''">
             <Output TaskParameter="Result" ItemName="_ExportedAnalyzerProjects"/>
         </XmlPeek>
         <RemoveDuplicates Inputs="@(_ExportedAnalyzerProjects)">
@@ -252,71 +187,47 @@ File.WriteAllText(OutputFile, content);
         </RemoveDuplicates>
 
         <MakeDir Directories="$(_BuildTransitiveDir);$([System.IO.Path]::GetDirectoryName($(_BuildTransitivePackFile)))"/>
-        <!-- In-tree variant: merge upstream sections (verbatim) + own partial. ProjectReference
-             consumers in this repo see the full transitive chain via this file. -->
-        <WriteTransitiveProps UpstreamPropsFiles="@(_ProjRefProps)"
+        <!-- Merged variant (always): own partial.props + verbatim sections from each direct
+             projref's own .merged.props, deduped structurally. This is what in-tree
+             consumers Import via Directory.Build.props. SelfNamespace is the project's
+             own namespace as a global using for upstream consumers; Exe projects skip
+             it because nothing else consumes their namespace. -->
+        <PropertyGroup>
+            <_SelfNamespaceForMerged Condition="'$(OutputType)' != 'Exe'">$(RootNamespace)</_SelfNamespaceForMerged>
+        </PropertyGroup>
+        <WriteTransitiveProps UpstreamPropsFiles="@(_ProjRefMergedProps)"
                               SelfPartialPropsFile="$(_BuildTransitivePartialFile)"
-                              SelfNamespace="$(RootNamespace)"
+                              SelfNamespace="$(_SelfNamespaceForMerged)"
                               AnalyzerProjects="@(_DistinctExportedAnalyzerProjects)"
                               SkipUpstreamMerge="false"
-                              OutputFile="$(_BuildTransitiveFile)"/>
-        <!-- Pack variant: own partial only. NuGet auto-imports each dependency package's
-             pack .props separately, so merging here would only cause duplicate aliases. -->
+                              OutputFile="$(_BuildTransitiveMergedFile)"/>
+        <!-- Mirror the merged content to <Name>.props when MergePropsWhenNotPacked=true. -->
+        <Copy SourceFiles="$(_BuildTransitiveMergedFile)"
+              DestinationFiles="$(_BuildTransitiveInSourcePropsFile)"
+              SkipUnchangedFiles="true"
+              Condition="'$(_BuildTransitiveInSourcePropsFile)' != ''"/>
+        <!-- Pack variant: own partial only. Skip for Exe (no nupkg to pack into). -->
         <WriteTransitiveProps SelfPartialPropsFile="$(_BuildTransitivePartialFile)"
                               SelfNamespace="$(RootNamespace)"
                               SkipUpstreamMerge="true"
-                              OutputFile="$(_BuildTransitivePackFile)"/>
-        <ItemGroup>
+                              OutputFile="$(_BuildTransitivePackFile)"
+                              Condition="'$(OutputType)' != 'Exe'"/>
+        <ItemGroup Condition="'$(OutputType)' != 'Exe'">
             <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(PackageId).props"/>
         </ItemGroup>
     </Target>
 
-
-    <Target Name="ImportProjectRefBuildTransitiveUsings"
-            BeforeTargets="GenerateGlobalUsings"
-            DependsOnTargets="ResolveProjectReferences">
-        <ItemGroup>
-            <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
-                           Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
-        </ItemGroup>
-
-        <ParseTransitiveUsings SourceFiles="@(_ProjRefProps)"
-                               Condition="'@(_ProjRefProps)' != ''">
-            <Output TaskParameter="ParsedUsings" ItemName="_ImportedParsedUsings"/>
-        </ParseTransitiveUsings>
-
-        <!-- Unconditional Using items from upstream .props. -->
-        <ItemGroup>
-            <Using Include="%(_ImportedParsedUsings.UsingInclude)"
-                   Condition="'%(_ImportedParsedUsings.Condition)' == '' and '%(_ImportedParsedUsings.UsingInclude)' != ''">
-                <Alias>%(_ImportedParsedUsings.Alias)</Alias>
-            </Using>
-        </ItemGroup>
-        <!-- Conditional Using items (e.g. OS-conditional ItemGroups); MSBuild expands
-             the captured Condition metadata into the Using element's Condition. -->
-        <ItemGroup>
-            <Using Include="%(_ImportedParsedUsings.UsingInclude)"
-                   Condition="'%(_ImportedParsedUsings.Condition)' != '' and '%(_ImportedParsedUsings.UsingInclude)' != '' and %(_ImportedParsedUsings.Condition)">
-                <Alias>%(_ImportedParsedUsings.Alias)</Alias>
-            </Using>
-        </ItemGroup>
-    </Target>
-
+    <!--
+        SharpSticksTransitiveAnalyzerProject items come in as live MSBuild items via the
+        own .merged.props Import (see Directory.Build.props). Resolve them to assembly
+        paths via <MSBuild Targets="GetTargetPath"/> and add as Analyzer items.
+    -->
     <Target Name="ImportProjectRefBuildTransitiveAnalyzers"
             BeforeTargets="CoreCompile"
-            DependsOnTargets="ImportProjectRefBuildTransitiveUsings">
+            DependsOnTargets="ResolveProjectReferences">
         <ItemGroup>
-            <_ProjRefProps Include="%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props"
-                           Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)buildTransitive\%(ProjectReference.Filename).props')"/>
-        </ItemGroup>
-        <XmlPeek XmlInputPath="%(_ProjRefProps.Identity)"
-                 Query="/Project/ItemGroup/SharpSticksTransitiveAnalyzerProject[string-length(@Include) &gt; 0]/@Include"
-                 Condition="'@(_ProjRefProps)' != ''">
-            <Output TaskParameter="Result" ItemName="_ImportedTransitiveAnalyzerProjects"/>
-        </XmlPeek>
-        <ItemGroup>
-            <_TransitiveAnalyzerProject Include="$(MSBuildThisFileDirectory)%(_ImportedTransitiveAnalyzerProjects.Identity)"
-                                        Condition="'@(_ImportedTransitiveAnalyzerProjects)' != '' and Exists('$(MSBuildThisFileDirectory)%(_ImportedTransitiveAnalyzerProjects.Identity)')"/>
+            <_TransitiveAnalyzerProject Include="$(MSBuildThisFileDirectory)%(SharpSticksTransitiveAnalyzerProject.Identity)"
+                                        Condition="'@(SharpSticksTransitiveAnalyzerProject)' != '' and Exists('$(MSBuildThisFileDirectory)%(SharpSticksTransitiveAnalyzerProject.Identity)')"/>
         </ItemGroup>
         <MSBuild Projects="@(_TransitiveAnalyzerProject)"
                  Targets="GetTargetPath"
