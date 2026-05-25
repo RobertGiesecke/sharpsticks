@@ -2,19 +2,23 @@
 
 public static class RuntimeBuilder
 {
-	public readonly record struct BuildOptions()
+	public readonly record struct BuildOptions<TInputDevice, TOutputDevice>()
+		where TInputDevice : JoystickDevice
+		where TOutputDevice : OutputDevice
 	{
 		public required string Name { get; init; }
 		public DebugLogger? DebugLogger { get; init; }
-		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
+		public IOutputDeviceFactory<TOutputDevice>? OutputDeviceFactory { get; init; }
 		public ITimeSource? TimeSource { get; init; }
-		public required ImmutableArray<JoystickDevice> ConnectedDevices { get; init; }
+		public required ImmutableArray<TInputDevice> ConnectedDevices { get; init; }
 		public ImmutableArray<IBoundRoute> Routes { get; init; } = [];
 	}
 
-	extension(Runtime)
+	extension<TInputDevice, TOutputDevice>(Runtime<TInputDevice, TOutputDevice>)
+		where TInputDevice : JoystickDevice
+		where TOutputDevice : OutputDevice
 	{
-		public static IOutputRuntimeContext Build(BuildOptions options)
+		public static IOutputRuntimeContext<TInputDevice, TOutputDevice> Build(BuildOptions<TInputDevice, TOutputDevice> options)
 		{
 			var optionsOutputDeviceFactory = options.OutputDeviceFactory ??
 			                                 throw new ArgumentNullException(nameof(options.OutputDeviceFactory));
@@ -137,7 +141,7 @@ public static class RuntimeBuilder
 				referencedOutputDeviceIds.Add(output.OutputDeviceId);
 			}
 
-			var devices = new PooledDictionary<int, JoystickDevice>();
+			var devices = new PooledDictionary<int, TInputDevice>();
 
 			try
 			{
@@ -161,11 +165,11 @@ public static class RuntimeBuilder
 				}
 
 				using var openedOutputs = CreateOutputDeviceList();
-				
+
 				var outputDevices = openedOutputs.ToImmutableArray();
 				try
 				{
-					return new Runtime(
+					return new Runtime<TInputDevice, TOutputDevice>(
 						options.Name,
 						options.DebugLogger,
 						devices,
@@ -189,7 +193,7 @@ public static class RuntimeBuilder
 			}
 			catch
 			{
-				Runtime.DisposeDevices(devices.Values);
+				Runtime<TInputDevice, TOutputDevice>.DisposeDevices(devices.Values);
 				foreach (var device in options.ConnectedDevices)
 				{
 					if (!devices.TryGetValue(device.DeviceId, out var selected) || !ReferenceEquals(selected, device))
@@ -202,7 +206,7 @@ public static class RuntimeBuilder
 				throw;
 			}
 
-			PooledList<OutputDevice> CreateOutputDeviceList()
+			PooledList<TOutputDevice> CreateOutputDeviceList()
 			{
 				using var disposables = new PooledList<IDisposable>();
 				try
@@ -234,7 +238,8 @@ public static class RuntimeBuilder
 					}
 
 					outputRequests.Sort((a, b) => a.DeviceId.CompareTo(b.DeviceId));
-					return optionsOutputDeviceFactory.EnumerateConnectedOutputDevices(outputRequests, options.ConnectedDevices);
+					return optionsOutputDeviceFactory.EnumerateConnectedOutputDevices(outputRequests,
+						options.ConnectedDevices);
 				}
 				finally
 				{

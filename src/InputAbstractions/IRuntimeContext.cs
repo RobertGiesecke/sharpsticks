@@ -1,8 +1,9 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public interface IRuntimeContext
+public interface IRuntimeContext<TInputDevice>
+	where TInputDevice : JoystickDevice
 {
-	public FrozenDictionary<int, JoystickDevice> DevicesById { get; }
+	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
-	public ImmutableArray<JoystickDevice> Devices { get; }
+	public ImmutableArray<TInputDevice> Devices { get; }
 }

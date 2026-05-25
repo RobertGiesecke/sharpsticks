@@ -1,9 +1,11 @@
 ﻿namespace SharpSticks.OutputAbstractions;
 
-public interface IOutputRuntimeContext : IRuntimeContext, IDisposable
+public interface IOutputRuntimeContext<TInputDevice, TOutputDevice> : IRuntimeContext<TInputDevice>, IDisposable
+	where TInputDevice : JoystickDevice
+	where TOutputDevice : OutputDevice
 {
 	string Name { get; }
-	ImmutableArray<OutputDevice> OutputDevices { get; }
+	ImmutableArray<TOutputDevice> OutputDevices { get; }
 	void Run(CancellationToken cancellationToken, DebugLogger? debugLogger = null);
 
 	/// <summary>
