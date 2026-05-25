@@ -3,19 +3,47 @@ using System.Runtime.CompilerServices;
 
 namespace SharpSticks.Console;
 
-public static class ConsoleExtensions
+public static class ConsoleExtensions<TInputDevice, TOutputDevice>
+	where TInputDevice : JoystickDevice, IJoystickDeviceWithFactory<TInputDevice>
+	where TOutputDevice : OutputDevice, IOutputDeviceWithFactory<TOutputDevice>
 {
 	public readonly record struct BuildOptions()
 	{
 		public required string Name { get; init; }
 		public DebugLogger? DebugLogger { get; init; }
-		public IOutputDeviceFactory<PlatformDefaultOutputDevice>? OutputDeviceFactory { get; init; }
-		public ImmutableArray<PlatformDefaultInputDevice>? ConnectedDevices { get; init; }
+		public IOutputDeviceFactory<TOutputDevice>? OutputDeviceFactory { get; init; }
+		public ImmutableArray<TInputDevice>? ConnectedDevices { get; init; }
 		public ImmutableArray<IBoundRoute> Routes { get; init; } = [];
 	}
 
-	public static PooledList<PlatformDefaultInputDevice> EnumerateConnectedDevices() => PlatformDefaultInputDevice.EnumerateConnected();
+	public static PooledList<TInputDevice> EnumerateConnectedDevices() =>
+		TInputDevice.Factory.EnumerateConnectedInputDevices();
 
+	public static void BuildAndRunAsConsole(BuildOptions buildOptions,
+		DebugLogger? debugLogger = null)
+	{
+		// ReSharper disable once InvokeAsExtensionMember
+		ConsoleExtensions.BuildAndRunAsConsole<TInputDevice, TOutputDevice>(buildOptions, debugLogger);
+	}
+
+	[OverloadResolutionPriority(2)]
+	public static IOutputRuntimeContext<TInputDevice, TOutputDevice> BuildRuntime(
+		BuildOptions buildOptions)
+	{
+		using var connectedDevices = buildOptions.ConnectedDevices is null
+			? TInputDevice.Factory.EnumerateConnectedInputDevices()
+			: null;
+
+		return RuntimeBuilder.Build(
+			EnsureOutputDeviceFactory(
+				CopyOptions(
+					buildOptions,
+					connectedDevices)));
+	}
+}
+
+public static class ConsoleExtensions
+{
 	extension<TInputDevice, TOutputDevice>(IOutputRuntimeContext<TInputDevice, TOutputDevice> runtime)
 		where TInputDevice : JoystickDevice
 		where TOutputDevice : OutputDevice
@@ -37,16 +65,19 @@ public static class ConsoleExtensions
 		}
 	}
 
-	extension(IOutputRuntimeContext<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> runtime)
+	extension<TInputDevice, TOutputDevice>(ICombinedDeviceFactory<TInputDevice, TOutputDevice> factory)
+		where TInputDevice : JoystickDevice, IJoystickDeviceWithFactory<TInputDevice>
+		where TOutputDevice : OutputDevice, IOutputDeviceWithFactory<TOutputDevice>
 	{
-		public static void BuildAndRunAsConsole(BuildOptions buildOptions,
+		public static void BuildAndRunAsConsole(
+			ConsoleExtensions<TInputDevice, TOutputDevice>.BuildOptions buildOptions,
 			DebugLogger? debugLogger = null)
 		{
 			var effectiveOptions = buildOptions switch
 			{
 				{ OutputDeviceFactory: null } => buildOptions with
 				{
-					OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance
+					OutputDeviceFactory = TOutputDevice.Factory,
 				},
 				_ => buildOptions,
 			};
@@ -60,7 +91,7 @@ public static class ConsoleExtensions
 			runtimeMapping.RunAsConsole(debugLogger);
 		}
 
-		private static bool TryRunSetupSubcommand(BuildOptions options)
+		private static bool TryRunSetupSubcommand(ConsoleExtensions<TInputDevice, TOutputDevice>.BuildOptions options)
 		{
 			var args = Environment.GetCommandLineArgs();
 			if (args.Length < 3 || !string.Equals(args[1], "setup", StringComparison.OrdinalIgnoreCase))
@@ -98,23 +129,23 @@ public static class ConsoleExtensions
 
 
 		[OverloadResolutionPriority(2)]
-		public static IOutputRuntimeContext<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> Build(
-			BuildOptions buildOptions)
+		public static IOutputRuntimeContext<TInputDevice, TOutputDevice> Build(
+			ConsoleExtensions<TInputDevice, TOutputDevice>.BuildOptions buildOptions)
 		{
 			using var connectedDevices = buildOptions.ConnectedDevices is null
-				? PlatformDefaultInputDevice.EnumerateConnected()
+				? TInputDevice.Factory.EnumerateConnectedInputDevices()
 				: null;
 
 			return RuntimeBuilder.Build(
 				EnsureOutputDeviceFactory(
-					CopyOptions(
+					CopyOptions<TInputDevice, TOutputDevice>(
 						buildOptions,
 						connectedDevices)));
 		}
 
-		private static RuntimeBuilder.BuildOptions<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> CopyOptions(
-			BuildOptions o,
-			PooledList<PlatformDefaultInputDevice>? joystickDevices) => new()
+		internal static RuntimeBuilder.BuildOptions<TInputDevice, TOutputDevice> CopyOptions(
+			ConsoleExtensions<TInputDevice, TOutputDevice>.BuildOptions o,
+			PooledList<TInputDevice>? joystickDevices) => new()
 		{
 			Name = o.Name,
 			DebugLogger = o.DebugLogger,
@@ -125,12 +156,13 @@ public static class ConsoleExtensions
 
 
 		[OverloadResolutionPriority(2)]
-		public static IOutputRuntimeContext<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> BuildFromConfig(
+		public static IOutputRuntimeContext<TInputDevice, TOutputDevice> BuildFromConfig(
 			AppConfig config)
 		{
+			
 			var buildOptions = EnsureOutputDeviceFactory(
-				Runtime<PlatformDefaultInputDevice, PlatformDefaultOutputDevice>.GetBuildOptionsFromConfig(config));
-			return Build(new()
+				Runtime<TInputDevice, TOutputDevice>.GetBuildOptionsFromConfig(config, TOutputDevice.Factory, TInputDevice.Factory));
+			return Build<TInputDevice, TOutputDevice>(new()
 			{
 				Name = buildOptions.Name,
 				DebugLogger = buildOptions.DebugLogger,
@@ -141,13 +173,15 @@ public static class ConsoleExtensions
 		}
 	}
 
-	private static RuntimeBuilder.BuildOptions<PlatformDefaultInputDevice, PlatformDefaultOutputDevice>
-		EnsureOutputDeviceFactory(
-			RuntimeBuilder.BuildOptions<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> buildOptions)
+	internal static RuntimeBuilder.BuildOptions<TInputDevice, TOutputDevice>
+		EnsureOutputDeviceFactory<TInputDevice, TOutputDevice>(
+			RuntimeBuilder.BuildOptions<TInputDevice, TOutputDevice> buildOptions)
+		where TInputDevice : JoystickDevice
+		where TOutputDevice : OutputDevice, IOutputDeviceWithFactory<TOutputDevice>
 	{
 		return buildOptions switch
 		{
-			{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = VJoyDeviceFactory.Instance },
+			{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = TOutputDevice.Factory },
 			_ => buildOptions,
 		};
 	}
