@@ -3,6 +3,13 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
+        <!--
+            Materialize source-generator output as .cs files under `generated/` so we can
+            inspect exactly what the compiler saw. Toggle off when not debugging — the
+            files are otherwise kept in-memory by Roslyn.
+        -->
+        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+        <CompilerGeneratedFilesOutputPath>generated</CompilerGeneratedFilesOutputPath>
     </PropertyGroup>
 
     <!--
