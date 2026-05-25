@@ -47,8 +47,10 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
+		GeneratorLog.Log("IncludedFilesSourceGenerator.Initialize");
 		context.RegisterPostInitializationOutput(static postInitializationContext =>
 		{
+			GeneratorLog.Log("PostInitialization: emit included-files resources");
 			var assembly = typeof(IncludedFilesSourceGenerator).GetTypeInfo().Assembly;
 
 			foreach (var resourceName in assembly.GetManifestResourceNames()
@@ -75,17 +77,25 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		var deviceInfoTargets = context.SyntaxProvider.ForAttributeWithMetadataName(
 				GenerateDeviceInfosAttributeMetadataName,
 				static (node, _) => node is TypeDeclarationSyntax,
-				static (syntaxContext, _) => new DeviceInfoTarget(
-					(INamedTypeSymbol)syntaxContext.TargetSymbol,
-					GetDeviceInfoLevels(syntaxContext),
-					GetDeviceRenames(syntaxContext),
-					GetAxisRenames(syntaxContext),
-					GetButtonRenames(syntaxContext)))
+				static (syntaxContext, _) =>
+				{
+					GeneratorLog.Log($"SyntaxProvider: select DeviceInfoTarget for {syntaxContext.TargetSymbol.ToDisplayString()}");
+					return new DeviceInfoTarget(
+						(INamedTypeSymbol)syntaxContext.TargetSymbol,
+						GetDeviceInfoLevels(syntaxContext),
+						GetDeviceRenames(syntaxContext),
+						GetAxisRenames(syntaxContext),
+						GetButtonRenames(syntaxContext));
+				})
 			.Where(static target => target.Type.TypeKind is TypeKind.Class or TypeKind.Struct);
 
 		context.RegisterSourceOutput(
 			deviceInfoTargets.Collect(),
-			static (sourceProductionContext, targets) => GenerateDeviceInfos(sourceProductionContext, targets));
+			static (sourceProductionContext, targets) =>
+			{
+				GeneratorLog.Log($"RegisterSourceOutput: GenerateDeviceInfos targets={targets.Length}");
+				GenerateDeviceInfos(sourceProductionContext, targets);
+			});
 
 		var assemblyTarget = context.CompilationProvider.Select(static (compilation, _) =>
 		{
@@ -94,11 +104,13 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 				data.AttributeClass?.ToDisplayString() == GenerateDeviceInfosAttributeMetadataName);
 			if (generateAttr is null)
 			{
+				GeneratorLog.Log("CompilationProvider(assemblyTarget): no [GenerateDeviceInfos] on assembly");
 				return default;
 			}
 
-			var classAttributes = compilation.GetTypeByMetadataName("Devices")?.GetAttributes()
-			                      ?? ImmutableArray<AttributeData>.Empty;
+			var devicesType = compilation.GetTypeByMetadataName("Devices");
+			var classAttributes = devicesType?.GetAttributes() ?? ImmutableArray<AttributeData>.Empty;
+			GeneratorLog.Log($"CompilationProvider(assemblyTarget): asm-attrs={attributes.Length} Devices-symbol={(devicesType is null ? "<none>" : "found")} class-attrs={classAttributes.Length}");
 
 			return new AssemblyDeviceInfoTarget(
 				GetDeviceInfoLevels(attributes),
@@ -109,7 +121,11 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 
 		context.RegisterSourceOutput(
 			assemblyTarget,
-			static (sourceProductionContext, target) => GenerateAssemblyDeviceInfos(sourceProductionContext, target));
+			static (sourceProductionContext, target) =>
+			{
+				GeneratorLog.Log($"RegisterSourceOutput: GenerateAssemblyDeviceInfos present={target.IsPresent} levels={target.Levels}");
+				GenerateAssemblyDeviceInfos(sourceProductionContext, target);
+			});
 
 		// Mirror the MSBuild <Using> items shipped via SharpSticks.Console's
 		// buildTransitive props. VS Code's single-file-script mode does not run
@@ -118,18 +134,26 @@ public sealed class IncludedFilesSourceGenerator : IIncrementalGenerator
 		// so emitting them from the generator coexists cleanly with the MSBuild
 		// path used by full project builds.
 		var packageReferences = context.CompilationProvider.Select(static (compilation, _) =>
-			new PackageReferencesInfo(
+		{
+			var info = new PackageReferencesInfo(
 				HasInputAbstractions: compilation.GetTypeByMetadataName("SharpSticks.InputAbstractions.Axis") is not null,
 				HasOutputAbstractions: compilation.GetTypeByMetadataName("SharpSticks.OutputAbstractions.OutputDevice") is not null,
 				HasDirectInput: compilation.GetTypeByMetadataName("SharpSticks.DirectInput.DirectInputJoystickDevice") is not null,
 				HasVJoy: compilation.GetTypeByMetadataName("SharpSticks.VJoy.VJoyDevice") is not null,
 				HasConsole: compilation.GetTypeByMetadataName("SharpSticks.Console.ConsoleExtensions") is not null,
 				HasConfig: compilation.GetTypeByMetadataName("SharpSticks.Config.BlendedAxisCurve") is not null,
-				HasMacros: compilation.GetTypeByMetadataName("SharpSticks.InputAbstractions.Macros") is not null));
+				HasMacros: compilation.GetTypeByMetadataName("SharpSticks.InputAbstractions.Macros") is not null);
+			GeneratorLog.Log($"CompilationProvider(packageReferences): {info}");
+			return info;
+		});
 
 		context.RegisterSourceOutput(
 			packageReferences,
-			static (sourceProductionContext, info) => GeneratePackageGlobalUsings(sourceProductionContext, info));
+			static (sourceProductionContext, info) =>
+			{
+				GeneratorLog.Log("RegisterSourceOutput: GeneratePackageGlobalUsings");
+				GeneratePackageGlobalUsings(sourceProductionContext, info);
+			});
 	}
 
 	private readonly record struct PackageReferencesInfo(
