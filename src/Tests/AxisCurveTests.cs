@@ -136,8 +136,8 @@ public sealed class AxisCurveTests : IDisposable
 		Assert.False(nonLinear.IsFlat);
 	}
 
-	private IOutputRuntimeContext BuildRuntime(AxisCurve curve) =>
-		Runtime.Build(new()
+	private IFakesOutputRuntimeContext BuildRuntime(AxisCurve curve) =>
+		FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,

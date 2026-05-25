@@ -509,7 +509,7 @@ public sealed class AppConfigTests : IDisposable
 			Gain = 1.0,
 		});
 
-		using var runtime = Runtime.Build(new()
+		using var runtime = FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
@@ -634,7 +634,7 @@ public sealed class AppConfigTests : IDisposable
 		public FakeDeviceManager Fakes { get; }
 		public FakeJoystickDevice Stick { get; }
 		public FakeOutputDevice Output { get; }
-		public IOutputRuntimeContext Runtime { get; }
+		public IFakesOutputRuntimeContext Runtime { get; }
 
 		public ComplexHarness(AppConfig config)
 		{
@@ -645,7 +645,7 @@ public sealed class AppConfigTests : IDisposable
 				.AddButtons(4)
 				.Build();
 			Output = Fakes.AddOutputDevice().AddAxis(Axis.X).Build();
-			Runtime = OutputAbstractions.Runtime.Build(new()
+			Runtime = FakesRuntime.Build(new()
 			{
 				Name = "test",
 				ConnectedDevices = Fakes.InputDevices,
@@ -669,8 +669,8 @@ public sealed class AppConfigTests : IDisposable
 	private static AppConfig? Deserialize(string json) =>
 		JsonSerializer.Deserialize(json, AppJsonContext.Default.AppConfig);
 
-	private IOutputRuntimeContext BuildRuntime(AppConfig config) =>
-		Runtime.Build(new()
+	private IFakesOutputRuntimeContext BuildRuntime(AppConfig config) =>
+		FakesRuntime.Build(new()
 		{
 			Name = config.Name ?? "test",
 			ConnectedDevices = _Fakes.InputDevices,

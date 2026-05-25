@@ -128,7 +128,7 @@ public sealed class AllocationTests : IDisposable
 		_Stick2.SetAxisValue(Axis.Y, 0.5);
 	}
 
-	private void WarmUp(IOutputRuntimeContext runtime, int iterations)
+	private void WarmUp(IFakesOutputRuntimeContext runtime, int iterations)
 	{
 		for (var i = 0; i < iterations; i++)
 		{
@@ -148,7 +148,7 @@ public sealed class AllocationTests : IDisposable
 		}
 	}
 
-	private IOutputRuntimeContext BuildComprehensiveRuntime()
+	private IFakesOutputRuntimeContext BuildComprehensiveRuntime()
 	{
 		var blended = new BlendedAxisCurve
 		{
@@ -175,7 +175,7 @@ public sealed class AllocationTests : IDisposable
 			InitialValue = 0.5,
 		};
 
-		return Runtime.Build(new()
+		return FakesRuntime.Build(new()
 		{
 			Name = "alloc-comprehensive",
 			ConnectedDevices = _Fakes.InputDevices,

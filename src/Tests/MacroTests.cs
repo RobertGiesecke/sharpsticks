@@ -556,8 +556,8 @@ public sealed class MacroTests : IDisposable
 
 	// ── Helpers ─────────────────────────────────────────────────────────
 
-	private IOutputRuntimeContext Build(params IBoundRoute[] routes) =>
-		Runtime.Build(new()
+	private IFakesOutputRuntimeContext Build(params IBoundRoute[] routes) =>
+		FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,

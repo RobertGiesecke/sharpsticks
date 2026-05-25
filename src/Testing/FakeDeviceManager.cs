@@ -16,9 +16,9 @@ public sealed class FakeDeviceManager : IDisposable
 	private uint _NextOutputDeviceId = 1;
 	private bool _Disposed;
 
-	public IOutputDeviceFactory OutputDeviceFactory => _OutputDeviceFactory;
+	public IOutputDeviceFactory<FakeOutputDevice> OutputDeviceFactory => _OutputDeviceFactory;
 
-	public ImmutableArray<JoystickDevice> InputDevices => [.._InputDevices];
+	public ImmutableArray<FakeJoystickDevice> InputDevices => [.._InputDevices];
 
 	public IReadOnlyList<FakeOutputDevice> OutputDevices => _OutputDevicesList;
 

@@ -346,8 +346,8 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		Stateful = stateful,
 	};
 
-	private IOutputRuntimeContext BuildRuntime(BlendedAxisCurve modifier) =>
-		Runtime.Build(new()
+	private IFakesOutputRuntimeContext BuildRuntime(BlendedAxisCurve modifier) =>
+		FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,

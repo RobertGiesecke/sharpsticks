@@ -250,8 +250,8 @@ public sealed class WhenButtonPressedAxisModifierTests : IDisposable
 		Assert.Equal(1.0, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
-	private IOutputRuntimeContext BuildRuntime(WhenButtonPressedAxisModifier modifier) =>
-		Runtime.Build(new()
+	private IFakesOutputRuntimeContext BuildRuntime(WhenButtonPressedAxisModifier modifier) =>
+		FakesRuntime.Build(new()
 		{
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
