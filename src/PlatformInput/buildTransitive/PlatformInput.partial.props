@@ -6,6 +6,7 @@
                 <PlatformDefaultInputDeviceFullTypeName>SharpSticks.DirectInput.$(PlatformDefaultInputDeviceTypeName)</PlatformDefaultInputDeviceFullTypeName>
                 <PlatformDefaultInputDeviceFactoryTypeName>DirectInputJoystickDeviceFactory</PlatformDefaultInputDeviceFactoryTypeName>
                 <PlatformDefaultInputDeviceFactoryFullTypeName>SharpSticks.DirectInput.$(PlatformDefaultInputDeviceFactoryTypeName)</PlatformDefaultInputDeviceFactoryFullTypeName>
+                <DefineConstants>$(DefineConstants);SHARPSTICKS_COMPILED_FOR_WINDOWS</DefineConstants>
             </PropertyGroup>
         </When>
         <When Condition="$([MSBuild]::IsOSPlatform('Linux'))">
@@ -14,6 +15,7 @@
                 <PlatformDefaultInputDeviceFullTypeName>SharpSticks.LinuxInput.$(PlatformDefaultInputDeviceTypeName)</PlatformDefaultInputDeviceFullTypeName>
                 <PlatformDefaultInputDeviceFactoryTypeName>LinuxInputJoystickDeviceFactory</PlatformDefaultInputDeviceFactoryTypeName>
                 <PlatformDefaultInputDeviceFactoryFullTypeName>SharpSticks.LinuxInput.$(PlatformDefaultInputDeviceFactoryTypeName)</PlatformDefaultInputDeviceFactoryFullTypeName>
+                <DefineConstants>$(DefineConstants);SHARPSTICKS_COMPILED_FOR_LINUX</DefineConstants>
             </PropertyGroup>
         </When>
     </Choose>
@@ -23,6 +25,9 @@
             <ItemGroup>
                 <Using Alias="PlatformDefaultInputDevice" Include="$(PlatformDefaultInputDeviceFullTypeName)"/>
             </ItemGroup>
+            <PropertyGroup>
+                <DefineConstants>$(DefineConstants);SHARPSTICKS_HAS_INPUT_DEVICE_TYPE</DefineConstants>
+            </PropertyGroup>
         </When>
     </Choose>
     <Choose>

@@ -1,13 +1,4 @@
 <Project>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-        <Using Alias="PlatformDefaultOutputDevice" Include="SharpSticks.VJoy.VJoyDevice"/>
-        <Using Alias="PlatformDefaultOutputDeviceFactory" Include="SharpSticks.VJoy.VJoyDeviceFactory"/>
-    </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
-        <Using Alias="PlatformDefaultOutputDevice" Include="SharpSticks.LinuxOutput.LinuxOutputDevice"/>
-        <Using Alias="PlatformDefaultOutputDeviceFactory" Include="SharpSticks.LinuxOutput.LinuxOutputDeviceFactory"/>
-    </ItemGroup>
-
     <Choose>
         <When Condition="$([MSBuild]::IsOSPlatform('Windows'))">
             <PropertyGroup>
@@ -15,6 +6,7 @@
                 <PlatformDefaultOutputDeviceFullTypeName>SharpSticks.VJoy.$(PlatformDefaultOutputDeviceTypeName)</PlatformDefaultOutputDeviceFullTypeName>
                 <PlatformDefaultOutputDeviceFactoryTypeName>VJoyDeviceFactory</PlatformDefaultOutputDeviceFactoryTypeName>
                 <PlatformDefaultOutputDeviceFactoryFullTypeName>SharpSticks.VJoy.$(PlatformDefaultOutputDeviceFactoryTypeName)</PlatformDefaultOutputDeviceFactoryFullTypeName>
+                <DefineConstants>$(DefineConstants);SHARPSTICKS_COMPILED_FOR_WINDOWS</DefineConstants>
             </PropertyGroup>
         </When>
         <When Condition="$([MSBuild]::IsOSPlatform('Linux'))">
@@ -23,6 +15,7 @@
                 <PlatformDefaultOutputDeviceFullTypeName>SharpSticks.LinuxOutput.$(PlatformDefaultOutputDeviceTypeName)</PlatformDefaultOutputDeviceFullTypeName>
                 <PlatformDefaultOutputDeviceFactoryTypeName>LinuxOutputDeviceFactory</PlatformDefaultOutputDeviceFactoryTypeName>
                 <PlatformDefaultOutputDeviceFactoryFullTypeName>SharpSticks.LinuxOutput.$(PlatformDefaultOutputDeviceFactoryTypeName)</PlatformDefaultOutputDeviceFactoryFullTypeName>
+                <DefineConstants>$(DefineConstants);SHARPSTICKS_COMPILED_FOR_LINUX</DefineConstants>
             </PropertyGroup>
         </When>
     </Choose>
@@ -32,6 +25,9 @@
             <ItemGroup>
                 <Using Alias="PlatformDefaultOutputDevice" Include="$(PlatformDefaultOutputDeviceFullTypeName)"/>
             </ItemGroup>
+            <PropertyGroup>
+                <DefineConstants>$(DefineConstants);SHARPSTICKS_HAS_OUTPUT_DEVICE_TYPE</DefineConstants>
+            </PropertyGroup>
         </When>
     </Choose>
     <Choose>
