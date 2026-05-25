@@ -2,8 +2,8 @@ namespace SharpSticks.Config;
 
 public sealed record BlendedAxisCurve : IAxisModifier
 {
-	public required AxisCurve NormalCurve { get; init; }
-	public required AxisCurve PrecisionCurve { get; init; }
+	public required IAxisModifier NormalCurve { get; init; }
+	public required IAxisModifier PrecisionCurve { get; init; }
 	public required AxisBinding ModifierAxis { get; init; }
 	public double FactorLow { get; init; }
 	public double FactorHigh { get; init; } = 1.0;

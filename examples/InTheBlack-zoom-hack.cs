@@ -3,8 +3,8 @@
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
-	NormalCurve = new() { Max = 1.0d },
-	PrecisionCurve = new() { Max = 0.2d },
+	NormalCurve = new AxisCurve { Max = 1.0d },
+	PrecisionCurve = new AxisCurve { Max = 0.2d },
 	ModifierAxis = LeftStick.Axes.BrakeLever,
 	Stateful = true,
 };
