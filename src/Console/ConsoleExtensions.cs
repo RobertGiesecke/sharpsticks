@@ -9,19 +9,17 @@ public static class ConsoleExtensions
 	{
 		public required string Name { get; init; }
 		public DebugLogger? DebugLogger { get; init; }
-		public IOutputDeviceFactory? OutputDeviceFactory { get; init; }
-		public ImmutableArray<JoystickDevice>? ConnectedDevices { get; init; }
+		public IOutputDeviceFactory<PlatformDefaultOutputDevice>? OutputDeviceFactory { get; init; }
+		public ImmutableArray<PlatformDefaultInputDevice>? ConnectedDevices { get; init; }
 		public ImmutableArray<IBoundRoute> Routes { get; init; } = [];
 	}
 
-	extension(IOutputRuntimeContext runtime)
-	{
-		public static PooledList<JoystickDevice> EnumerateConnectedDevices()
-		{
-			using var list = PlatformDefaultInputDevice.EnumerateConnected();
-			return list.ConvertAll<JoystickDevice>(t => t);
-		}
+	public static PooledList<PlatformDefaultInputDevice> EnumerateConnectedDevices() => PlatformDefaultInputDevice.EnumerateConnected();
 
+	extension<TInputDevice, TOutputDevice>(IOutputRuntimeContext<TInputDevice, TOutputDevice> runtime)
+		where TInputDevice : JoystickDevice
+		where TOutputDevice : OutputDevice
+	{
 		public void RunAsConsole(DebugLogger? debugLogger = null)
 		{
 			using var cts = new CancellationTokenSource();
@@ -37,13 +35,19 @@ public static class ConsoleExtensions
 
 			runtime.Run(cts.Token, debugLogger);
 		}
+	}
 
+	extension(IOutputRuntimeContext<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> runtime)
+	{
 		public static void BuildAndRunAsConsole(BuildOptions buildOptions,
 			DebugLogger? debugLogger = null)
 		{
 			var effectiveOptions = buildOptions switch
 			{
-				{ OutputDeviceFactory: null } => buildOptions with { OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance },
+				{ OutputDeviceFactory: null } => buildOptions with
+				{
+					OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance
+				},
 				_ => buildOptions,
 			};
 
@@ -65,6 +69,7 @@ public static class ConsoleExtensions
 			}
 
 			var subcommand = args[2];
+			// ReSharper disable once SuspiciousTypeConversion.Global
 			if (options.OutputDeviceFactory is not ISupportsOutputSetup setupCapable)
 			{
 				System.Console.Error.WriteLine(
@@ -93,10 +98,11 @@ public static class ConsoleExtensions
 
 
 		[OverloadResolutionPriority(2)]
-		public static IOutputRuntimeContext Build(BuildOptions buildOptions)
+		public static IOutputRuntimeContext<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> Build(
+			BuildOptions buildOptions)
 		{
 			using var connectedDevices = buildOptions.ConnectedDevices is null
-				? EnumerateConnectedDevices()
+				? PlatformDefaultInputDevice.EnumerateConnected()
 				: null;
 
 			return RuntimeBuilder.Build(
@@ -106,9 +112,9 @@ public static class ConsoleExtensions
 						connectedDevices)));
 		}
 
-		private static RuntimeBuilder.BuildOptions CopyOptions(
+		private static RuntimeBuilder.BuildOptions<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> CopyOptions(
 			BuildOptions o,
-			PooledList<JoystickDevice>? joystickDevices) => new()
+			PooledList<PlatformDefaultInputDevice>? joystickDevices) => new()
 		{
 			Name = o.Name,
 			DebugLogger = o.DebugLogger,
@@ -119,9 +125,11 @@ public static class ConsoleExtensions
 
 
 		[OverloadResolutionPriority(2)]
-		public static IOutputRuntimeContext BuildFromConfig(AppConfig config)
+		public static IOutputRuntimeContext<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> BuildFromConfig(
+			AppConfig config)
 		{
-			var buildOptions = EnsureOutputDeviceFactory(Runtime.GetBuildOptionsFromConfig(config));
+			var buildOptions = EnsureOutputDeviceFactory(
+				Runtime<PlatformDefaultInputDevice, PlatformDefaultOutputDevice>.GetBuildOptionsFromConfig(config));
 			return Build(new()
 			{
 				Name = buildOptions.Name,
@@ -133,7 +141,9 @@ public static class ConsoleExtensions
 		}
 	}
 
-	private static RuntimeBuilder.BuildOptions EnsureOutputDeviceFactory(RuntimeBuilder.BuildOptions buildOptions)
+	private static RuntimeBuilder.BuildOptions<PlatformDefaultInputDevice, PlatformDefaultOutputDevice>
+		EnsureOutputDeviceFactory(
+			RuntimeBuilder.BuildOptions<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> buildOptions)
 	{
 		return buildOptions switch
 		{
