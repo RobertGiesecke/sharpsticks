@@ -207,13 +207,10 @@ public static class RuntimeExtensions
 			IOutputDeviceFactory? outputDeviceFactory = null)
 		{
 			using var connectedDevices = PlatformDefaultInputDevice.EnumerateConnected();
-			using var asJoystickDevices = connectedDevices
-				.Select<PlatformDefaultInputDevice, JoystickDevice>(d => d)
-				.ToPooledList();
 
 			using var deviceMap = new PooledDictionary<int, int>();
 
-			config.ResolveDeviceMap(asJoystickDevices, deviceMap);
+			config.ResolveDeviceMap(connectedDevices, deviceMap);
 
 			return new()
 			{
