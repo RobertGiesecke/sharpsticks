@@ -1,5 +1,5 @@
-//#:project Console/Console.csproj
-#:package SharpSticks.Console@0.1.0-debug10
+#:project ../src/Console/Console.csproj
+//#:package SharpSticks.Console@0.1.0-debug10
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
