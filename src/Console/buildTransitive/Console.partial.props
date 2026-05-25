@@ -3,4 +3,11 @@
     <Using Include="static SharpSticks.Console.ConsoleExtensions" />
     <Using Include="static SharpSticks.InputAbstractions.Macros" />
   </ItemGroup>
+  <Choose>
+    <When Condition="'$(PlatformDefaultInputDeviceFullTypeName)' != '' and '$(PlatformDefaultOutputDeviceFullTypeName)' != ''">
+      <ItemGroup>
+        <Using Include="static SharpSticks.Console.ConsoleExtensions&lt;$(PlatformDefaultInputDeviceFullTypeName), $(PlatformDefaultOutputDeviceFullTypeName)&gt;" />
+      </ItemGroup>
+    </When>
+  </Choose>
 </Project>

@@ -234,23 +234,23 @@ public static class RuntimeExtensions
 		}
 	}
 
-	extension(Runtime<PlatformDefaultInputDevice, PlatformDefaultOutputDevice>)
+	extension <TInputDevice, TOutputDevice>(ICombinedDeviceFactory<TInputDevice, TOutputDevice> factory) 
+		where TInputDevice : JoystickDevice 
+		where TOutputDevice : OutputDevice
 	{
-		public static IOutputRuntimeContext<PlatformDefaultInputDevice, PlatformDefaultOutputDevice> BuildFromConfig(
+		public IOutputRuntimeContext<TInputDevice, TOutputDevice> RuntimeFromConfig(
 			AppConfig config)
 		{
 			var buildOptions = GetBuildOptionsFromConfig(
 				config,
-				PlatformDefaultOutputDeviceFactory.Instance,
-				PlatformDefaultInputDeviceFactory.Instance);
-			return Runtime<PlatformDefaultInputDevice, PlatformDefaultOutputDevice>.Build(buildOptions);
+				factory,
+				factory);
+			return Runtime<TInputDevice, TOutputDevice>.Build(buildOptions);
 		}
 
-		public static RuntimeBuilder.BuildOptions<PlatformDefaultInputDevice, PlatformDefaultOutputDevice>
-			GetBuildOptionsFromConfig(
-				AppConfig config)
+		public RuntimeBuilder.BuildOptions<TInputDevice, TOutputDevice> GetBuildOptionsFromConfig(AppConfig config)
 		{
-			using var connectedDevices = PlatformDefaultInputDeviceFactory.Instance.EnumerateConnectedInputDevices();
+			using var connectedDevices = factory.EnumerateConnectedInputDevices();
 
 			using var deviceMap = new PooledDictionary<int, int>();
 
@@ -259,7 +259,7 @@ public static class RuntimeExtensions
 			return new()
 			{
 				Name = config.Name ?? "unnamed",
-				OutputDeviceFactory = PlatformDefaultOutputDeviceFactory.Instance,
+				OutputDeviceFactory = factory,
 				ConnectedDevices = [..connectedDevices],
 				Routes = config.BuildRoutes(deviceMap),
 			};
