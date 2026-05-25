@@ -6,6 +6,7 @@ var modifierBlendCurve = new BlendedAxisCurve
 	Stateful = true,
 };
 
+
 BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
