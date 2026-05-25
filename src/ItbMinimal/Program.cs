@@ -6,10 +6,11 @@ var modifierBlendCurve = new BlendedAxisCurve
 	Stateful = true,
 };
 
-
 BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
+	OutputDeviceFactory = PlatformDefaultDeviceFactory.Instance,
+	
 	Routes =
 	[
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()

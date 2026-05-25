@@ -22,6 +22,7 @@
     <ItemGroup>
 <!--      <ProjectReference Include="..\Config\Config.csproj" />-->
       <ProjectReference Include="..\Console\Console.csproj" />
+      <ProjectReference Include="..\PlatformDefaults\PlatformDefaults.csproj" />
 <!--      <ProjectReference Include="..\DirectInput\DirectInput.csproj" />-->
 <!--      <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />-->
 <!--      <ProjectReference Include="..\VJoy\VJoy.csproj" />-->
