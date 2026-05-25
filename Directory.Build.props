@@ -20,12 +20,17 @@
         <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
     <!--
-        Import the own buildTransitive\<Name>.partial.props so MSBuild natively evaluates
-        any <Choose>/<PropertyGroup>/<ItemGroup>/<Using> the project author wrote there.
-        Upstream projref partial.props content is brought in separately by Directory.Build.targets'
-        ImportProjectRefBuildTransitiveUsings (which uses Microsoft.Build.Evaluation.Project
-        on each direct projref's already-merged in-tree .props).
+        Import the own buildTransitive\<Name>.merged.props so MSBuild natively evaluates the
+        full <Choose>/<PropertyGroup>/<ItemGroup>/<Using> chain — including transitive content
+        merged in from every direct projref's own .merged.props by GenerateBuildTransitiveProps.
+
+        First build of a fresh checkout: this file doesn't exist yet (Exists() guards the Import),
+        so transitive aliases are missing. GenerateBuildTransitiveProps writes it during that
+        build; a second build picks it up. The own .partial.props is imported separately as a
+        first-build fallback so the project's own aliases are still available immediately.
     -->
-    <Import Condition="exists('$(MSBuildProjectDirectory)\buildTransitive\$(MSBuildProjectName).partial.props')"
+    <Import Condition="exists('$(MSBuildProjectDirectory)\buildTransitive\$(MSBuildProjectName).merged.props')"
+            Project="$(MSBuildProjectDirectory)\buildTransitive\$(MSBuildProjectName).merged.props"/>
+    <Import Condition="!exists('$(MSBuildProjectDirectory)\buildTransitive\$(MSBuildProjectName).merged.props') and exists('$(MSBuildProjectDirectory)\buildTransitive\$(MSBuildProjectName).partial.props')"
             Project="$(MSBuildProjectDirectory)\buildTransitive\$(MSBuildProjectName).partial.props"/>
 </Project>
