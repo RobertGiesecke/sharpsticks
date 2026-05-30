@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.IO;
 using System.Text;
-using System.Threading;
 
 namespace SharpSticks.Generators;
 
@@ -13,7 +11,7 @@ internal static class GeneratorLog
 {
 	private static readonly string LogPath = ResolveLogPath();
 	private static readonly int ProcessId = GetProcessIdSafe();
-	private static readonly object Gate = new();
+	private static readonly Lock Gate = new();
 
 	internal static void Log(string message)
 	{
