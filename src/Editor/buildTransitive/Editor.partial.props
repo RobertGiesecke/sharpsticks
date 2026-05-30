@@ -1,2 +1,12 @@
 <Project>
+    <!--
+        No extra content needed. The merged props (this project's + every dependency's,
+        assembled by GenerateBuildTransitiveProps) carries the <Using> items that a real
+        `dotnet build`/`run` turns into global usings via GenerateGlobalUsings.
+
+        Editors (VS Code / Zed) don't apply package buildTransitive props for file-based
+        programs, so those <Using> items never reach IntelliSense — that gap is bridged by
+        the SharpSticks generator, which derives the package global usings itself (it runs
+        in the editor, unlike the props). See DevicesGenerator.ComputePackageGlobalUsings.
+    -->
 </Project>
