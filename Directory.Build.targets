@@ -212,12 +212,21 @@ File.WriteAllText(OutputFile, content);
               DestinationFiles="$(_BuildTransitiveInSourcePropsFile)"
               SkipUnchangedFiles="true"
               Condition="'$(_BuildTransitiveInSourcePropsFile)' != ''"/>
-        <!-- Pack variant: own partial only. Skip for Exe (no nupkg to pack into). -->
+        <!-- Pack variant. Normally own partial only — NuGet auto-imports each transitive
+             package's .props during a real restore/build, so merging here would duplicate.
+             When PackMergedBuildTransitiveProps=true (opt-in, e.g. SharpSticks.Editor) the
+             packed props is the fully-merged set instead: editors that import only the
+             directly-referenced package's props for file-based scripts (VS Code / Zed) then
+             get every using + alias from a single file. Skip for Exe (no nupkg). -->
         <WriteTransitiveProps SelfPartialPropsFile="$(_BuildTransitivePartialFile)"
                               SelfNamespace="$(RootNamespace)"
                               SkipUpstreamMerge="true"
                               OutputFile="$(_BuildTransitivePackFile)"
-                              Condition="'$(OutputType)' != 'Exe'"/>
+                              Condition="'$(OutputType)' != 'Exe' and '$(PackMergedBuildTransitiveProps)' != 'true'"/>
+        <Copy SourceFiles="$(_BuildTransitiveMergedFile)"
+              DestinationFiles="$(_BuildTransitivePackFile)"
+              SkipUnchangedFiles="true"
+              Condition="'$(OutputType)' != 'Exe' and '$(PackMergedBuildTransitiveProps)' == 'true'"/>
         <ItemGroup Condition="'$(OutputType)' != 'Exe'">
             <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(PackageId).props"/>
         </ItemGroup>

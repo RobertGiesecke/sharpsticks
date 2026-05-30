@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <!--
+            Bundle package for a good file-based-script editing experience. Its packed
+            buildTransitive props is the fully-merged set (every using + PlatformDefault*
+            alias), so editors that import only the directly-referenced package's props
+            (VS Code / Zed for `#:package`) resolve the whole surface from one import.
+            A real `dotnet build` still works because NuGet dedupes the duplicate usings.
+        -->
+        <PackMergedBuildTransitiveProps>true</PackMergedBuildTransitiveProps>
+        <Description>Bundles SharpSticks.Console and inlines every global using into a single buildTransitive props for file-based-script editing in VS Code / Zed</Description>
+    </PropertyGroup>
+
+    <!--
+        Console flows everything (PrivateAssets="none"), so the source generator reaches a
+        `#:package SharpSticks.Editor` consumer through the single edge Editor -> Console ->
+        Generators. We deliberately do NOT add a direct Editor -> Generators reference: that
+        would give the analyzer two paths into the consumer graph and the SDK would load it
+        twice (the generator runs twice -> duplicate generated types). PlatformDefaults flows
+        the default way (runtime only) and doesn't carry the analyzer, so it adds no second
+        path. Editor's own inlined merged props already provides every global using.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\Console\Console.csproj" PrivateAssets="none"/>
+        <ProjectReference Include="..\PlatformDefaults\PlatformDefaults.csproj"/>
+    </ItemGroup>
+
+</Project>
