@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 
 namespace SharpSticks.Generators;
 
@@ -9,6 +8,10 @@ namespace SharpSticks.Generators;
 /// failure mode here is swallowed — logging must never fail a build.
 internal static class GeneratorLog
 {
+#if !GENERATOR_LOG
+	[Conditional("GENERATOR_LOG")]
+	internal static extern void Log(string message);
+#else
 	private static readonly string LogPath = ResolveLogPath();
 	private static readonly int ProcessId = GetProcessIdSafe();
 	private static readonly Lock Gate = new();
@@ -24,7 +27,7 @@ internal static class GeneratorLog
 				" ", message, "\n");
 			lock (Gate)
 			{
-				File.AppendAllText(LogPath, line, Encoding.UTF8);
+				File.AppendAllText(LogPath, line, System.Text.Encoding.UTF8);
 			}
 		}
 		catch
@@ -38,8 +41,8 @@ internal static class GeneratorLog
 		try
 		{
 			var dir = Environment.GetEnvironmentVariable("TEMP")
-				?? Environment.GetEnvironmentVariable("TMP")
-				?? "/tmp";
+			          ?? Environment.GetEnvironmentVariable("TMP")
+			          ?? "/tmp";
 			return Path.Combine(dir, "sharpsticks-gen.log");
 		}
 		catch
@@ -59,4 +62,5 @@ internal static class GeneratorLog
 			return 0;
 		}
 	}
+#endif
 }
