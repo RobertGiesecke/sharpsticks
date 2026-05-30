@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text;
 using Collections.Pooled;
@@ -14,18 +13,7 @@ namespace SharpSticks.Generators;
 public sealed class DevicesGenerator : IIncrementalGenerator
 {
 	private const string NamespaceRoot = $"{nameof(SharpSticks)}.";
-
-	// Cache last-known-good emissions per RegisterSourceOutput callback. When an edit
-	// transiently makes the SyntaxProvider return zero DeviceInfoTargets (Roslyn briefly
-	// can't resolve `[GenerateDeviceInfos]` mid-edit), the callback fires with an empty
-	// list. Without a re-emit, Roslyn discards the previously-generated source for that
-	// callback — IDEs then show squiggles on `Devices.Typed.*` until the user edits again
-	// and the next run produces non-empty results. Re-emitting from cache keeps the
-	// generated surface in scope across those transient empties.
-	private static readonly ConcurrentDictionary<string, string> LastDeviceInfosEmissions = new(StringComparer.Ordinal);
-
-	private static readonly ConcurrentDictionary<string, string> LastAssemblyDeviceInfosEmissions =
-		new(StringComparer.Ordinal);
+	private const string DefaultDevicesClassName = "Devices";
 
 	private const string GenerateDeviceInfosAttributeMetadataName = nameof(GenerateDeviceInfosAttribute);
 	private const string RenameDeviceAttributeMetadataName = nameof(RenameDeviceAttribute);
@@ -63,19 +51,64 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 		var deviceInfoTargets = context.SyntaxProvider.ForAttributeWithMetadataName(
 				GenerateDeviceInfosAttributeMetadataName,
-				static (node, _) => node is TypeDeclarationSyntax,
+				static (node, _) => node is TypeDeclarationSyntax or CompilationUnitSyntax,
 				static (syntaxContext, _) =>
 				{
 					GeneratorLog.Log(
-						$"SyntaxProvider: select {nameof(DeviceInfoTarget)} for {syntaxContext.TargetSymbol.ToDisplayString()}");
-					var targetSymbol = (INamedTypeSymbol)syntaxContext.TargetSymbol;
-					return new DeviceInfoTarget(
-						DeviceType.FromNameTypeSymbol(targetSymbol),
-						targetSymbol.Locations.FirstOrDefault(static location => location.IsInSource),
-						GetDeviceInfoLevels(syntaxContext),
-						GetDeviceRenames(syntaxContext),
-						GetAxisRenames(syntaxContext),
-						GetButtonRenames(syntaxContext));
+						$"SyntaxProvider: select {nameof(DeviceInfoTarget)} for {syntaxContext.TargetSymbol.GetType().FullName} {syntaxContext.TargetSymbol.ToDisplayString()}");
+
+					var deviceInfoTarget = syntaxContext.TargetSymbol switch
+					{
+						INamedTypeSymbol targetSymbol => new DeviceInfoTarget(
+							DeviceType.FromNameTypeSymbol(targetSymbol),
+							syntaxContext.TargetNode.GetLocation(),
+							GetDeviceInfoLevels(syntaxContext.Attributes),
+							GetDeviceRenames(targetSymbol.GetAttributes()),
+							GetAxisRenames(targetSymbol.GetAttributes()),
+							GetButtonRenames(targetSymbol.GetAttributes())),
+						ISourceAssemblySymbol targetSymbol
+							when targetSymbol.Compilation.GetTypeByMetadataName(
+									     DefaultDevicesClassName) is
+								     { } d
+							     && targetSymbol.GetAttributes().AddRange(d.GetAttributes()) is var allAttributes
+							=> new DeviceInfoTarget(
+								DeviceType.FromNameTypeSymbol(d),
+								syntaxContext.TargetNode.GetLocation(),
+								GetDeviceInfoLevels(allAttributes),
+								GetDeviceRenames(allAttributes),
+								GetAxisRenames(allAttributes),
+								GetButtonRenames(allAttributes)),
+						ISourceAssemblySymbol targetSymbol
+							when targetSymbol.GetAttributes() is var allAttributes
+							=> new DeviceInfoTarget(
+								new()
+								{
+									Namespace = null,
+									FullyQualifiedDisplayString = DefaultDevicesClassName,
+									DisplayString = DefaultDevicesClassName,
+									ContainingTypes = [],
+									Name = DefaultDevicesClassName,
+									IsStatic = true,
+									IsNested = false,
+									IsPartial = true,
+									Accessibility = Accessibility.Internal,
+									TypeKind = DeviceTypeKind.Class,
+									ClrTypeKind = TypeKind.Unknown,
+									TypeDeclaration = DefaultDevicesClassName
+								},
+								syntaxContext.TargetNode.GetLocation(),
+								GetDeviceInfoLevels(allAttributes),
+								GetDeviceRenames(allAttributes),
+								GetAxisRenames(allAttributes),
+								GetButtonRenames(allAttributes)),
+						_ => throw new ArgumentOutOfRangeException(nameof(syntaxContext.TargetSymbol),
+							syntaxContext.TargetSymbol,
+							$"unsupported target symbol: {syntaxContext.TargetSymbol.ToDisplayString()}"),
+					};
+
+					GeneratorLog.Log(
+						$"SyntaxProvider: use {nameof(DeviceInfoTarget)} {new { deviceInfoTarget.FirstLocation, deviceInfoTarget.DeviceType.FullyQualifiedDisplayString }}");
+					return deviceInfoTarget;
 				})
 			.Where(static target => target.DeviceType.ClrTypeKind is TypeKind.Class or TypeKind.Struct);
 
@@ -86,38 +119,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 				GeneratorLog.Log($"RegisterSourceOutput: {nameof(GenerateDeviceInfos)} targets={targets.Length}");
 				GenerateDeviceInfos(sourceProductionContext, targets);
 			});
-
-		var assemblyTarget = context.CompilationProvider.Select(static (compilation, _) =>
-		{
-			var attributes = compilation.Assembly.GetAttributes();
-			var generateAttr = attributes.FirstOrDefault(static data =>
-				data.AttributeClass?.ToDisplayString() == GenerateDeviceInfosAttributeMetadataName);
-			if (generateAttr is null)
-			{
-				GeneratorLog.Log("CompilationProvider(assemblyTarget): no [GenerateDeviceInfos] on assembly");
-				return default;
-			}
-
-			var devicesType = compilation.GetTypeByMetadataName("Devices");
-			var classAttributes = devicesType?.GetAttributes() ?? ImmutableArray<AttributeData>.Empty;
-			GeneratorLog.Log(
-				$"CompilationProvider(assemblyTarget): asm-attrs={attributes.Length} Devices-symbol={(devicesType is null ? "<none>" : "found")} class-attrs={classAttributes.Length}");
-
-			return new AssemblyDeviceInfoTarget(
-				GetDeviceInfoLevels(attributes),
-				GetDeviceRenames(attributes).AddRange(GetDeviceRenames(classAttributes)),
-				GetAxisRenames(attributes).AddRange(GetAxisRenames(classAttributes)),
-				GetButtonRenames(attributes).AddRange(GetButtonRenames(classAttributes)));
-		});
-
-		context.RegisterSourceOutput(
-			assemblyTarget,
-			static (sourceProductionContext, target) =>
-			{
-				GeneratorLog.Log(
-					$"RegisterSourceOutput: GenerateAssemblyDeviceInfos present={target.IsPresent} levels={target.Levels}");
-				GenerateAssemblyDeviceInfos(sourceProductionContext, target);
-			});
 	}
 
 	private static void GenerateDeviceInfos(SourceProductionContext context, ImmutableArray<DeviceInfoTarget> targets)
@@ -125,11 +126,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		if (targets.IsDefaultOrEmpty)
 		{
 			GeneratorLog.Log(
-				$"{nameof(GenerateDeviceInfos)}: empty targets, replaying {LastDeviceInfosEmissions.Count} cached emissions");
-			foreach (var kvp in LastDeviceInfosEmissions)
-			{
-				context.AddSource(kvp.Key, SourceText.From(kvp.Value, Encoding.UTF8));
-			}
+				$"{nameof(GenerateDeviceInfos)}: empty targets");
 
 			return;
 		}
@@ -145,8 +142,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			context.ReportDiagnostic(Diagnostic.Create(OutputDevicesUnavailable, Location.None, outputError));
 			outputDevices = ImmutableArray<OutputDeviceSnapshot>.Empty;
 		}
-
-		var fresh = new Dictionary<string, string>(StringComparer.Ordinal);
 
 		foreach (var target in CoalesceTargets(targets))
 		{
@@ -172,25 +167,12 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			GeneratorLog.Log(
 				$"AddSource: {hintName} ({source.Length} chars, target={target.DeviceType.DisplayString})");
 			context.AddSource(hintName, SourceText.From(source, Encoding.UTF8));
-			fresh[hintName] = source;
 
 			var fqn = target.DeviceType.FullyQualifiedDisplayString;
 			var globalUsings = BuildGlobalUsings(fqn, target.Levels);
 			var globalUsingsHintName = hintName.Replace(".DeviceInfos.g.cs", ".GlobalUsings.g.cs");
 			GeneratorLog.Log($"AddSource: {globalUsingsHintName} ({globalUsings.Length} chars)");
 			context.AddSource(globalUsingsHintName, SourceText.From(globalUsings, Encoding.UTF8));
-			fresh[globalUsingsHintName] = globalUsings;
-		}
-
-		ReplaceCache(LastDeviceInfosEmissions, fresh);
-	}
-
-	private static void ReplaceCache(ConcurrentDictionary<string, string> cache, Dictionary<string, string> fresh)
-	{
-		cache.Clear();
-		foreach (var kvp in fresh)
-		{
-			cache[kvp.Key] = kvp.Value;
 		}
 	}
 
@@ -205,65 +187,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		}
 
 		return usings.ToString();
-	}
-
-	private static void GenerateAssemblyDeviceInfos(SourceProductionContext context, AssemblyDeviceInfoTarget target)
-	{
-		if (!target.IsPresent || target.Levels == 0)
-		{
-			GeneratorLog.Log(
-				$"GenerateAssemblyDeviceInfos: empty target, replaying {LastAssemblyDeviceInfosEmissions.Count} cached emissions");
-			foreach (var kvp in LastAssemblyDeviceInfosEmissions)
-			{
-				context.AddSource(kvp.Key, SourceText.From(kvp.Value, Encoding.UTF8));
-			}
-
-			return;
-		}
-
-		if (!DeviceSnapshots.TryEnumerateInputDevices(out var directInputDevices, out var directInputError))
-		{
-			context.ReportDiagnostic(Diagnostic.Create(InputDevicesUnavailable, Location.None, directInputError));
-			directInputDevices = ImmutableArray<InputDeviceSnapshot>.Empty;
-		}
-
-		if (!DeviceSnapshots.TryEnumerateOutputDevices(out var outputDevices, out var outputError))
-		{
-			context.ReportDiagnostic(Diagnostic.Create(OutputDevicesUnavailable, Location.None, outputError));
-			outputDevices = ImmutableArray<OutputDeviceSnapshot>.Empty;
-		}
-
-		var builder = new StringBuilder();
-		builder.AppendLine("// <auto-generated />");
-		builder.AppendLine("#nullable enable");
-		if (HasLevel(target.Levels, GenerateDeviceInfosLevels.TypedDevices))
-		{
-			builder.AppendLine("using System.Collections.Immutable;");
-		}
-
-		builder.AppendLine();
-		builder.AppendLine("internal partial class Devices");
-		builder.AppendLine("{");
-
-		AppendDeviceMembers(builder, target.Levels, target.DeviceRenames, target.AxisRenames, target.ButtonRenames,
-			directInputDevices, outputDevices, indentLevel: 1);
-
-		builder.AppendLine("}");
-
-		var assemblySource = builder.ToString();
-		GeneratorLog.Log($"AddSource: Devices.AssemblyDeviceInfos.g.cs ({assemblySource.Length} chars)");
-		context.AddSource("Devices.AssemblyDeviceInfos.g.cs", SourceText.From(assemblySource, Encoding.UTF8));
-
-		var assemblyGlobalUsings = BuildGlobalUsings("Devices", target.Levels);
-		GeneratorLog.Log($"AddSource: Devices.GlobalUsings.g.cs ({assemblyGlobalUsings.Length} chars)");
-		context.AddSource("Devices.GlobalUsings.g.cs",
-			SourceText.From(assemblyGlobalUsings, Encoding.UTF8));
-
-		ReplaceCache(LastAssemblyDeviceInfosEmissions, new(StringComparer.Ordinal)
-		{
-			["Devices.AssemblyDeviceInfos.g.cs"] = assemblySource,
-			["Devices.GlobalUsings.g.cs"] = assemblyGlobalUsings,
-		});
 	}
 
 	private static string GenerateDeviceInfosSource(
@@ -299,7 +222,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			var containingType = containingTypes[index];
 			var indent = new string('\t', index);
 			builder.Append(indent)
-				.Append(containingType.Accessibility)
+				.Append(GetAccessibility(containingType.Accessibility))
 				.Append(' ');
 
 			if (containingType.IsStatic)
@@ -880,9 +803,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		return result;
 	}
 
-	private static ImmutableArray<ButtonRename> GetButtonRenames(GeneratorAttributeSyntaxContext syntaxContext) =>
-		GetButtonRenames(syntaxContext.TargetSymbol.GetAttributes());
-
 	private static ImmutableArray<ButtonRename> GetButtonRenames(IEnumerable<AttributeData> attributes)
 	{
 		var builder = ImmutableArray.CreateBuilder<ButtonRename>();
@@ -935,9 +855,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		return -1;
 	}
 
-	private static ImmutableArray<DeviceRename> GetDeviceRenames(GeneratorAttributeSyntaxContext syntaxContext) =>
-		GetDeviceRenames(syntaxContext.TargetSymbol.GetAttributes());
-
 	private static ImmutableArray<DeviceRename> GetDeviceRenames(IEnumerable<AttributeData> attributes)
 	{
 		var builder = ImmutableArray.CreateBuilder<DeviceRename>();
@@ -966,9 +883,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 		return builder.ToImmutable();
 	}
-
-	private static ImmutableArray<AxisRename> GetAxisRenames(GeneratorAttributeSyntaxContext syntaxContext) =>
-		GetAxisRenames(syntaxContext.TargetSymbol.GetAttributes());
 
 	private static ImmutableArray<AxisRename> GetAxisRenames(IEnumerable<AttributeData> attributes)
 	{
@@ -1133,9 +1047,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		return names;
 	}
 
-	private static GenerateDeviceInfosLevels GetDeviceInfoLevels(GeneratorAttributeSyntaxContext syntaxContext) =>
-		GetDeviceInfoLevels(syntaxContext.Attributes);
-
 	private static GenerateDeviceInfosLevels GetDeviceInfoLevels(IEnumerable<AttributeData> attributes)
 	{
 		var attribute = attributes.FirstOrDefault(static data =>
@@ -1276,8 +1187,9 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			builder.Add(new()
 			{
 				IsStatic = current.IsStatic,
+				IsNested = true,
 				IsPartial = IsPartial(current),
-				Accessibility = GetAccessibility(current),
+				Accessibility = current.DeclaredAccessibility,
 				Name = current.Name,
 				TypeKind = GetDeviceTypeKind(current),
 				ClrTypeKind = current.TypeKind,
@@ -1310,9 +1222,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		return builder + ".DeviceInfos.g.cs";
 	}
 
-	private static string GetAccessibility(INamedTypeSymbol symbol)
-	{
-		return symbol.DeclaredAccessibility switch
+	private static string GetAccessibility(Accessibility declaredAccessibility) =>
+		declaredAccessibility switch
 		{
 			Accessibility.Public => "public",
 			Accessibility.Protected => "protected",
@@ -1322,7 +1233,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			Accessibility.Private => "private",
 			_ => "internal",
 		};
-	}
 
 	private static DeviceTypeKind GetDeviceTypeKind(INamedTypeSymbol symbol) =>
 		symbol switch
@@ -1368,8 +1278,11 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		public required bool IsStatic { get; init; }
 
 		// ReSharper disable once MemberHidesStaticFromOuterClass
+		public required bool IsNested { get; init; }
+
+		// ReSharper disable once MemberHidesStaticFromOuterClass
 		public required bool IsPartial { get; init; }
-		public required string Accessibility { get; init; }
+		public required Accessibility Accessibility { get; init; }
 		public required DeviceTypeKind TypeKind { get; init; }
 		public required TypeKind ClrTypeKind { get; init; }
 		public required string TypeDeclaration { get; init; }
@@ -1384,6 +1297,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		protected virtual void AddToHashCode(ref HashCode hashCode)
 		{
 			hashCode.Add(Name);
+			hashCode.Add(IsNested);
 			hashCode.Add(IsStatic);
 			hashCode.Add(IsPartial);
 			hashCode.Add(Accessibility);
@@ -1402,11 +1316,12 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			return new()
 			{
 				Name = typeSymbol.Name,
+				IsNested = typeSymbol.ContainingType is not null,
 				IsStatic = typeSymbol.IsStatic,
 				IsPartial = IsPartial(typeSymbol),
 				FullyQualifiedDisplayString = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
 				DisplayString = typeSymbol.ToDisplayString(),
-				Accessibility = GetAccessibility(typeSymbol),
+				Accessibility = typeSymbol.DeclaredAccessibility,
 				Namespace = typeSymbol.ContainingNamespace.IsGlobalNamespace
 					? null
 					: typeSymbol.ContainingNamespace.ToDisplayString(),
@@ -1414,16 +1329,12 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 				ClrTypeKind = typeSymbol.TypeKind,
 				TypeDeclaration = GetTypeDeclaration(typeSymbol),
 				ContainingTypes = GetContainingTypeChain(typeSymbol),
-				ParentDeviceTypes = default,
 			};
 		}
 
 		public required string? Namespace { get; init; }
 		public required string FullyQualifiedDisplayString { get; init; }
 		public required string DisplayString { get; init; }
-
-		// ReSharper disable once TypeWithSuspiciousEqualityIsUsedInRecord.Local
-		public required ImmutableArray<DeviceType> ParentDeviceTypes { get; init; }
 
 		// ReSharper disable once TypeWithSuspiciousEqualityIsUsedInRecord.Local
 		public required ImmutableArray<DeviceContainingType> ContainingTypes { get; init; }
@@ -1444,7 +1355,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 			return base.Equals(other) &&
 			       Namespace == other.Namespace &&
-			       ParentDeviceTypes.SequenceEqual(other.ParentDeviceTypes) &&
 			       ContainingTypes.SequenceEqual(other.ContainingTypes);
 		}
 
@@ -1452,7 +1362,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		{
 			base.AddToHashCode(ref hashCode);
 			hashCode.Add(Namespace);
-			hashCode.Add(ParentDeviceTypes.Length);
 			hashCode.Add(ContainingTypes.Length);
 		}
 	}
@@ -1507,30 +1416,6 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		public ImmutableArray<ButtonRename> ButtonRenames { get; init; }
 	}
 
-	private readonly record struct AssemblyDeviceInfoTarget(
-		GenerateDeviceInfosLevels Levels,
-		ImmutableArray<DeviceRename> DeviceRenames,
-		ImmutableArray<AxisRename> AxisRenames,
-		ImmutableArray<ButtonRename> ButtonRenames)
-	{
-		public bool IsPresent => Levels != 0 || !DeviceRenames.IsDefaultOrEmpty;
-
-		public bool Equals(AssemblyDeviceInfoTarget other) =>
-			Levels == other.Levels
-			&& DeviceRenames.SequenceEqual(other.DeviceRenames)
-			&& AxisRenames.SequenceEqual(other.AxisRenames)
-			&& ButtonRenames.SequenceEqual(other.ButtonRenames);
-
-		public override int GetHashCode()
-		{
-			var hc = new HashCode();
-			hc.Add(Levels);
-			hc.Add(DeviceRenames.Length);
-			hc.Add(AxisRenames.Length);
-			hc.Add(ButtonRenames.Length);
-			return hc.ToHashCode();
-		}
-	}
 
 	private readonly record struct DeviceRename(string DeviceName, string NewName);
 
