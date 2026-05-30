@@ -12,16 +12,21 @@ internal static unsafe partial class DirectInputNative
 	public static readonly Guid IidIDirectInput8W =
 		new(0xBF798031, 0x483A, 0x4DA2, 0xAA, 0x99, 0x5D, 0x64, 0xED, 0x36, 0x97, 0x00);
 
-	[DllImport("dinput8.dll", PreserveSig = true)]
-	public static extern int DirectInput8Create(
+	// All parameters are blittable, so no custom marshalling is needed. LibraryImport has no
+	// PreserveSig concept — it never translates the HRESULT, so returning the int is correct.
+	[LibraryImport("dinput8.dll")]
+	public static partial int DirectInput8Create(
 		IntPtr hinst,
 		uint dwVersion,
 		in Guid riidltf,
 		out IntPtr ppvOut,
 		IntPtr punkOuter);
 
-	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-	public static extern IntPtr GetModuleHandle(string? lpModuleName);
+	// LibraryImport does not auto-append the W/A suffix that DllImport derived from
+	// CharSet.Unicode, and kernel32 exports only GetModuleHandleW — so name the entry point
+	// explicitly and marshal the string as UTF-16.
+	[LibraryImport("kernel32.dll", EntryPoint = "GetModuleHandleW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+	public static partial IntPtr GetModuleHandle(string? lpModuleName);
 
 	public static bool Succeeded(int hresult)
 	{

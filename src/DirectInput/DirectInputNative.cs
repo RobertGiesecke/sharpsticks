@@ -17,18 +17,18 @@ internal static unsafe partial class DirectInputNative
 
 	public static readonly Guid DiPropRange = new(4, 0, 0, 0xC0, 0, 0, 0, 0, 0, 0, 0x46);
 
-	[DllImport("kernel32.dll", SetLastError = true)]
-	public static extern nint CreateEventW(nint lpEventAttributes, bool bManualReset, bool bInitialState, nint lpName);
+	[LibraryImport("kernel32.dll", SetLastError = true)]
+	public static partial nint CreateEventW(nint lpEventAttributes, [MarshalAs(UnmanagedType.Bool)] bool bManualReset, [MarshalAs(UnmanagedType.Bool)] bool bInitialState, nint lpName);
 
-	[DllImport("kernel32.dll", SetLastError = true)]
+	[LibraryImport("kernel32.dll", SetLastError = true)]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool CloseHandle(nint hObject);
+	public static partial bool CloseHandle(nint hObject);
 
-	[DllImport("kernel32.dll")]
-	public static extern IntPtr GetConsoleWindow();
+	[LibraryImport("kernel32.dll")]
+	public static partial IntPtr GetConsoleWindow();
 
-	[DllImport("user32.dll")]
-	public static extern IntPtr GetDesktopWindow();
+	[LibraryImport("user32.dll")]
+	public static partial IntPtr GetDesktopWindow();
 
 	public static int GetInstance(uint type)
 	{
