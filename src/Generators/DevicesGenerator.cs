@@ -227,7 +227,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			context.AddSource(hintName, SourceText.From(source, Encoding.UTF8));
 
 			var emitGlobalUsings = emittableCount == 1
-				|| (hasDefault && IsDefaultDevicesClass(target.DeviceType));
+			                       || (hasDefault && IsDefaultDevicesClass(target.DeviceType));
 			if (!emitGlobalUsings)
 			{
 				GeneratorLog.Log(
@@ -650,7 +650,11 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			return;
 		}
 
+
 		{
+			builder.AppendLine();
+			builder.AppendLine("\tpublic static class Types");
+			builder.AppendLine("\t{");
 			for (var index = 0; index < directInputDevices.Length; index++)
 			{
 				if (IsOutputCounterpart(index))
@@ -674,8 +678,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 					directInputDevices[index],
 					axisPropertyNames,
 					buttonPropertyNames,
-					indent,
-					memberIndent);
+					indent + "\t",
+					memberIndent + "\t");
 			}
 
 			foreach (var outputDevice in outputDevices.OrderBy(static d => d.DeviceId))
@@ -690,8 +694,10 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 					BuildButtonPropertyNames(deviceName, vjoyBaseName, buttonRenames, vjoyIdentifier);
 				AppendSeparator(builder, ref wroteMember);
 				AppendTypedOutputDeviceClass(builder, vjoyIdentifier, vjoyBaseName, outputDevice.Axes, outputAxisNames,
-					outputDevice.ButtonCount, outputButtonNames, indent, memberIndent);
+					outputDevice.ButtonCount, outputButtonNames, indent + "\t", memberIndent + "\t");
 			}
+
+			builder.AppendLine("\t}");
 
 			AppendSeparator(builder, ref wroteMember);
 			builder.Append(indent).AppendLine("public static class Typed");
@@ -708,7 +714,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 					.Append(directInputDevices[index].ProductName)
 					.AppendLine("</summary>");
 				builder.Append(memberIndent)
-					.Append("public static Typed")
+					.Append("public static Types.")
 					.Append(deviceIdentifiers[index])
 					.Append(' ')
 					.Append(deviceIdentifiers[index])
@@ -726,7 +732,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 					.Append(deviceName)
 					.AppendLine("</summary>");
 				builder.Append(memberIndent)
-					.Append("public static Typed")
+					.Append("public static Types.")
 					.Append(vjoyIdentifier)
 					.Append(' ')
 					.Append(vjoyIdentifier)
@@ -751,7 +757,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		var innerIndent = memberIndent;
 		var innerMemberIndent = memberIndent + "\t";
 
-		builder.Append(classIndent).Append("public sealed record Typed").Append(deviceIdentifier)
+		builder.Append(classIndent).Append("public sealed record ").Append(deviceIdentifier)
 			.Append(": IJoystickDevice").AppendLine();
 		builder.Append(classIndent).AppendLine("{");
 
@@ -879,7 +885,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		var innerIndent = memberIndent;
 		var innerMemberIndent = memberIndent + "\t";
 
-		builder.Append(indent).Append("public sealed record Typed").Append(vjoyIdentifier).Append(": IOutputDevice")
+		builder.Append(indent).Append("public sealed record ").Append(vjoyIdentifier).Append(": IOutputDevice")
 			.AppendLine();
 		builder.Append(indent).AppendLine("{");
 
