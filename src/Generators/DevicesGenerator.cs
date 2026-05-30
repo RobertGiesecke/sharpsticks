@@ -21,8 +21,10 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 	private const string RenameButtonAttributeMetadataName = nameof(RenameButton);
 	private const GenerateDeviceInfosLevels GenerateDeviceInfosLevelsDefault = GenerateDeviceInfosLevels.DeviceNames;
 
+	const string DiagnosticCodePrefix = "STICKS";
+
 	private static readonly DiagnosticDescriptor TypeMustBePartial = new(
-		"SACIG001",
+		$"{DiagnosticCodePrefix}001",
 		"GenerateDeviceInfos target must be partial",
 		"Type '{0}' must be partial to receive generated device info members",
 		$"{NamespaceRoot}Generators",
@@ -30,7 +32,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		isEnabledByDefault: true);
 
 	private static readonly DiagnosticDescriptor InputDevicesUnavailable = new(
-		"SACIG002",
+		$"{DiagnosticCodePrefix}002",
 		"Input device snapshot unavailable",
 		"Input device info generation could not enumerate devices: {0}",
 		$"{NamespaceRoot}Generators",
@@ -38,7 +40,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		isEnabledByDefault: true);
 
 	private static readonly DiagnosticDescriptor OutputDevicesUnavailable = new(
-		"SACIG003",
+		$"{DiagnosticCodePrefix}003",
 		"Output device snapshot unavailable",
 		"Output device info generation could not enumerate output devices: {0}",
 		$"{NamespaceRoot}Generators",
@@ -46,7 +48,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		isEnabledByDefault: true);
 
 	private static readonly DiagnosticDescriptor RenameUsesReservedName = new(
-		"SACIG004",
+		$"{DiagnosticCodePrefix}004",
 		"Rename uses a reserved member name",
 		"{0} on device '{1}' is renamed to \"All\", which clashes with the generated 'All' collection property",
 		$"{NamespaceRoot}Generators",
@@ -54,7 +56,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		isEnabledByDefault: true);
 
 	private static readonly DiagnosticDescriptor RenameClashesWithBuiltInName = new(
-		"SACIG005",
+		$"{DiagnosticCodePrefix}005",
 		"Rename clashes with a built-in device member name",
 		"{0} on device '{1}' is renamed to \"{2}\", which is the built-in name of a different {3} on the same device",
 		$"{NamespaceRoot}Generators",
@@ -62,7 +64,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		isEnabledByDefault: true);
 
 	private static readonly DiagnosticDescriptor DuplicateRenameName = new(
-		"SACIG006",
+		$"{DiagnosticCodePrefix}006",
 		"Duplicate generated member name",
 		"Device '{0}' has multiple {1} members named \"{2}\"; each must resolve to a distinct name",
 		$"{NamespaceRoot}Generators",
