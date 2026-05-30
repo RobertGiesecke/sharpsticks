@@ -179,7 +179,17 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			outputDevices = ImmutableArray<OutputDeviceSnapshot>.Empty;
 		}
 
-		foreach (var target in CoalesceTargets(targets))
+		var coalesced = CoalesceTargets(targets);
+
+		// `global using static <Devices>` would clash if more than one Devices class is
+		// generated. So with multiple classes, only the default one — type `Devices` with no
+		// namespace — gets the static import; if none of them is the default, none do. A
+		// single class always gets it, whatever its name/namespace.
+		var emittableCount = coalesced.Count(static t => t.DeviceType.IsPartial && t.Levels != 0);
+		var hasDefault = coalesced.Any(static t =>
+			t.DeviceType.IsPartial && t.Levels != 0 && IsDefaultDevicesClass(t.DeviceType));
+
+		foreach (var target in coalesced)
 		{
 			if (!target.DeviceType.IsPartial)
 			{
@@ -216,6 +226,15 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 				$"AddSource: {hintName} ({source.Length} chars, target={target.DeviceType.DisplayString})");
 			context.AddSource(hintName, SourceText.From(source, Encoding.UTF8));
 
+			var emitGlobalUsings = emittableCount == 1
+				|| (hasDefault && IsDefaultDevicesClass(target.DeviceType));
+			if (!emitGlobalUsings)
+			{
+				GeneratorLog.Log(
+					$"Skip GlobalUsings for {target.DeviceType.DisplayString} (multiple Devices classes)");
+				continue;
+			}
+
 			var fqn = target.DeviceType.FullyQualifiedDisplayString;
 			var globalUsings = BuildGlobalUsings(fqn, target.Levels);
 			var globalUsingsHintName = hintName.Replace(".DeviceInfos.g.cs", ".GlobalUsings.g.cs");
@@ -223,6 +242,9 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			context.AddSource(globalUsingsHintName, SourceText.From(globalUsings, Encoding.UTF8));
 		}
 	}
+
+	private static bool IsDefaultDevicesClass(DeviceType type) =>
+		type.Namespace is null && !type.IsNested && type.Name == DefaultDevicesClassName;
 
 	// Mirrors the device iteration in AppendDeviceMembers so the names we validate match
 	// the names that will actually be emitted into the typed binding records. Reports at
