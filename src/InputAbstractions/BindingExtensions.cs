@@ -11,6 +11,35 @@ public static class BindingExtensions
 		RouteAxisOptions? options = null) =>
 		binding.RouteAxis(outputDeviceId, binding.Axis, options);
 
+	public static GroupedSourceAxes GroupWith(
+		this AxisBinding binding,
+		params ReadOnlySpan<AxisBinding> otherAxes) =>
+		new()
+		{
+			SourceAxes = [binding, ..otherAxes],
+		};
+
+	public static ImmutableArray<AxisRoute> RouteToSameAxesOnOutput(
+		this GroupedSourceAxes bindings,
+		uint outputDeviceId,
+		RouteAxisOptions? options = null) =>
+	[
+		..bindings.SourceAxes.Distinct().Select(b => b.RouteAxis(outputDeviceId, b.Axis, options))
+	];
+
+
+	public static ImmutableArray<AxisRoute> RouteToSameAxesOnOutput(
+		this GroupedSourceAxes bindings,
+		uint outputDeviceId,
+		double scale = 1.0,
+		double offset = 0.0,
+		IAxisModifier? modifier = null) =>
+	[
+		..bindings.SourceAxes.Distinct().Select(b =>
+			b.RouteToSameAxisOnOutput(outputDeviceId, scale: scale, offset: offset, modifier: modifier))
+	];
+
+
 	public static AxisRoute RouteToSameAxisOnOutput(
 		this AxisBinding binding,
 		uint outputDeviceId,
