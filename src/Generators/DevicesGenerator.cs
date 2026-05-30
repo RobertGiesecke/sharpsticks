@@ -71,6 +71,14 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		DiagnosticSeverity.Error,
 		isEnabledByDefault: true);
 
+	private static readonly DiagnosticDescriptor ConflictingRename = new(
+		$"{DiagnosticCodePrefix}007",
+		"Conflicting renames for the same input",
+		"{0} on device '{1}' is renamed more than once with different names; the last rename (\"{2}\") wins",
+		$"{NamespaceRoot}Generators",
+		DiagnosticSeverity.Warning,
+		isEnabledByDefault: true);
+
 	private const string ReservedBindingMemberName = "All";
 
 	public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -260,6 +268,60 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			using var buttonMap = BuildButtonPropertyNames(deviceName, vjoyBaseName, buttonRenames, vjoyIdentifier);
 			ValidateDeviceRenames(
 				context, location, vjoyIdentifier, outputDevice.Axes, outputDevice.ButtonCount, axisMap, buttonMap);
+		}
+
+		// Conflicting renames are a config error regardless of whether the named device is
+		// even connected, so detect them on the raw rename arrays grouped by the device name
+		// as written, not against the enumerated device list.
+		ReportConflictingRenames(context, location, axisRenames, buttonRenames);
+	}
+
+	// The maps built by BuildAxisPropertyNames/BuildButtonPropertyNames silently let the
+	// last rename for a given axis/button win. Surface that as a warning so a conflicting
+	// pair of [RenameButton(dev, 2, "a")] / [RenameButton(dev, 2, "b")] doesn't quietly
+	// drop one.
+	private static void ReportConflictingRenames(
+		SourceProductionContext context,
+		Location? location,
+		ImmutableArray<AxisRename> axisRenames,
+		ImmutableArray<ButtonRename> buttonRenames)
+	{
+		using var axisLastName = new PooledDictionary<(string Device, Axis Axis), string>();
+		using var axisConflicts = new PooledSet<(string Device, Axis Axis)>();
+		foreach (var rename in axisRenames)
+		{
+			var key = (rename.DeviceName, rename.OriginalAxis);
+			if (axisLastName.TryGetValue(key, out var previous) && previous != rename.NewPropertyName)
+			{
+				axisConflicts.Add(key);
+			}
+
+			axisLastName[key] = rename.NewPropertyName;
+		}
+
+		foreach (var key in axisConflicts)
+		{
+			context.ReportDiagnostic(Diagnostic.Create(
+				ConflictingRename, location, $"Axis {key.Axis}", key.Device, axisLastName[key]));
+		}
+
+		using var buttonLastName = new PooledDictionary<(string Device, int Button), string>();
+		using var buttonConflicts = new PooledSet<(string Device, int Button)>();
+		foreach (var rename in buttonRenames)
+		{
+			var key = (rename.DeviceName, rename.Button);
+			if (buttonLastName.TryGetValue(key, out var previous) && previous != rename.NewPropertyName)
+			{
+				buttonConflicts.Add(key);
+			}
+
+			buttonLastName[key] = rename.NewPropertyName;
+		}
+
+		foreach (var key in buttonConflicts)
+		{
+			context.ReportDiagnostic(Diagnostic.Create(
+				ConflictingRename, location, $"Button {key.Button}", key.Device, buttonLastName[key]));
 		}
 	}
 
