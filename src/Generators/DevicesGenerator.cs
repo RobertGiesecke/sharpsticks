@@ -67,7 +67,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 				static (syntaxContext, _) =>
 				{
 					GeneratorLog.Log(
-						$"SyntaxProvider: select DeviceInfoTarget for {syntaxContext.TargetSymbol.ToDisplayString()}");
+						$"SyntaxProvider: select {nameof(DeviceInfoTarget)} for {syntaxContext.TargetSymbol.ToDisplayString()}");
 					var targetSymbol = (INamedTypeSymbol)syntaxContext.TargetSymbol;
 					return new DeviceInfoTarget(
 						DeviceType.FromNameTypeSymbol(targetSymbol),
@@ -83,7 +83,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			deviceInfoTargets.Collect(),
 			static (sourceProductionContext, targets) =>
 			{
-				GeneratorLog.Log($"RegisterSourceOutput: GenerateDeviceInfos targets={targets.Length}");
+				GeneratorLog.Log($"RegisterSourceOutput: {nameof(GenerateDeviceInfos)} targets={targets.Length}");
 				GenerateDeviceInfos(sourceProductionContext, targets);
 			});
 
@@ -125,7 +125,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		if (targets.IsDefaultOrEmpty)
 		{
 			GeneratorLog.Log(
-				$"GenerateDeviceInfos: empty targets, replaying {LastDeviceInfosEmissions.Count} cached emissions");
+				$"{nameof(GenerateDeviceInfos)}: empty targets, replaying {LastDeviceInfosEmissions.Count} cached emissions");
 			foreach (var kvp in LastDeviceInfosEmissions)
 			{
 				context.AddSource(kvp.Key, SourceText.From(kvp.Value, Encoding.UTF8));
