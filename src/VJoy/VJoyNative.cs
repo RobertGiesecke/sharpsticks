@@ -4,7 +4,7 @@ using Collections.Pooled;
 
 namespace SharpSticks.VJoy;
 
-public static class VJoyNative
+public static partial class VJoyNative
 {
 	static VJoyNative()
 	{
@@ -74,44 +74,46 @@ public static class VJoyNative
 		}
 	}
 
-	[DllImport("vJoyInterface.dll", EntryPoint = "vJoyEnabled")]
+	// vJoy's export is lowercase `vJoyEnabled`; the others match their PascalCase method names.
+	// The SetDllImportResolver above still applies — LibraryImport stubs honour it.
+	[LibraryImport("vJoyInterface.dll", EntryPoint = "vJoyEnabled")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool VJoyEnabled();
+	public static partial bool VJoyEnabled();
 
-	[DllImport("vJoyInterface.dll")]
-	public static extern VjdStatus GetVJDStatus(uint deviceId);
+	[LibraryImport("vJoyInterface.dll")]
+	public static partial VjdStatus GetVJDStatus(uint deviceId);
 
-	[DllImport("vJoyInterface.dll")]
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool AcquireVJD(uint deviceId);
+	public static partial bool AcquireVJD(uint deviceId);
 
-	[DllImport("vJoyInterface.dll")]
-	public static extern void RelinquishVJD(uint deviceId);
+	[LibraryImport("vJoyInterface.dll")]
+	public static partial void RelinquishVJD(uint deviceId);
 
-	[DllImport("vJoyInterface.dll")]
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool ResetVJD(uint deviceId);
+	public static partial bool ResetVJD(uint deviceId);
 
-	[DllImport("vJoyInterface.dll")]
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool GetVJDAxisExist(uint deviceId, uint axisUsage);
+	public static partial bool GetVJDAxisExist(uint deviceId, uint axisUsage);
 
-	[DllImport("vJoyInterface.dll")]
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool GetVJDAxisMin(uint deviceId, uint axisUsage, ref int min);
+	public static partial bool GetVJDAxisMin(uint deviceId, uint axisUsage, ref int min);
 
-	[DllImport("vJoyInterface.dll")]
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool GetVJDAxisMax(uint deviceId, uint axisUsage, ref int max);
+	public static partial bool GetVJDAxisMax(uint deviceId, uint axisUsage, ref int max);
 
-	[DllImport("vJoyInterface.dll")]
-	public static extern int GetVJDButtonNumber(uint deviceId);
+	[LibraryImport("vJoyInterface.dll")]
+	public static partial int GetVJDButtonNumber(uint deviceId);
 
-	[DllImport("vJoyInterface.dll")]
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool SetAxis(int value, uint deviceId, uint axisUsage);
+	public static partial bool SetAxis(int value, uint deviceId, uint axisUsage);
 
-	[DllImport("vJoyInterface.dll")]
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool SetBtn(bool pressed, uint deviceId, uint buttonNumber);
+	public static partial bool SetBtn([MarshalAs(UnmanagedType.Bool)] bool pressed, uint deviceId, uint buttonNumber);
 }
