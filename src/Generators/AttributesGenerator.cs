@@ -39,35 +39,9 @@ public sealed class AttributesGenerator : IIncrementalGenerator
 					continue;
 				}
 
-				using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-				var source = reader.ReadToEnd();
-				var hintName = GetHintName(resourceName);
-				GeneratorLog.Log($"AttributesGenerator AddSource: {hintName} ({source.Length} chars)");
-				postInitializationContext.AddSource(hintName, SourceText.From(source, Encoding.UTF8));
+				GeneratorLog.Log($"AttributesGenerator AddSource: {resourceName} ({stream.Length} chars)");
+				postInitializationContext.AddSource(resourceName, SourceText.From(stream, Encoding.UTF8, canBeEmbedded: true));
 			}
 		});
-	}
-
-	private static string GetHintName(string resourceName)
-	{
-		var relativePath = resourceName.Substring(ResourcePrefix.Length).Replace('\\', '/');
-		var hash = CalculateFnv1A(relativePath);
-
-		return "IncludedFiles/" + relativePath + "." + hash.ToString("x8") + ".g.cs";
-	}
-
-	private static uint CalculateFnv1A(string value)
-	{
-		const uint offsetBasis = 2166136261;
-		const uint prime = 16777619;
-
-		var hash = offsetBasis;
-		foreach (var c in value)
-		{
-			hash ^= c;
-			hash *= prime;
-		}
-
-		return hash;
 	}
 }
