@@ -298,7 +298,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	public void ProcessFrame(DebugLogger? debugLogger = null)
 	{
 		debugLogger ??= _DebugLogger;
-		using var debugLinesScope = SharedPools.StringBuilder.GetInstance();
+		using var debugLinesScope = debugLogger is null ? null : SharedPools.StringBuilder.GetInstance().AsNullable();
 
 		var currentStates = _CurrentStates;
 		currentStates.AsSpan().Fill(null);
@@ -318,7 +318,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		}
 
 		var shouldLog = debugLogger?.ShouldLogNow() is true;
-		var debugLines = shouldLog ? debugLinesScope.Instance : null;
+		var debugLines = shouldLog ? debugLinesScope!.Value.Instance : null;
 		debugLines?.Clear();
 
 		_Macros?.Step(currentStates);
