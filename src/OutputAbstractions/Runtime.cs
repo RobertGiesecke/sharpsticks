@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace SharpSticks.OutputAbstractions;
@@ -48,16 +49,22 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public int Pressers => _OutputButtonState.Pressers;
 		public int Suppressors => _OutputButtonState.Suppressors;
 		public bool WasRouteAssertingLastFrame => _OutputButtonState.WasRouteAssertingLastFrame;
+
 		public void SetWasRouteAssertingLastFrame(bool value)
 		{
 			ref var outputButtonState = ref _OutputButtonState;
 			outputButtonState.WasRouteAssertingLastFrame = value;
 		}
 
-		public static void IncrementPressers(ref OutputButtonState outputButtonState ) => outputButtonState.Pressers++;
-		public static void IncrementSuppressors(ref OutputButtonState outputButtonState ) => outputButtonState.Suppressors++;
-		public static void DecrementSuppressors(ref OutputButtonState outputButtonState ) => outputButtonState.Suppressors--;
-		public static void DecrementPressers(ref OutputButtonState outputButtonState ) => outputButtonState.Pressers--;
+		public static void IncrementPressers(ref OutputButtonState outputButtonState) => outputButtonState.Pressers++;
+
+		public static void IncrementSuppressors(ref OutputButtonState outputButtonState) =>
+			outputButtonState.Suppressors++;
+
+		public static void DecrementSuppressors(ref OutputButtonState outputButtonState) =>
+			outputButtonState.Suppressors--;
+
+		public static void DecrementPressers(ref OutputButtonState outputButtonState) => outputButtonState.Pressers--;
 
 		public void IncrementPressers() => IncrementPressers(ref _OutputButtonState);
 		public void IncrementSuppressors() => IncrementSuppressors(ref _OutputButtonState);
@@ -405,6 +412,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		_AxisZoneNextDeadlineTicks = earliestDeadline;
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
 	private void ApplyButtons(JoystickState?[] states, StringBuilder? debugLines)
 	{
 		foreach (var route in _ButtonRoutes)
@@ -475,6 +483,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		}
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
 	private void ApplyAxes(JoystickState?[] states, StringBuilder? debugLines)
 	{
 		foreach (var route in _AxisRoutes)

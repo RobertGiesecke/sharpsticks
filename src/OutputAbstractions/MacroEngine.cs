@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace SharpSticks.OutputAbstractions;
 
 /// <summary>
@@ -75,6 +77,7 @@ internal sealed class MacroEngine : IDisposable
 	/// </summary>
 	public long? NextDeadlineTicks { get; private set; }
 
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
 	public void Step(JoystickState?[] states)
 	{
 		var now = _Time.GetTimestamp();
@@ -205,6 +208,7 @@ internal sealed class MacroRouteState : IDisposable
 	public MacroSession? Running { get; private set; }
 	public long? NextDeadlineTicks { get; private set; }
 
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
 	public void Step(JoystickState?[] states, long now)
 	{
 		if (states[SourceDeviceIndex] is { } state)
