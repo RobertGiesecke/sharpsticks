@@ -45,7 +45,7 @@ internal static class DeviceSnapshots
 
 	private static (bool, ImmutableArray<InputDeviceSnapshot>, string?) EnumerateInputDevicesCore()
 	{
-		GeneratorLog.Log("DeviceSnapshots.EnumerateInputDevicesCore: start");
+		GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateInputDevicesCore)}: start");
 		try
 		{
 			var available = GetFactory().EnumerateAvailableInputs();
@@ -55,19 +55,19 @@ internal static class DeviceSnapshots
 				builder.Add(new(device.DeviceId, device.ProductName, device.ProductGuid, device.Axes, device.ButtonCount));
 			}
 
-			GeneratorLog.Log($"DeviceSnapshots.EnumerateInputDevicesCore: ok, count={available.Length}");
+			GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateInputDevicesCore)}: ok, count={available.Length}");
 			return (true, builder.ToImmutable(), null);
 		}
 		catch (Exception ex)
 		{
-			GeneratorLog.Log($"DeviceSnapshots.EnumerateInputDevicesCore: throw {ex.GetType().Name}: {ex.Message}");
+			GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateInputDevicesCore)}: throw {ex.GetType().Name}: {ex.Message}");
 			return (false, ImmutableArray<InputDeviceSnapshot>.Empty, ex.Message);
 		}
 	}
 
 	private static (bool, ImmutableArray<OutputDeviceSnapshot>, string?) EnumerateOutputDevicesCore()
 	{
-		GeneratorLog.Log("DeviceSnapshots.EnumerateOutputDevicesCore: start");
+		GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateOutputDevicesCore)}: start");
 		try
 		{
 			var available = GetFactory().EnumerateAvailableOutputs();
@@ -77,12 +77,12 @@ internal static class DeviceSnapshots
 				builder.Add(new(slot.DeviceId, slot.Axes, slot.ButtonCount, slot.InputProductGuid));
 			}
 
-			GeneratorLog.Log($"DeviceSnapshots.EnumerateOutputDevicesCore: ok, count={available.Length}");
+			GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateOutputDevicesCore)}: ok, count={available.Length}");
 			return (true, builder.ToImmutable(), null);
 		}
 		catch (Exception ex)
 		{
-			GeneratorLog.Log($"DeviceSnapshots.EnumerateOutputDevicesCore: throw {ex.GetType().Name}: {ex.Message}");
+			GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateOutputDevicesCore)}: throw {ex.GetType().Name}: {ex.Message}");
 			return (false, ImmutableArray<OutputDeviceSnapshot>.Empty, ex.Message);
 		}
 	}

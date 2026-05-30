@@ -18,10 +18,10 @@ public sealed class AttributesGenerator : IIncrementalGenerator
 
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
-		GeneratorLog.Log("AttributesGenerator.Initialize");
+		GeneratorLog.Log($"{nameof(AttributesGenerator)}.{nameof(Initialize)}");
 		context.RegisterPostInitializationOutput(static postInitializationContext =>
 		{
-			GeneratorLog.Log("AttributesGenerator.PostInitialization: emit included-files resources");
+			GeneratorLog.Log($"{nameof(AttributesGenerator)}.PostInitialization: emit included-files resources");
 			var assembly = typeof(AttributesGenerator).GetTypeInfo().Assembly;
 
 			foreach (var resourceName in assembly.GetManifestResourceNames()
@@ -39,7 +39,7 @@ public sealed class AttributesGenerator : IIncrementalGenerator
 					continue;
 				}
 
-				GeneratorLog.Log($"AttributesGenerator AddSource: {resourceName} ({stream.Length} chars)");
+				GeneratorLog.Log($"{nameof(AttributesGenerator)} AddSource: {resourceName} ({stream.Length} chars)");
 				postInitializationContext.AddSource(resourceName, SourceText.From(stream, Encoding.UTF8, canBeEmbedded: true));
 			}
 		});
