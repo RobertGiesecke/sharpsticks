@@ -8,8 +8,6 @@
             inspect exactly what the compiler saw. Toggle off when not debugging — the
             files are otherwise kept in-memory by Roslyn.
         -->
-        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-        <CompilerGeneratedFilesOutputPath>generated</CompilerGeneratedFilesOutputPath>
     </PropertyGroup>
 
     <!--
