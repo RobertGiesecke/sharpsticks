@@ -122,14 +122,31 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 									Namespace = null,
 									FullyQualifiedDisplayString = DefaultDevicesClassName,
 									DisplayString = DefaultDevicesClassName,
-									ContainingTypes = [],
+									// ContainingTypes is the declaration chain INCLUDING the target itself —
+									// GenerateDeviceInfosSource emits one `partial class` wrapper per entry, so
+									// the synthesized default must list its own `Devices` class here or the
+									// members would be emitted at global scope (no enclosing Devices type).
+									ContainingTypes =
+									[
+										new()
+										{
+											IsStatic = true,
+											IsNested = false,
+											IsPartial = true,
+											Accessibility = Accessibility.Internal,
+											Name = DefaultDevicesClassName,
+											TypeKind = DeviceTypeKind.Class,
+											ClrTypeKind = TypeKind.Class,
+											TypeDeclaration = DefaultDevicesClassName,
+										},
+									],
 									Name = DefaultDevicesClassName,
 									IsStatic = true,
 									IsNested = false,
 									IsPartial = true,
 									Accessibility = Accessibility.Internal,
 									TypeKind = DeviceTypeKind.Class,
-									ClrTypeKind = TypeKind.Unknown,
+									ClrTypeKind = TypeKind.Class,
 									TypeDeclaration = DefaultDevicesClassName
 								},
 								syntaxContext.TargetNode.GetLocation(),
