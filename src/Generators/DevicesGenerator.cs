@@ -45,6 +45,32 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		DiagnosticSeverity.Warning,
 		isEnabledByDefault: true);
 
+	private static readonly DiagnosticDescriptor RenameUsesReservedName = new(
+		"SACIG004",
+		"Rename uses a reserved member name",
+		"{0} on device '{1}' is renamed to \"All\", which clashes with the generated 'All' collection property",
+		$"{NamespaceRoot}Generators",
+		DiagnosticSeverity.Error,
+		isEnabledByDefault: true);
+
+	private static readonly DiagnosticDescriptor RenameClashesWithBuiltInName = new(
+		"SACIG005",
+		"Rename clashes with a built-in device member name",
+		"{0} on device '{1}' is renamed to \"{2}\", which is the built-in name of a different {3} on the same device",
+		$"{NamespaceRoot}Generators",
+		DiagnosticSeverity.Error,
+		isEnabledByDefault: true);
+
+	private static readonly DiagnosticDescriptor DuplicateRenameName = new(
+		"SACIG006",
+		"Duplicate generated member name",
+		"Device '{0}' has multiple {1} members named \"{2}\"; each must resolve to a distinct name",
+		$"{NamespaceRoot}Generators",
+		DiagnosticSeverity.Error,
+		isEnabledByDefault: true);
+
+	private const string ReservedBindingMemberName = "All";
+
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
 		GeneratorLog.Log("DevicesGenerator.Initialize");
@@ -159,6 +185,18 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 				continue;
 			}
 
+			if (HasLevel(target.Levels, GenerateDeviceInfosLevels.TypedDevices))
+			{
+				ValidateRenames(
+					context,
+					target.FirstLocation,
+					target.DeviceRenames,
+					target.AxisRenames,
+					target.ButtonRenames,
+					directInputDevices,
+					outputDevices);
+			}
+
 			var source = GenerateDeviceInfosSource(
 				target.DeviceType, target.Levels,
 				target.DeviceRenames, target.AxisRenames, target.ButtonRenames,
@@ -174,6 +212,142 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			GeneratorLog.Log($"AddSource: {globalUsingsHintName} ({globalUsings.Length} chars)");
 			context.AddSource(globalUsingsHintName, SourceText.From(globalUsings, Encoding.UTF8));
 		}
+	}
+
+	// Mirrors the device iteration in AppendDeviceMembers so the names we validate match
+	// the names that will actually be emitted into the typed binding records. Reports at
+	// the [GenerateDeviceInfos] location — per-attribute spans aren't kept in the cached
+	// model to preserve incrementality, so the message names the device + member instead.
+	private static void ValidateRenames(
+		SourceProductionContext context,
+		Location? location,
+		ImmutableArray<DeviceRename> deviceRenames,
+		ImmutableArray<AxisRename> axisRenames,
+		ImmutableArray<ButtonRename> buttonRenames,
+		ImmutableArray<InputDeviceSnapshot> directInputDevices,
+		ImmutableArray<OutputDeviceSnapshot> outputDevices)
+	{
+		var directInputNames = GetDirectInputDeviceConstantNames(directInputDevices, outputDevices);
+		var deviceIdentifiers = GetDeviceIdentifiers(directInputDevices, directInputNames, deviceRenames);
+		using var outputProductGuids = new PooledSet<Guid>(
+			outputDevices.Select(static d => d.InputProductGuid));
+
+		for (var index = 0; index < directInputDevices.Length; index++)
+		{
+			if (outputProductGuids.Contains(directInputDevices[index].ProductGuid))
+			{
+				continue;
+			}
+
+			var device = directInputDevices[index];
+			using var axisMap = BuildAxisPropertyNames(
+				device.ProductName, directInputNames[index], axisRenames, deviceIdentifiers[index]);
+			using var buttonMap = BuildButtonPropertyNames(
+				device.ProductName, directInputNames[index], buttonRenames, deviceIdentifiers[index]);
+			ValidateDeviceRenames(
+				context, location, deviceIdentifiers[index], device.Axes, device.ButtonCount, axisMap, buttonMap);
+		}
+
+		foreach (var outputDevice in outputDevices)
+		{
+			var vjoyBaseName = $"VJoyDevice{outputDevice.DeviceId}";
+			var vjoyIdentifier = GetOutputDeviceIdentifier(vjoyBaseName, deviceRenames);
+			var diIdx = directInputNames.IndexOf(vjoyBaseName);
+			var deviceName = diIdx >= 0 ? directInputDevices[diIdx].ProductName : vjoyBaseName;
+			using var axisMap = BuildAxisPropertyNames(deviceName, vjoyBaseName, axisRenames, vjoyIdentifier);
+			using var buttonMap = BuildButtonPropertyNames(deviceName, vjoyBaseName, buttonRenames, vjoyIdentifier);
+			ValidateDeviceRenames(
+				context, location, vjoyIdentifier, outputDevice.Axes, outputDevice.ButtonCount, axisMap, buttonMap);
+		}
+	}
+
+	private static void ValidateDeviceRenames(
+		SourceProductionContext context,
+		Location? location,
+		string deviceDisplayName,
+		ImmutableArray<Axis> presentAxes,
+		uint buttonCount,
+		PooledDictionary<Axis, string> axisMap,
+		PooledDictionary<int, string> buttonMap)
+	{
+		// "All" clashes with the generated collection property even for renames that target
+		// an axis/button not present on the device, so check every applicable rename.
+		foreach (var rename in axisMap)
+		{
+			if (rename.Value == ReservedBindingMemberName)
+			{
+				Report(RenameUsesReservedName, $"Axis {rename.Key}", deviceDisplayName);
+			}
+		}
+
+		foreach (var rename in buttonMap)
+		{
+			if (rename.Value == ReservedBindingMemberName)
+			{
+				Report(RenameUsesReservedName, $"Button {rename.Key}", deviceDisplayName);
+			}
+		}
+
+		using var builtinAxisNames = new PooledSet<string>(
+			presentAxes.Select(static a => a.ToString()), StringComparer.Ordinal);
+		using var axisNameCounts = new PooledDictionary<string, int>(StringComparer.Ordinal);
+		foreach (var axis in presentAxes)
+		{
+			var hasRename = axisMap.TryGetValue(axis, out var renamed);
+			var finalName = hasRename ? renamed : axis.ToString();
+
+			if (hasRename && finalName != axis.ToString() && builtinAxisNames.Contains(finalName))
+			{
+				Report(RenameClashesWithBuiltInName, $"Axis {axis}", deviceDisplayName, finalName, "axis");
+			}
+
+			if (finalName != ReservedBindingMemberName)
+			{
+				axisNameCounts[finalName] = axisNameCounts.GetValueOrDefault(finalName) + 1;
+			}
+		}
+
+		foreach (var pair in axisNameCounts)
+		{
+			if (pair.Value > 1)
+			{
+				Report(DuplicateRenameName, deviceDisplayName, "axis", pair.Key);
+			}
+		}
+
+		using var builtinButtonNames = new PooledSet<string>(StringComparer.Ordinal);
+		for (var btn = 1; btn <= buttonCount; btn++)
+		{
+			builtinButtonNames.Add($"Btn{btn}");
+		}
+
+		using var buttonNameCounts = new PooledDictionary<string, int>(StringComparer.Ordinal);
+		for (var btn = 1; btn <= buttonCount; btn++)
+		{
+			var hasRename = buttonMap.TryGetValue(btn, out var renamed);
+			var finalName = hasRename ? renamed : $"Btn{btn}";
+
+			if (hasRename && finalName != $"Btn{btn}" && builtinButtonNames.Contains(finalName))
+			{
+				Report(RenameClashesWithBuiltInName, $"Button {btn}", deviceDisplayName, finalName, "button");
+			}
+
+			if (finalName != ReservedBindingMemberName)
+			{
+				buttonNameCounts[finalName] = buttonNameCounts.GetValueOrDefault(finalName) + 1;
+			}
+		}
+
+		foreach (var pair in buttonNameCounts)
+		{
+			if (pair.Value > 1)
+			{
+				Report(DuplicateRenameName, deviceDisplayName, "button", pair.Key);
+			}
+		}
+
+		void Report(DiagnosticDescriptor descriptor, params object[] messageArgs) =>
+			context.ReportDiagnostic(Diagnostic.Create(descriptor, location, messageArgs));
 	}
 
 	private static string BuildGlobalUsings(string qualifiedTypeName, GenerateDeviceInfosLevels levels)
