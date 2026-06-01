@@ -51,16 +51,6 @@ internal static class GeneratorLog
 		}
 	}
 
-	private static int GetProcessIdSafe()
-	{
-		try
-		{
-			return Process.GetCurrentProcess().Id;
-		}
-		catch
-		{
-			return 0;
-		}
-	}
+	private static int GetProcessIdSafe() => Environment.ProcessId;
 #endif
 }
