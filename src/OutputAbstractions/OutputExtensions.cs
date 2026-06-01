@@ -83,6 +83,7 @@ public static class OutputExtensions
 	{
 		using var result = new PooledList<AxisRoute>(sourceAxes.Length);
 		var newSpan = result.AddSpan(sourceAxes.Length);
+		var outputIndex = 0;
 		for (var index = 0; index < sourceAxes.Length; index++)
 		{
 			var axisBinding = sourceAxes[index];
@@ -96,9 +97,9 @@ public static class OutputExtensions
 				options = new();
 			}
 
-			newSpan[index] = axisBinding.RouteToSameAxisOnOutput(outputDevice.DeviceId, options);
+			newSpan[outputIndex++] = axisBinding.RouteToSameAxisOnOutput(outputDevice.DeviceId, options);
 		}
 
-		return [..newSpan];
+		return [..newSpan.Slice(0, outputIndex)];
 	}
 }
