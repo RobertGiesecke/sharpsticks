@@ -24,10 +24,10 @@ internal static class LinuxInputEventLoop
 		EnsureLoopRunning();
 		_Subscribers[fd] = dataAvailable;
 
-		var events = LinuxEventCodes.EpollIn | LinuxEventCodes.EpollErr | LinuxEventCodes.EpollHup;
+		var events = EpollEvents.In | EpollEvents.Err | EpollEvents.Hup;
 		var result = LinuxEpollEventLayout.IsPacked
-			? Ctl<LinuxEpollEventPacked>(LinuxEventCodes.EpollCtlAdd, fd, events)
-			: Ctl<LinuxEpollEventAligned>(LinuxEventCodes.EpollCtlAdd, fd, events);
+			? Ctl<LinuxEpollEventPacked>(EpollCtlOp.Add, fd, events)
+			: Ctl<LinuxEpollEventAligned>(EpollCtlOp.Add, fd, events);
 
 		if (result < 0)
 		{
@@ -47,17 +47,17 @@ internal static class LinuxInputEventLoop
 
 		if (LinuxEpollEventLayout.IsPacked)
 		{
-			Ctl<LinuxEpollEventPacked>(LinuxEventCodes.EpollCtlDel, fd, events: 0);
+			Ctl<LinuxEpollEventPacked>(EpollCtlOp.Del, fd, events: EpollEvents.None);
 		}
 		else
 		{
-			Ctl<LinuxEpollEventAligned>(LinuxEventCodes.EpollCtlDel, fd, events: 0);
+			Ctl<LinuxEpollEventAligned>(EpollCtlOp.Del, fd, events: EpollEvents.None);
 		}
 	}
 
 	/// Build the arch-correct epoll_event and issue an epoll_ctl op. For DEL the kernel ignores
-	/// the event payload, so <paramref name="events"/> is just 0 there.
-	private static int Ctl<TEvent>(int op, int fd, uint events)
+	/// the event payload, so <paramref name="events"/> is just <see cref="EpollEvents.None"/> there.
+	private static int Ctl<TEvent>(EpollCtlOp op, int fd, EpollEvents events)
 		where TEvent : unmanaged, IEpollEvent<TEvent>
 	{
 		var ev = TEvent.Create(events, (ulong)fd);
@@ -78,7 +78,7 @@ internal static class LinuxInputEventLoop
 				return;
 			}
 
-			_EpollFd = LinuxLibc.EpollCreate1(LinuxEventCodes.OCloseOnExec);
+			_EpollFd = LinuxLibc.EpollCreate1(OpenFlags.CloseOnExec);
 			if (_EpollFd < 0)
 			{
 				throw new InvalidOperationException(
