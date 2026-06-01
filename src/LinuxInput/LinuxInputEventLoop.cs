@@ -25,17 +25,9 @@ internal static class LinuxInputEventLoop
 		_Subscribers[fd] = dataAvailable;
 
 		var events = LinuxEventCodes.EpollIn | LinuxEventCodes.EpollErr | LinuxEventCodes.EpollHup;
-		int result;
-		if (LinuxEpollEventLayout.IsPacked)
-		{
-			var ev = new LinuxEpollEventPacked { Events = events, Data = (ulong)fd };
-			result = LinuxLibc.EpollCtlPacked(_EpollFd, LinuxEventCodes.EpollCtlAdd, fd, ref ev);
-		}
-		else
-		{
-			var ev = new LinuxEpollEventAligned { Events = events, Data = (ulong)fd };
-			result = LinuxLibc.EpollCtlAligned(_EpollFd, LinuxEventCodes.EpollCtlAdd, fd, ref ev);
-		}
+		var result = LinuxEpollEventLayout.IsPacked
+			? Ctl<LinuxEpollEventPacked>(LinuxEventCodes.EpollCtlAdd, fd, events)
+			: Ctl<LinuxEpollEventAligned>(LinuxEventCodes.EpollCtlAdd, fd, events);
 
 		if (result < 0)
 		{
@@ -55,14 +47,21 @@ internal static class LinuxInputEventLoop
 
 		if (LinuxEpollEventLayout.IsPacked)
 		{
-			var ev = default(LinuxEpollEventPacked);
-			LinuxLibc.EpollCtlPacked(_EpollFd, LinuxEventCodes.EpollCtlDel, fd, ref ev);
+			Ctl<LinuxEpollEventPacked>(LinuxEventCodes.EpollCtlDel, fd, events: 0);
 		}
 		else
 		{
-			var ev = default(LinuxEpollEventAligned);
-			LinuxLibc.EpollCtlAligned(_EpollFd, LinuxEventCodes.EpollCtlDel, fd, ref ev);
+			Ctl<LinuxEpollEventAligned>(LinuxEventCodes.EpollCtlDel, fd, events: 0);
 		}
+	}
+
+	/// Build the arch-correct epoll_event and issue an epoll_ctl op. For DEL the kernel ignores
+	/// the event payload, so <paramref name="events"/> is just 0 there.
+	private static int Ctl<TEvent>(int op, int fd, uint events)
+		where TEvent : unmanaged, IEpollEvent<TEvent>
+	{
+		var ev = TEvent.Create(events, (ulong)fd);
+		return TEvent.Ctl(_EpollFd, op, fd, ref ev);
 	}
 
 	private static void EnsureLoopRunning()
@@ -102,39 +101,21 @@ internal static class LinuxInputEventLoop
 
 		if (LinuxEpollEventLayout.IsPacked)
 		{
-			LoopBodyPacked(token);
+			LoopBody<LinuxEpollEventPacked>(token);
 		}
 		else
 		{
-			LoopBodyAligned(token);
+			LoopBody<LinuxEpollEventAligned>(token);
 		}
 	}
 
-	private static void LoopBodyPacked(CancellationToken token)
+	private static void LoopBody<TEvent>(CancellationToken token)
+		where TEvent : unmanaged, IEpollEvent<TEvent>
 	{
-		Span<LinuxEpollEventPacked> events = stackalloc LinuxEpollEventPacked[MaxEventsPerWait];
+		Span<TEvent> events = stackalloc TEvent[MaxEventsPerWait];
 		while (!token.IsCancellationRequested)
 		{
-			var count = LinuxLibc.EpollWaitPacked(
-				_EpollFd, ref MemoryMarshal.GetReference(events), events.Length, 250);
-			if (count <= 0)
-			{
-				continue;
-			}
-
-			for (var i = 0; i < count; i++)
-			{
-				SignalFd((int)events[i].Data);
-			}
-		}
-	}
-
-	private static void LoopBodyAligned(CancellationToken token)
-	{
-		Span<LinuxEpollEventAligned> events = stackalloc LinuxEpollEventAligned[MaxEventsPerWait];
-		while (!token.IsCancellationRequested)
-		{
-			var count = LinuxLibc.EpollWaitAligned(
+			var count = TEvent.Wait(
 				_EpollFd, ref MemoryMarshal.GetReference(events), events.Length, 250);
 			if (count <= 0)
 			{
