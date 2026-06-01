@@ -50,7 +50,7 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 			return;
 		}
 
-		WriteBurst(LinuxEventCodes.EvAbs, code, translated);
+		WriteBurst(EvType.Abs, code, translated);
 		_LastAxisValues[axis] = translated;
 	}
 
@@ -70,7 +70,7 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 			return;
 		}
 
-		WriteBurst(LinuxEventCodes.EvKey, code, pressed ? 1 : 0);
+		WriteBurst(EvType.Key, code, pressed ? 1 : 0);
 		_LastButtonValues[buttonNumber] = pressed;
 	}
 
@@ -82,7 +82,7 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 		_LastButtonValues.Dispose();
 	}
 
-	private void WriteBurst(ushort type, ushort code, int value)
+	private void WriteBurst(EvType type, ushort code, int value)
 	{
 		// Two events in one write(): the change + the SYN_REPORT terminator so the kernel
 		// publishes immediately. Stackalloc'd; no allocation.
@@ -90,7 +90,7 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 		burst[0] = new() { Type = type, Code = code, Value = value };
 		burst[1] = new()
 		{
-			Type = LinuxEventCodes.EvSyn,
+			Type = EvType.Syn,
 			Code = LinuxEventCodes.SynReport,
 			Value = 0,
 		};

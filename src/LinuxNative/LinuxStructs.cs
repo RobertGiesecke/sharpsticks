@@ -9,7 +9,7 @@ public struct LinuxInputEvent
 {
 	public long TvSec;
 	public long TvUsec;
-	public ushort Type;
+	public EvType Type;
 	public ushort Code;
 	public int Value;
 

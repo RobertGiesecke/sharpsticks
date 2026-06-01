@@ -34,7 +34,7 @@ internal static class LinuxInputDeviceEnumerator
 	{
 		info = default;
 		var fd = LinuxLibc.Open(path,
-			LinuxEventCodes.OReadOnly | LinuxEventCodes.ONonBlock | LinuxEventCodes.OCloseOnExec);
+			OpenFlags.ReadOnly | OpenFlags.NonBlock | OpenFlags.CloseOnExec);
 		if (fd < 0)
 		{
 			return false;
@@ -43,7 +43,7 @@ internal static class LinuxInputDeviceEnumerator
 		try
 		{
 			Span<byte> keyBits = stackalloc byte[(LinuxEventCodes.BtnDigi / 8) + 1];
-			if (!TryGetBits(fd, LinuxEventCodes.EvKey, keyBits))
+			if (!TryGetBits(fd, EvType.Key, keyBits))
 			{
 				return false;
 			}
@@ -54,7 +54,7 @@ internal static class LinuxInputDeviceEnumerator
 			}
 
 			Span<byte> absBits = stackalloc byte[(LinuxEventCodes.AbsMax / 8) + 1];
-			TryGetBits(fd, LinuxEventCodes.EvAbs, absBits);
+			TryGetBits(fd, EvType.Abs, absBits);
 
 			var name = ReadStringIoctl(fd, EvdevIoctls.EviocgName(256));
 			var uniq = ReadStringIoctl(fd, EvdevIoctls.EviocgUniq(256));
@@ -98,11 +98,11 @@ internal static class LinuxInputDeviceEnumerator
 		}
 	}
 
-	private static bool TryGetBits(int fd, uint evType, Span<byte> bits)
+	private static bool TryGetBits(int fd, EvType evType, Span<byte> bits)
 	{
 		bits.Clear();
 		var result = LinuxLibc.IoctlBuffer(fd,
-			EvdevIoctls.EviocgBit(evType, (uint)bits.Length),
+			EvdevIoctls.EviocgBit(evType.ToNative(), (uint)bits.Length),
 			ref MemoryMarshal.GetReference(bits));
 		return result >= 0;
 	}

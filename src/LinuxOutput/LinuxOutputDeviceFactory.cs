@@ -51,7 +51,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	{
 		var fd = LinuxLibc.Open(
 			LinuxUinput.DevicePath,
-			LinuxEventCodes.OWriteOnly | LinuxEventCodes.ONonBlock | LinuxEventCodes.OCloseOnExec);
+			OpenFlags.WriteOnly | OpenFlags.NonBlock | OpenFlags.CloseOnExec);
 		if (fd < 0)
 		{
 			throw new InvalidOperationException(
@@ -88,9 +88,9 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 		IReadOnlyCollection<ButtonRoute> buttonRoutes,
 		IReadOnlyCollection<int>? macroButtonNumbers)
 	{
-		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, LinuxEventCodes.EvKey), "UI_SET_EVBIT(EV_KEY)");
-		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, LinuxEventCodes.EvAbs), "UI_SET_EVBIT(EV_ABS)");
-		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, LinuxEventCodes.EvSyn), "UI_SET_EVBIT(EV_SYN)");
+		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, EvType.Key.ToNative()), "UI_SET_EVBIT(EV_KEY)");
+		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, EvType.Abs.ToNative()), "UI_SET_EVBIT(EV_ABS)");
+		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, EvType.Syn.ToNative()), "UI_SET_EVBIT(EV_SYN)");
 
 		foreach (var axis in axisRoutes.Select(static r => r.OutputBinding.Axis).Distinct())
 		{

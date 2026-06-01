@@ -9,7 +9,7 @@ public static partial class LinuxLibc
 	private const string Libc = "libc";
 
 	[LibraryImport(Libc, EntryPoint = "open", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
-	public static partial int Open(string path, int flags);
+	public static partial int Open(string path, OpenFlags flags);
 
 	[LibraryImport(Libc, EntryPoint = "close", SetLastError = true)]
 	public static partial int Close(int fd);
@@ -41,13 +41,13 @@ public static partial class LinuxLibc
 
 	// epoll syscalls — used by LinuxInput's shared event loop
 	[LibraryImport(Libc, EntryPoint = "epoll_create1", SetLastError = true)]
-	public static partial int EpollCreate1(int flags);
+	public static partial int EpollCreate1(OpenFlags flags);
 
 	[LibraryImport(Libc, EntryPoint = "epoll_ctl", SetLastError = true)]
-	public static partial int EpollCtlPacked(int epfd, int op, int fd, ref LinuxEpollEventPacked ev);
+	public static partial int EpollCtlPacked(int epfd, EpollCtlOp op, int fd, ref LinuxEpollEventPacked ev);
 
 	[LibraryImport(Libc, EntryPoint = "epoll_ctl", SetLastError = true)]
-	public static partial int EpollCtlAligned(int epfd, int op, int fd, ref LinuxEpollEventAligned ev);
+	public static partial int EpollCtlAligned(int epfd, EpollCtlOp op, int fd, ref LinuxEpollEventAligned ev);
 
 	[LibraryImport(Libc, EntryPoint = "epoll_wait", SetLastError = true)]
 	public static partial int EpollWaitPacked(int epfd, ref LinuxEpollEventPacked events, int maxEvents, int timeoutMs);
@@ -72,23 +72,23 @@ public interface IEpollEvent<TSelf>
 	where TSelf : unmanaged, IEpollEvent<TSelf>
 {
 	ulong Data { get; }
-	static abstract TSelf Create(uint events, ulong data);
-	static abstract int Ctl(int epfd, int op, int fd, ref TSelf ev);
+	static abstract TSelf Create(EpollEvents events, ulong data);
+	static abstract int Ctl(int epfd, EpollCtlOp op, int fd, ref TSelf ev);
 	static abstract int Wait(int epfd, ref TSelf events, int maxEvents, int timeoutMs);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public struct LinuxEpollEventPacked : IEpollEvent<LinuxEpollEventPacked>
 {
-	public uint Events;
+	public EpollEvents Events;
 	private ulong _Data;
 
 	public readonly ulong Data => _Data;
 
-	public static LinuxEpollEventPacked Create(uint events, ulong data) =>
+	public static LinuxEpollEventPacked Create(EpollEvents events, ulong data) =>
 		new() { Events = events, _Data = data };
 
-	public static int Ctl(int epfd, int op, int fd, ref LinuxEpollEventPacked ev) =>
+	public static int Ctl(int epfd, EpollCtlOp op, int fd, ref LinuxEpollEventPacked ev) =>
 		LinuxLibc.EpollCtlPacked(epfd, op, fd, ref ev);
 
 	public static int Wait(int epfd, ref LinuxEpollEventPacked events, int maxEvents, int timeoutMs) =>
@@ -98,16 +98,16 @@ public struct LinuxEpollEventPacked : IEpollEvent<LinuxEpollEventPacked>
 [StructLayout(LayoutKind.Sequential)]
 public struct LinuxEpollEventAligned : IEpollEvent<LinuxEpollEventAligned>
 {
-	public uint Events;
+	public EpollEvents Events;
 	private uint _Padding;
 	private ulong _Data;
 
 	public readonly ulong Data => _Data;
 
-	public static LinuxEpollEventAligned Create(uint events, ulong data) =>
+	public static LinuxEpollEventAligned Create(EpollEvents events, ulong data) =>
 		new() { Events = events, _Data = data };
 
-	public static int Ctl(int epfd, int op, int fd, ref LinuxEpollEventAligned ev) =>
+	public static int Ctl(int epfd, EpollCtlOp op, int fd, ref LinuxEpollEventAligned ev) =>
 		LinuxLibc.EpollCtlAligned(epfd, op, fd, ref ev);
 
 	public static int Wait(int epfd, ref LinuxEpollEventAligned events, int maxEvents, int timeoutMs) =>

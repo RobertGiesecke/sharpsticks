@@ -107,10 +107,10 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice, IJoystickDeviceWi
 	{
 		switch (ev.Type)
 		{
-			case LinuxEventCodes.EvAbs:
+			case EvType.Abs:
 				ApplyAbsEvent(ev.Code, ev.Value);
 				break;
-			case LinuxEventCodes.EvKey:
+			case EvType.Key:
 				ApplyKeyEvent(ev.Code, ev.Value);
 				break;
 		}
@@ -224,7 +224,7 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice, IJoystickDeviceWi
 	{
 		var fd = LinuxLibc.Open(
 			info.EventPath,
-			LinuxEventCodes.OReadOnly | LinuxEventCodes.ONonBlock | LinuxEventCodes.OCloseOnExec
+			OpenFlags.ReadOnly | OpenFlags.NonBlock | OpenFlags.CloseOnExec
 		);
 		if (fd < 0)
 		{
