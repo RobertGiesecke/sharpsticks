@@ -87,8 +87,8 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 		// Two events in one write(): the change + the SYN_REPORT terminator so the kernel
 		// publishes immediately. Stackalloc'd; no allocation.
 		Span<LinuxInputEvent> burst = stackalloc LinuxInputEvent[2];
-		burst[0] = new LinuxInputEvent { Type = type, Code = code, Value = value };
-		burst[1] = new LinuxInputEvent
+		burst[0] = new() { Type = type, Code = code, Value = value };
+		burst[1] = new()
 		{
 			Type = LinuxEventCodes.EvSyn,
 			Code = LinuxEventCodes.SynReport,

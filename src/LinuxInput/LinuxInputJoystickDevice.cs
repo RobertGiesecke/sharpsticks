@@ -250,7 +250,7 @@ public sealed class LinuxInputJoystickDevice : JoystickDevice, IJoystickDeviceWi
 			}
 
 			dataAvailable = new(false);
-			return new LinuxInputJoystickDevice(
+			return new(
 				info,
 				fd,
 				rangesBuilder.ToFrozenDictionary(),
