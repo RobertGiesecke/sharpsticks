@@ -111,6 +111,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 				$"UI_ABS_SETUP({axis})");
 		}
 
+		var hasJoystickRangeButton = false;
 		foreach (var buttonNumber in buttonRoutes
 			         .Select(static r => r.OutputBinding.ButtonNumber)
 			         .Concat(macroButtonNumbers ?? [])
@@ -119,6 +120,19 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 			var code = LinuxOutputAxisCodes.GetButtonCode(buttonNumber);
 			MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetKeyBit, code),
 				$"UI_SET_KEYBIT({buttonNumber})");
+
+			// Any button in [BTN_JOYSTICK, BTN_GAMEPAD) classifies the device as a joystick,
+			// making the baseline below unnecessary.
+			hasJoystickRangeButton |= code is >= LinuxEventCodes.BtnJoystick and < LinuxEventCodes.BtnGamepad;
+		}
+
+		// udev's input_id and SDL need a BTN_JOYSTICK-range key to set ID_INPUT_JOYSTICK; without
+		// one, an axis-only profile works in evtest but is ignored by SDL/Steam Input/games. Add a
+		// baseline only when no routed button covers it, so we never inject a phantom button.
+		if (!hasJoystickRangeButton)
+		{
+			MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetKeyBit, LinuxEventCodes.BtnJoystick),
+				"UI_SET_KEYBIT(BTN_JOYSTICK baseline)");
 		}
 	}
 
