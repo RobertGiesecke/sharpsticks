@@ -18,6 +18,6 @@ public static class ProductGuidEncoder
 		BinaryPrimitives.WriteUInt32LittleEndian(bytes, pidVid);
 		// bytes[4..8] stay zero (Guid data2 + data3)
 		PidVidSuffix.CopyTo(bytes[8..]);
-		return new Guid(bytes);
+		return new(bytes);
 	}
 }

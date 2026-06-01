@@ -69,7 +69,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 			// AFTER UI_DEV_CREATE here, but the availableInputs snapshot was taken before
 			// that — so it can't contain our new counterpart. A consumer that wants to
 			// find the new evdev node should re-enumerate inputs after Open returns.
-			return new LinuxOutputDevice(
+			return new(
 				request.DeviceId,
 				fd,
 				CollectAxisCodes(request.AxisRoutes),
@@ -100,7 +100,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 			var setup = new LinuxUinputAbsSetup
 			{
 				Code = code,
-				AbsInfo = new LinuxAbsInfo
+				AbsInfo = new()
 				{
 					Minimum = LinuxOutputDevice.AxisRangeMin,
 					Maximum = LinuxOutputDevice.AxisRangeMax,
@@ -140,7 +140,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	{
 		var setup = new LinuxUinputSetup
 		{
-			Id = new LinuxInputId
+			Id = new()
 			{
 				BusType = LinuxUinput.BusVirtual,
 				Vendor = 0xfeed,

@@ -171,6 +171,6 @@ internal static class LinuxInputDeviceEnumerator
 		var bytes = System.Text.Encoding.UTF8.GetBytes(input);
 		Span<byte> hash = stackalloc byte[16];
 		System.Security.Cryptography.MD5.HashData(bytes, hash);
-		return new Guid(hash);
+		return new(hash);
 	}
 }
