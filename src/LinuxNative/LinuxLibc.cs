@@ -65,19 +65,53 @@ public static partial class LinuxLibc
 /// </list>
 /// Both layouts are declared explicitly; <see cref="LinuxEpollEventLayout.IsPacked"/> picks
 /// the right one at runtime.
+/// Shared surface over the arch-specific epoll_event layouts. Static-abstract members let the
+/// event loop run generically over <typeparamref name="TSelf"/> while each struct forwards to its
+/// own concrete <see cref="LibraryImportAttribute"/> (so SetLastError/errno capture is preserved).
+public interface IEpollEvent<TSelf> 
+	where TSelf : unmanaged, IEpollEvent<TSelf>
+{
+	ulong Data { get; }
+	static abstract TSelf Create(uint events, ulong data);
+	static abstract int Ctl(int epfd, int op, int fd, ref TSelf ev);
+	static abstract int Wait(int epfd, ref TSelf events, int maxEvents, int timeoutMs);
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct LinuxEpollEventPacked
+public struct LinuxEpollEventPacked : IEpollEvent<LinuxEpollEventPacked>
 {
 	public uint Events;
-	public ulong Data;
+	private ulong _Data;
+
+	public readonly ulong Data => _Data;
+
+	public static LinuxEpollEventPacked Create(uint events, ulong data) =>
+		new() { Events = events, _Data = data };
+
+	public static int Ctl(int epfd, int op, int fd, ref LinuxEpollEventPacked ev) =>
+		LinuxLibc.EpollCtlPacked(epfd, op, fd, ref ev);
+
+	public static int Wait(int epfd, ref LinuxEpollEventPacked events, int maxEvents, int timeoutMs) =>
+		LinuxLibc.EpollWaitPacked(epfd, ref events, maxEvents, timeoutMs);
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct LinuxEpollEventAligned
+public struct LinuxEpollEventAligned : IEpollEvent<LinuxEpollEventAligned>
 {
 	public uint Events;
 	private uint _Padding;
-	public ulong Data;
+	private ulong _Data;
+
+	public readonly ulong Data => _Data;
+
+	public static LinuxEpollEventAligned Create(uint events, ulong data) =>
+		new() { Events = events, _Data = data };
+
+	public static int Ctl(int epfd, int op, int fd, ref LinuxEpollEventAligned ev) =>
+		LinuxLibc.EpollCtlAligned(epfd, op, fd, ref ev);
+
+	public static int Wait(int epfd, ref LinuxEpollEventAligned events, int maxEvents, int timeoutMs) =>
+		LinuxLibc.EpollWaitAligned(epfd, ref events, maxEvents, timeoutMs);
 }
 
 public static class LinuxEpollEventLayout
