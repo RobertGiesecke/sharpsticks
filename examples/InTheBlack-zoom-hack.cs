@@ -1,5 +1,10 @@
-#:project ../src/Console/Console.csproj
-//#:package SharpSticks.Console@0.1.0-debug02.*
+//#:project ../src/Console/Console.csproj
+#:package SharpSticks.Editor@0.1.0-linux16
+
+[assembly:GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
+[assembly:RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
+[assembly:RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
+[assembly:RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
@@ -61,15 +66,12 @@ BuildAndRunAsConsole(new()
 	],
 });
 
-[GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
-[RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
 [RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
 
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
 // left stick
-[RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
 [RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
 
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
@@ -77,7 +79,6 @@ BuildAndRunAsConsole(new()
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, "BrakeLever")]
 // vjoy device
-[RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
 [RenameButton(DeviceNames.VJoyDevice1, 1, "Fire")]
 [RenameButton(DeviceNames.VJoyDevice1, 79, "CenterHeadTracking")]
 
