@@ -514,7 +514,7 @@ public sealed class AppConfigTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			Routes = [..routes],
+			Routes = [routes],
 		});
 
 		stick.SetAxisValue(Axis.X, 1.0);

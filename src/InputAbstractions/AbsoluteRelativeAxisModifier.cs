@@ -6,7 +6,22 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 	private readonly RelativeDirection _Direction;
 	private readonly double _RestPosition;
 
-	public AbsoluteRelativeAxisModifier(SharedState sharedState, RelativeDirection direction, double restPosition)
+	public static (AbsoluteRelativeAxisModifier Increase, AbsoluteRelativeAxisModifier Decrease) Create(
+		AbsoluteRelativeAxisOptions options)
+	{
+		var sharedState = new SharedState(options);
+		var increaseModifier = new AbsoluteRelativeAxisModifier(
+			sharedState, 
+			RelativeDirection.Increase, 
+			options.IncreaseRestPosition);
+		var decreaseModifier = new AbsoluteRelativeAxisModifier(
+			sharedState, 
+			RelativeDirection.Decrease, 
+			options.DecreaseRestPosition);
+		return (increaseModifier, decreaseModifier);
+	}
+
+	private AbsoluteRelativeAxisModifier(SharedState sharedState, RelativeDirection direction, double restPosition)
 	{
 		_SharedState = sharedState;
 		_Direction = direction;
@@ -21,7 +36,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		where TInputDevice : JoystickDevice =>
 		new RuntimeModifier(_SharedState, _Direction, _RestPosition);
 
-	internal sealed class SharedState
+	private sealed class SharedState
 	{
 		private readonly AbsoluteRelativeAxisOptions _Options;
 		private readonly double _Minimum;

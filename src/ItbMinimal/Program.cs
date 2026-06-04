@@ -8,7 +8,6 @@ BuildAndRunAsConsole(new()
 	Name = "ItB minimal + scaled rotations",
 	Routes =
 	[
-
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()
 		{
 			Reentry = MacroReentry.DropIfBusy,
@@ -34,7 +33,7 @@ BuildAndRunAsConsole(new()
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
 		LeftStick.Buttons.BrakeLever.RouteTo(VJoy1.Buttons.HoldForZoom),
-		..RightStick.Axes.X
+		RightStick.Axes.X
 			.GroupWith(
 				RightStick.Axes.Y,
 				RightStick.Axes.Twist)
@@ -48,7 +47,7 @@ BuildAndRunAsConsole(new()
 					Stateful = true,
 				}),
 		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever, scale: 2, offset: -1),
-		..LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
+		LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
 		{
 			IncreaseAxis = VJoy1.Axes.ZoomIn,
 			DecreaseAxis = VJoy1.Axes.ZoomOut,

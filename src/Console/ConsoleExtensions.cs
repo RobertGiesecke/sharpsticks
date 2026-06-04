@@ -13,7 +13,7 @@ public static class ConsoleExtensions<TInputDevice, TOutputDevice>
 		public DebugLogger? DebugLogger { get; init; }
 		public IOutputDeviceFactory<TOutputDevice>? OutputDeviceFactory { get; init; }
 		public ImmutableArray<TInputDevice>? ConnectedDevices { get; init; }
-		public ImmutableArray<IBoundRoute> Routes { get; init; } = [];
+		public ImmutableArray<IRoute> Routes { get; init; } = [];
 	}
 
 	public static PooledList<TInputDevice> EnumerateConnectedDevices() =>

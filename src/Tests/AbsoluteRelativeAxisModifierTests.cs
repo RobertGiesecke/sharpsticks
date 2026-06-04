@@ -382,7 +382,7 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			Routes = [..routes],
+			Routes = [routes],
 		});
 	}
 }

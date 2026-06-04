@@ -11,7 +11,7 @@ public static class RuntimeBuilder
 		public IOutputDeviceFactory<TOutputDevice>? OutputDeviceFactory { get; init; }
 		public ITimeSource? TimeSource { get; init; }
 		public required ImmutableArray<TInputDevice> ConnectedDevices { get; init; }
-		public ImmutableArray<IBoundRoute> Routes { get; init; } = [];
+		public ImmutableArray<IRoute> Routes { get; init; } = [];
 	}
 
 	extension<TInputDevice, TOutputDevice>(Runtime<TInputDevice, TOutputDevice>)
@@ -27,10 +27,23 @@ public static class RuntimeBuilder
 			using var connectedDevicesById = options.ConnectedDevices
 				.ToPooledDictionary(device => device.DeviceId);
 			using var referencedDeviceIds = new PooledSet<int>();
-			using var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToPooledList();
-			using var axisRoutes = options.Routes.OfType<AxisRoute>().ToPooledList();
-			using var macroRoutes = options.Routes.OfType<ButtonMacroRoute>().ToPooledList();
-			using var axisToButtonRoutes = options.Routes.OfType<AxisToButtonRoute>().ToPooledList();
+			using var routes = new PooledList<IRoute>(options.Routes.Length);
+			foreach (var route in options.Routes)
+			{
+				if(route is ICombinedRoute combinedRoute)
+				{
+					routes.AddRange(combinedRoute.GetRoutes());
+				}
+				else
+				{
+					routes.Add(route);
+				}
+			}
+			
+			using var buttonRoutes = routes.OfType<ButtonRoute>().ToPooledList();
+			using var axisRoutes = routes.OfType<AxisRoute>().ToPooledList();
+			using var macroRoutes = routes.OfType<ButtonMacroRoute>().ToPooledList();
+			using var axisToButtonRoutes = routes.OfType<AxisToButtonRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
 			using var auxiliaryOutputButtons = new PooledSet<OutputButtonBinding>();

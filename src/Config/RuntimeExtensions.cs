@@ -14,7 +14,7 @@ public static class RuntimeExtensions
 		/// <c>DeviceId</c> in bindings (and inside nested modifiers) is
 		/// rewritten through this map. Unmapped ids pass through unchanged.
 		/// </param>
-		public ImmutableArray<IBoundRoute> BuildRoutes(IReadOnlyDictionary<int, int>? deviceMap = null)
+		public ImmutableArray<IRoute> BuildRoutes(IReadOnlyDictionary<int, int>? deviceMap = null)
 		{
 			deviceMap ??= EmptyMap;
 
