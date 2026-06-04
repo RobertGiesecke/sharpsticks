@@ -203,7 +203,7 @@ public sealed class AllocationTests : IDisposable
 					}),
 
 				// AbsoluteRelativeAxisModifier (2 routes sharing state)
-				.._Stick2.BindAxis(Axis.Y).RouteAbsoluteRelative(absrel),
+				_Stick2.BindAxis(Axis.Y).RouteAbsoluteRelative(absrel),
 
 				// ButtonRoutes from both input devices
 				_Stick1.BindButton(1).RouteTo(_Output1.BindButton(1)),

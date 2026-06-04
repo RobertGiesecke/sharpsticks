@@ -33,20 +33,30 @@ public static class OutputExtensions
 		binding.RouteToSameAxisOnOutput(outputDevice.DeviceId, options);
 
 	[OverloadResolutionPriority(2)]
-	public static ImmutableArray<AxisRoute> RouteToSameAxesOnOutput(
+	public static RouteToSameAxesOnOutputCombinedRoute RouteToSameAxesOnOutput(
 		this GroupedSourceAxes bindings,
 		IOutputDevice outputDevice,
 		double scale = 1.0,
 		double offset = 0.0,
 		IAxisModifier? modifier = null) =>
-		bindings.RouteToSameAxesOnOutput(outputDevice.DeviceId, scale, offset, modifier);
+		new()
+		{
+			SourceAxes = bindings.SourceAxes,
+			OutputDeviceId = outputDevice.DeviceId,
+			Options = new() { Scale = scale, Offset = offset, Modifier = modifier },
+		};
 
 	[OverloadResolutionPriority(3)]
-	public static ImmutableArray<AxisRoute> RouteToSameAxesOnOutput(
+	public static RouteToSameAxesOnOutputCombinedRoute RouteToSameAxesOnOutput(
 		this GroupedSourceAxes bindings,
 		IOutputDevice outputDevice,
 		RouteAxisOptions? options = null) =>
-		bindings.RouteToSameAxesOnOutput(outputDevice.DeviceId, options);
+		new()
+		{
+			SourceAxes = bindings.SourceAxes,
+			OutputDeviceId = outputDevice.DeviceId,
+			Options = options,
+		};
 
 	public static IEnumerable<ButtonRoute> RouteToOutput<TOutputDevice>(
 		this ImmutableArray<ButtonBinding> sourceButtons,
