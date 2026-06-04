@@ -160,6 +160,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		[
 			..allOutputButtons.Select(binding =>
 			{
+				// ReSharper disable once AccessToDisposedClosure
 				var sources = bindingsByOutput.GetValueOrDefault(binding, []);
 				return new OutputButtonWithBindings
 				{
