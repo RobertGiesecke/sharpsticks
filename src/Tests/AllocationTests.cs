@@ -185,7 +185,7 @@ public sealed class AllocationTests : IDisposable
 			[
 				// AxisRoute with AxisCurve (non-linear)
 				_Stick1.BindAxis(Axis.X).RouteToSameAxisOnOutput(
-					_Output1, modifier: new AxisCurve { Max = 0.8, Steepness = 1.5 }),
+					_Output1, modifier: new AxisCurve { Max = 0.8, Exponent = 0.5 }),
 
 				// AxisRoute with WhenButtonPressedAxisModifier (stateful branch)
 				_Stick1.BindAxis(Axis.Y).RouteToSameAxisOnOutput(_Output1, modifier: whenPressed),
