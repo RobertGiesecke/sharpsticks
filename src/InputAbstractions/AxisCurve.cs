@@ -4,24 +4,31 @@ public sealed record AxisCurve : IAxisModifier
 {
 	public double Max { get; init; } = 1.0;
 	private const double Tolerance = 0.000001;
-	private const double InitialSteepness = 1.0;
+	private const double InitialExponent = 1.0;
 
-	public double Steepness
+	/// <summary>
+	/// Power-curve exponent: output = <see cref="Max"/> · sign(input) · |input|^Exponent.
+	/// 1.0 is linear; above 1 damps the center response (ease-out, e.g. a
+	/// game's "curve 2.4" setting); between 0 and 1 boosts it (ease-in).
+	/// Must be positive.
+	/// </summary>
+	public double Exponent
 	{
 		get;
 		init
 		{
+			ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(Exponent));
 			field = value;
 			IsLinear = Math.Abs(value - 1.0) < Tolerance;
-			IsFlat = Math.Abs(value) < Tolerance;
 		}
-	} = InitialSteepness;
+	} = InitialExponent;
 
 	[System.Text.Json.Serialization.JsonIgnore]
-	public bool IsLinear { get; private init; } = Math.Abs(InitialSteepness - 1.0) < Tolerance;
+	public bool IsLinear { get; private init; } = Math.Abs(InitialExponent - 1.0) < Tolerance;
 
+	/// <summary>A curve with <see cref="Max"/> 0 outputs 0 for every input.</summary>
 	[System.Text.Json.Serialization.JsonIgnore]
-	public bool IsFlat { get; private init; } = Math.Abs(InitialSteepness) < Tolerance;
+	public bool IsFlat => Math.Abs(Max) < Tolerance;
 
 	public void FillDevices(ICollection<int> deviceIds)
 	{
@@ -74,9 +81,7 @@ public sealed record AxisCurve : IAxisModifier
 				return _Curve.Max * input;
 			}
 
-			var steepness = _Curve.Steepness;
-			var exponent = steepness < 1.0 ? 1.0 / steepness : 2.0 - steepness;
-			return _Curve.Max * Math.Sign(input) * Math.Pow(Math.Abs(input), exponent);
+			return _Curve.Max * Math.Sign(input) * Math.Pow(Math.Abs(input), _Curve.Exponent);
 		}
 	}
 
