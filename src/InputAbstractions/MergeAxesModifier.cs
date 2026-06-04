@@ -55,9 +55,11 @@ internal sealed class MergeAxesModifier : IAxisModifier
 		MergeMode mode) : IRuntimeAxisModifier
 		where TInputDevice : JoystickDevice
 	{
-		public double Apply(double input, JoystickState?[] states)
+		// No state of its own, but the child modifiers may be stateful — so
+		// the mode is forwarded to every child evaluation.
+		public double Apply(double input, JoystickState?[] states, ApplyMode applyMode = ApplyMode.Update)
 		{
-			var first = firstModifier is { } fm ? fm.Apply(input, states) : input;
+			var first = firstModifier is { } fm ? fm.Apply(input, states, applyMode) : input;
 
 			double second;
 			if (states[secondDeviceIndex] is { } state)
@@ -66,7 +68,7 @@ internal sealed class MergeAxesModifier : IAxisModifier
 				second = raw * secondScale + secondOffset;
 				if (secondModifier is { } sm)
 				{
-					second = sm.Apply(second, states);
+					second = sm.Apply(second, states, applyMode);
 				}
 			}
 			else
@@ -74,7 +76,7 @@ internal sealed class MergeAxesModifier : IAxisModifier
 				second = secondOffset;
 				if (secondModifier is { } sm)
 				{
-					second = sm.Apply(second, states);
+					second = sm.Apply(second, states, applyMode);
 				}
 			}
 

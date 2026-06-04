@@ -20,17 +20,24 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 	// stateful branch drops the latched state.
 	public WhenButtonPressedStateful Stateful { get; init; } = WhenButtonPressedStateful.None;
 
-	private sealed class RuntimeModifier<TInputDevice> : IRuntimeAxisModifier
+	private sealed record RuntimeModifier<TInputDevice> :
+		StatefulRuntimeInputModifier<double, RuntimeModifier<TInputDevice>.BranchState>,
+		IRuntimeAxisModifier
 		where TInputDevice : JoystickDevice
 	{
+		internal struct BranchState
+		{
+			public bool HasPrevious;
+			public double LastInput;
+			public double LastOutput;
+			public double LastBranchOutput;
+			public IRuntimeAxisModifier? LastActive;
+		}
+
 		private readonly IRuntimeAxisModifier? _WhenPressed;
 		private readonly IRuntimeAxisModifier? _WhenNotPressed;
 		private readonly ImmutableArray<RuntimeButtonBinding> _Buttons;
 		private readonly WhenButtonPressedStateful _Stateful;
-
-		private bool _HasPrevious;
-		private double _LastInput;
-		private double _LastOutput;
 
 		private readonly record struct RuntimeButtonBinding
 		{
@@ -53,11 +60,11 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 			];
 		}
 
-		public double Apply(double input, JoystickState?[] states)
+		protected override double Apply(double input, JoystickState?[] states, ref BranchState state, ApplyMode mode)
 		{
 			var isPressed = IsAnyButtonPressed(states);
 			var active = isPressed && _WhenPressed is not null ? _WhenPressed : _WhenNotPressed;
-			var atInput = ApplyActive(active, input, states);
+			var atInput = ApplyActive(active, input, states, mode);
 
 			var statefulNow = _Stateful switch
 			{
@@ -68,14 +75,22 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 			};
 
 			double output;
-			if (statefulNow && _HasPrevious)
+			if (statefulNow && state.HasPrevious)
 			{
-				// Integrate input deltas through the currently-active branch.
-				// The seed is the PREVIOUS frame's output — possibly produced
-				// by the non-stateful branch — so entering a stateful branch
-				// holds the value where it was. Only further input changes
-				// move it, evaluated against the now-active curve.
-				output = _LastOutput + (atInput - ApplyActive(active, _LastInput, states));
+				// Integrate branch-output deltas onto the previous output.
+				// The subtrahend is where the active branch "was" last frame:
+				// - same branch: its actual previous output, so the branch's
+				//   own evolution (e.g. a stateful child's fade toward its
+				//   normal curve) flows through unchanged;
+				// - branch just switched: probe the now-active branch at the
+				//   previous input — as a Peek, so a stateful child is not
+				//   mutated twice per frame — which holds the output where
+				//   it was. Only further input changes move it, evaluated
+				//   against the now-active curve.
+				var previousBranchOutput = ReferenceEquals(active, state.LastActive)
+					? state.LastBranchOutput
+					: ApplyActive(active, state.LastInput, states, ApplyMode.Peek);
+				output = state.LastOutput + (atInput - previousBranchOutput);
 			}
 			else
 			{
@@ -84,9 +99,12 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 
 			// Track every frame, not just stateful ones, so the next entry
 			// into a stateful branch can seed from the actual previous output.
-			_LastInput = input;
-			_LastOutput = output;
-			_HasPrevious = true;
+			state.LastActive = active;
+			state.LastBranchOutput = atInput;
+			state.LastInput = input;
+			state.LastOutput = output;
+			state.HasPrevious = true;
+
 			return output;
 		}
 
@@ -108,8 +126,12 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 			return false;
 		}
 
-		private static double ApplyActive(IRuntimeAxisModifier? modifier, double input, JoystickState?[] states) =>
-			modifier?.Apply(input, states) ?? input;
+		private static double ApplyActive(
+			IRuntimeAxisModifier? modifier,
+			double input,
+			JoystickState?[] states,
+			ApplyMode mode) =>
+			modifier?.Apply(input, states, mode) ?? input;
 	}
 
 	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)

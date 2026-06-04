@@ -46,7 +46,7 @@ public sealed record AxisCurve : IAxisModifier
 		{
 		}
 
-		public double Apply(double input, JoystickState?[] states)
+		public double Apply(double input, JoystickState?[] states, ApplyMode applyMode = ApplyMode.Update)
 		{
 			return 0.0;
 		}
@@ -67,7 +67,7 @@ public sealed record AxisCurve : IAxisModifier
 			_Curve = axisCurve;
 		}
 
-		public double Apply(double input, JoystickState?[] states)
+		public double Apply(double input, JoystickState?[] states, ApplyMode applyMode = ApplyMode.Update)
 		{
 			if (_Curve.IsLinear)
 			{
@@ -95,6 +95,6 @@ public sealed record AxisCurve : IAxisModifier
 			_Max = axisCurve.Max;
 		}
 
-		public double Apply(double input, JoystickState?[] states) => _Max * input;
+		public double Apply(double input, JoystickState?[] states, ApplyMode applyMode = ApplyMode.Update) => _Max * input;
 	}
 }
