@@ -1,20 +1,17 @@
-var modifierBlendCurve = new BlendedAxisCurve
-{
-	NormalCurve = new AxisCurve { Max = 1.0d },
-	PrecisionCurve =  new AxisCurve { Max = 0.184d },
-	ModifierAxis = LeftStick.Axes.BrakeLever,
-	Stateful = true,
-};
+[assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
+[assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
+[assembly: RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
+[assembly: RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
 
 BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
-	OutputDeviceFactory = PlatformDefaultDeviceFactory.Instance,
-	
 	Routes =
 	[
+
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()
 		{
+			Reentry = MacroReentry.DropIfBusy,
 			OnPress =
 			[
 				// lift fire
@@ -37,9 +34,19 @@ BuildAndRunAsConsole(new()
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
 		LeftStick.Buttons.BrakeLever.RouteTo(VJoy1.Buttons.HoldForZoom),
-		RightStick.Axes.X.RouteTo(VJoy1.Axes.Roll, modifier: modifierBlendCurve),
-		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: modifierBlendCurve),
-		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: modifierBlendCurve),
+		..RightStick.Axes.X
+			.GroupWith(
+				RightStick.Axes.Y,
+				RightStick.Axes.Twist)
+			.RouteToSameAxesOnOutput(
+				VJoy1,
+				modifier: new BlendedAxisCurve
+				{
+					NormalCurve = new AxisCurve { Max = 1.0d },
+					PrecisionCurve = new AxisCurve { Max = 0.184d },
+					ModifierAxis = LeftStick.Axes.BrakeLever,
+					Stateful = true,
+				}),
 		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever, scale: 2, offset: -1),
 		..LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
 		{
@@ -58,34 +65,28 @@ BuildAndRunAsConsole(new()
 	],
 });
 
-[GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
-[RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
-[RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
-
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
+[RenameAxis(DeviceNames.RightStick, Axis.Z, "Twist")]
+[RenameButton(DeviceNames.RightStick, 1, "Trigger")]
+[RenameButton(DeviceNames.RightStick, 18, "CounterMeasureHatEast")]
 // left stick
-[RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
-[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
-
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, "BrakeLever")]
-// vjoy device
-[RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
-[RenameButton(DeviceNames.VJoyDevice1, 1, "Fire")]
-[RenameButton(DeviceNames.VJoyDevice1, 79, "CenterHeadTracking")]
-
-[RenameAxis(DeviceNames.VJoyDevice1, Axis.X, "Roll")]
-[RenameAxis(DeviceNames.VJoyDevice1, Axis.Y, "Pitch")]
-[RenameAxis(DeviceNames.VJoyDevice1, Axis.Z, "Yaw")]
-[RenameAxis(DeviceNames.VJoyDevice1, Axis.Rz, "BrakeLever")]
-[RenameAxis(DeviceNames.VJoyDevice1, Axis.Slider1, "ZoomIn")]
-[RenameAxis(DeviceNames.VJoyDevice1, Axis.Slider2, "ZoomOut")]
-
-[RenameButton(DeviceNames.VJoyDevice1, 71, "SwitchToWeaponGroup1")]
-[RenameButton(DeviceNames.VJoyDevice1, 72, "SwitchToWeaponGroup2")]
-[RenameButton(DeviceNames.VJoyDevice1, 20, "HoldForZoom")]
-partial class Devices;
+[RenameAxis(DeviceNames.LeftStick, Axis.Slider1, "BrakeLever")]
+[RenameButton(DeviceNames.LeftStick, 1, "Trigger")]
+[RenameButton(DeviceNames.LeftStick, 2, "SecondStageTrigger")]
+[RenameButton(DeviceNames.LeftStick, 11, "Outer2WayUp")]
+[RenameButton(DeviceNames.LeftStick, 20, "BrakeLever")]
+// vjoy device 1
+[RenameButton(DeviceNames.VJoy1, 1, "Fire")]
+[RenameButton(DeviceNames.VJoy1, 79, "CenterHeadTracking")]
+[RenameAxis(DeviceNames.VJoy1, Axis.X, "Roll")]
+[RenameAxis(DeviceNames.VJoy1, Axis.Y, "Pitch")]
+[RenameAxis(DeviceNames.VJoy1, Axis.Z, "Yaw")]
+[RenameAxis(DeviceNames.VJoy1, Axis.Rz, "BrakeLever")]
+[RenameAxis(DeviceNames.VJoy1, Axis.Slider1, "ZoomIn")]
+[RenameAxis(DeviceNames.VJoy1, Axis.Slider2, "ZoomOut")]
+[RenameButton(DeviceNames.VJoy1, 71, "SwitchToWeaponGroup1")]
+[RenameButton(DeviceNames.VJoy1, 72, "SwitchToWeaponGroup2")]
+[RenameButton(DeviceNames.VJoy1, 20, "HoldForZoom")]
+[RenameButton(DeviceNames.VJoy1, 128, "Letzta")]
+// ReSharper disable once ClassNeverInstantiated.Global
+static partial class Devices;
