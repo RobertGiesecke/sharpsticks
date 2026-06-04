@@ -31,18 +31,23 @@ public sealed record BlendedAxisCurve : IAxisModifier
 		deviceIds.Add(ModifierAxis.DeviceId);
 	}
 
-	private sealed class RuntimeModifier<TInputDevice> : IRuntimeAxisModifier
+	private sealed record RuntimeModifier<TInputDevice> :
+		StatefulRuntimeInputModifier<double, RuntimeModifier<TInputDevice>.LatchState>,
+		IRuntimeAxisModifier
 		where TInputDevice : JoystickDevice
 	{
+		internal struct LatchState
+		{
+			public bool HasState;
+			public double LastInput;
+			public double LastOutput;
+		}
+
 		private readonly int _ModifierAxisDeviceIndex;
 		private readonly TInputDevice _ModifierAxisDevice;
 		private readonly IRuntimeAxisModifier _NormalCurve;
 		private readonly IRuntimeAxisModifier _PrecisionCurve;
 		private readonly BlendedAxisCurve _Source;
-
-		private bool _HasState;
-		private double _LastInput;
-		private double _LastOutput;
 
 		public RuntimeModifier(BlendedAxisCurve source, IRuntimeContext<TInputDevice> runtimeContext)
 		{
@@ -54,7 +59,7 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			_ModifierAxisDeviceIndex = runtimeContext.DeviceIndexesById[_Source.ModifierAxis.DeviceId];
 		}
 
-		public double Apply(double input, JoystickState?[] states)
+		protected override double Apply(double input, JoystickState?[] states, ref LatchState state, ApplyMode mode)
 		{
 			if (ReadBlend(states) is not { } readout)
 			{
@@ -62,8 +67,8 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			}
 
 			var (blend, factorT) = readout;
-			var normal = _NormalCurve.Apply(input, states);
-			var blended = normal * (1.0 - blend) + _PrecisionCurve.Apply(input, states) * blend;
+			var normal = _NormalCurve.Apply(input, states, mode);
+			var blended = normal * (1.0 - blend) + _PrecisionCurve.Apply(input, states, mode) * blend;
 
 			if (!_Source.Stateful)
 			{
@@ -74,27 +79,27 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			// latched state so the next engagement starts fresh.
 			if (factorT <= _Source.RestThreshold)
 			{
-				_HasState = false;
+				state.HasState = false;
 				return normal;
 			}
 
-			if (!_HasState)
+			if (!state.HasState)
 			{
-				_LastInput = input;
-				_LastOutput = normal;
-				_HasState = true;
+				state.LastInput = input;
+				state.LastOutput = normal;
+				state.HasState = true;
 			}
 			else
 			{
 				// Integrate: only the input delta under the current blended
 				// curve moves the latched value.
-				_LastOutput += blended - BlendAt(_LastInput, blend, states);
-				_LastInput = input;
+				state.LastOutput += blended - BlendAt(state.LastInput, blend, states);
+				state.LastInput = input;
 			}
 
 			// Lerp on the raw modifier factor so releasing the axis fades the
 			// integrated value back toward the normal curve.
-			var output = normal * (1.0 - factorT) + _LastOutput * factorT;
+			var output = normal * (1.0 - factorT) + state.LastOutput * factorT;
 
 			// Clamp to the axis limits and bleed any excess off the latched
 			// value — otherwise the integrator winds up beyond what's
@@ -104,22 +109,25 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			const double min = -1.0;
 			if (output > max)
 			{
-				_LastOutput = (max - normal * (1.0 - factorT)) / factorT;
+				state.LastOutput = (max - normal * (1.0 - factorT)) / factorT;
 				return max;
 			}
 
 			if (output < min)
 			{
-				_LastOutput = (min - normal * (1.0 - factorT)) / factorT;
+				state.LastOutput = (min - normal * (1.0 - factorT)) / factorT;
 				return min;
 			}
 
 			return output;
 		}
 
+		// Probes the curves at a hypothetical (previous) input — always a peek:
+		// the regular per-frame Update call for the child curves already
+		// happened at the current input above.
 		private double BlendAt(double input, double blend, JoystickState?[] states) =>
-			_NormalCurve.Apply(input, states) * (1.0 - blend) +
-			_PrecisionCurve.Apply(input, states) * blend;
+			_NormalCurve.Apply(input, states, ApplyMode.Peek) * (1.0 - blend) +
+			_PrecisionCurve.Apply(input, states, ApplyMode.Peek) * blend;
 
 		private (double Blend, double FactorT)? ReadBlend(JoystickState?[] states)
 		{

@@ -192,15 +192,22 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		private double Clamp(double value) => Math.Clamp(value, _Minimum, _Maximum);
 	}
 
-	private sealed class RuntimeModifier : IRuntimeAxisModifier, IRuntimeAxisDebugView
+	private sealed record RuntimeModifier :
+		StatefulRuntimeInputModifier<double, RuntimeModifier.PulseState>,
+		IRuntimeAxisModifier,
+		IRuntimeAxisDebugView
 	{
+		internal struct PulseState
+		{
+			public double CurrentPulseMagnitude;
+		}
+
 		private readonly SharedState _SharedState;
 		private readonly RelativeDirection _Direction;
 		private readonly double _RestPosition;
 		private readonly double _OutputRiseRate;
 		private readonly double _OutputFallRate;
 		private readonly bool _IsDebugOwner;
-		private double _CurrentPulseMagnitude;
 
 		public RuntimeModifier(SharedState sharedState, RelativeDirection direction, double restPosition)
 		{
@@ -212,12 +219,21 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			_IsDebugOwner = direction == RelativeDirection.Decrease;
 		}
 
-		public double Apply(double input, JoystickState?[] states)
+		protected override double Apply(double input, JoystickState?[] states, ref PulseState state, ApplyMode mode)
 		{
+			// GetDesiredPulseMagnitude only records debug-view fields. The
+			// per-instance pulse magnitude lives in the state struct (peeks
+			// run on a copy); SharedState is shared with the paired direction
+			// and sits outside the struct, so it is only advanced on real
+			// frames.
 			var desiredPulseMagnitude = _SharedState.GetDesiredPulseMagnitude(input, _Direction);
-			_CurrentPulseMagnitude = Slew(_CurrentPulseMagnitude, desiredPulseMagnitude);
-			_SharedState.Advance(input, _Direction, _CurrentPulseMagnitude);
-			return MapPulseToSignedOutput(_RestPosition, _CurrentPulseMagnitude);
+			state.CurrentPulseMagnitude = Slew(state.CurrentPulseMagnitude, desiredPulseMagnitude);
+			if (mode == ApplyMode.Update)
+			{
+				_SharedState.Advance(input, _Direction, state.CurrentPulseMagnitude);
+			}
+
+			return MapPulseToSignedOutput(_RestPosition, state.CurrentPulseMagnitude);
 		}
 
 		public string? GetDebugView()
