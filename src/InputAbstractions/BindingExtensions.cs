@@ -147,7 +147,6 @@ public static class BindingExtensions
 		this AxisBinding binding,
 		AbsoluteRelativeAxisOptions options)
 	{
-
 		return new()
 		{
 			Binding = binding,
@@ -179,6 +178,26 @@ public static class BindingExtensions
 		return new()
 		{
 			Source = axis,
+			OutputBinding = output,
+			Min = min,
+			Max = max,
+			IncludeMax = o.IncludeMax,
+			Mode = o.Mode,
+			PulseDuration = o.PulseDuration,
+		};
+	}
+
+	public static MultiAxesToButtonRoute RouteWhenInRange(
+		this GroupedSourceAxes axes,
+		double min,
+		double max,
+		OutputButtonBinding output,
+		AxisZoneOptions? options = null)
+	{
+		var o = options ?? new();
+		return new()
+		{
+			Sources = axes.SourceAxes,
 			OutputBinding = output,
 			Min = min,
 			Max = max,
@@ -241,8 +260,26 @@ public static class BindingExtensions
 		}
 
 		return builder.MoveToImmutable();
+	}	public static IEnumerable<MultiAxesToButtonRoute> RouteZones(
+		this GroupedSourceAxes axes,
+		IEnumerable<AxisZone> zones,
+		AxisZoneOptions? options = null)
+	{
+		var o = options ?? new();
+		foreach (var zone in zones)
+		{
+			yield return new()
+			{
+				Sources = axes.SourceAxes,
+				OutputBinding = zone.Output,
+				Min = zone.Min,
+				Max = zone.Max,
+				IncludeMax = o.IncludeMax,
+				Mode = o.Mode,
+				PulseDuration = o.PulseDuration,
+			};
+		}
 	}
-
 
 	public readonly record struct ComplexRouteOptions()
 	{
