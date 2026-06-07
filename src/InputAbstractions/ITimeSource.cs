@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace SharpSticks.OutputAbstractions;
+namespace SharpSticks.InputAbstractions;
 
 /// <summary>
 /// Monotonic time abstraction the macro engine uses to schedule waits and
