@@ -50,8 +50,8 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
 		where TInputDevice : JoystickDevice =>
 		_Direction is { } direction
-			? new DualAxesRuntimeModifier(_SharedState, direction, _RestPosition)
-			: new BidirectionalRuntimeModifier(_SharedState);
+			? new DualAxesRuntimeModifier(_SharedState, direction, _RestPosition, context.TimeSource)
+			: new BidirectionalRuntimeModifier(_SharedState, context.TimeSource);
 
 	private enum RelativeDirection
 	{
@@ -153,7 +153,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		/// direction flip still moves the consumer), so the model tracks the
 		/// consumer instead of standing still while it drifts.
 		/// </summary>
-		public void AdvanceNet(double input, double netPulse)
+		public void AdvanceNet(double input, double netPulse, double elapsedSeconds)
 		{
 			SetActual(RelativeDirection.Increase, Math.Max(netPulse, 0.0));
 			SetActual(RelativeDirection.Decrease, Math.Max(-netPulse, 0.0));
@@ -166,14 +166,14 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 				return;
 			}
 
-			var rate = netPulse > 0.0 ? _Options.IncreaseRate : _Options.DecreaseRate;
-			if (netPulse == 0.0 || rate <= 0.0)
+			var unitsPerSecond = UnitsPerSecond(netPulse > 0.0 ? RelativeDirection.Increase : RelativeDirection.Decrease);
+			if (netPulse == 0.0 || unitsPerSecond <= 0.0)
 			{
 				LastCurrentAfter = Current;
 				return;
 			}
 
-			var step = netPulse * rate;
+			var step = netPulse * unitsPerSecond * elapsedSeconds;
 
 			// Moving toward the target must not overshoot it (mirrors Advance);
 			// moving away from it integrates as-is — the consumer moved, so
@@ -187,7 +187,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			LastCurrentAfter = Current;
 		}
 
-		public void Advance(double input, RelativeDirection direction, double actualPulseMagnitude)
+		public void Advance(double input, RelativeDirection direction, double actualPulseMagnitude, double elapsedSeconds)
 		{
 			SetActual(direction, actualPulseMagnitude);
 			var target = MapInputToTarget(input);
@@ -205,14 +205,14 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 				return;
 			}
 
-			var rate = isIncrease ? _Options.IncreaseRate : _Options.DecreaseRate;
-			if (rate <= 0.0 || actualPulseMagnitude <= 0.0)
+			var unitsPerSecond = UnitsPerSecond(direction);
+			if (unitsPerSecond <= 0.0 || actualPulseMagnitude <= 0.0)
 			{
 				LastCurrentAfter = Current;
 				return;
 			}
 
-			var step = actualPulseMagnitude * rate;
+			var step = actualPulseMagnitude * unitsPerSecond * elapsedSeconds;
 			if (step > Math.Abs(error))
 			{
 				step = Math.Abs(error);
@@ -220,6 +220,18 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 
 			Current = Clamp(Current + (isIncrease ? step : -step));
 			LastCurrentAfter = Current;
+		}
+
+		// Range-per-second the model advances at full pulse for a direction.
+		// A non-finite or non-positive SecondsToFull freezes the model (0).
+		private double UnitsPerSecond(RelativeDirection direction)
+		{
+			var secondsToFull = direction == RelativeDirection.Increase
+				? _Options.IncreaseSecondsToFull
+				: _Options.DecreaseSecondsToFull;
+			return double.IsFinite(secondsToFull) && secondsToFull > 0.0
+				? (_Maximum - _Minimum) / secondsToFull
+				: 0.0;
 		}
 
 		private void SetDesired(RelativeDirection direction, double value)
@@ -276,25 +288,43 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		where TState : struct
 	{
 		protected SharedState SharedState { get; }
+		protected ITimeSource TimeSource { get; }
+		private readonly long _StartTimestamp;
 
-		protected RuntimeModifier(SharedState sharedState)
+		protected RuntimeModifier(SharedState sharedState, ITimeSource timeSource)
 		{
 			SharedState = sharedState;
+			TimeSource = timeSource;
+			// First frame measures from construction, not from 0, so it
+			// doesn't integrate a huge gap.
+			_StartTimestamp = timeSource.GetTimestamp();
 		}
 
-		protected static double Slew(double current, double desired, double riseRate, double fallRate) =>
-			MoveTowards(
-				current,
-				desired,
-				desired > current
-					? riseRate
-					: fallRate);
+		// Seconds since the previous Update frame (or construction, the first
+		// time). The caller threads the per-instance last timestamp through its
+		// state struct so peeks — which run on a copy — never disturb it.
+		protected double ElapsedSeconds(bool hasLast, long lastTimestamp, long now) =>
+			(now - (hasLast ? lastTimestamp : _StartTimestamp)) / (double)TimeSource.Frequency;
+
+		// Slew the emitted pulse toward its desired value, capped to what the
+		// ramp-time budget allows this frame. The pulse magnitude spans 0→1, so
+		// secondsToFull == 1 / maxStepPerSecond; a non-positive ramp time means
+		// instant (no smoothing). Wall-clock based, so frame rate doesn't matter.
+		protected static double Slew(
+			double current, double desired, double riseSeconds, double fallSeconds, double elapsedSeconds)
+		{
+			var seconds = desired > current ? riseSeconds : fallSeconds;
+			var maxStep = seconds > 0.0 ? elapsedSeconds / seconds : double.PositiveInfinity;
+			return MoveTowards(current, desired, maxStep);
+		}
 
 		private static double MoveTowards(double current, double desired, double maxStep)
 		{
+			// No budget this frame (no time elapsed) → hold. +Infinity (instant
+			// / no smoothing) sails past the abs-delta check below to snap.
 			if (maxStep <= 0.0)
 			{
-				return desired;
+				return current;
 			}
 
 			var delta = desired - current;
@@ -335,15 +365,18 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		{
 			public double IncreasePulse;
 			public double DecreasePulse;
+			public long LastTimestamp;
+			public bool HasTimestamp;
 		}
 
-		private readonly double _OutputRiseRate;
-		private readonly double _OutputFallRate;
+		private readonly double _OutputRiseSeconds;
+		private readonly double _OutputFallSeconds;
 
-		public BidirectionalRuntimeModifier(SharedState sharedState) : base(sharedState)
+		public BidirectionalRuntimeModifier(SharedState sharedState, ITimeSource timeSource)
+			: base(sharedState, timeSource)
 		{
-			_OutputRiseRate = Math.Max(sharedState.Options.OutputRiseRate, 0.0);
-			_OutputFallRate = Math.Max(sharedState.Options.OutputFallRate, 0.0);
+			_OutputRiseSeconds = sharedState.Options.OutputRiseSeconds;
+			_OutputFallSeconds = sharedState.Options.OutputFallSeconds;
 		}
 
 		protected override double Apply(double input, JoystickState?[] states, ref PulseState state, ApplyMode mode)
@@ -352,10 +385,14 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			// direction matching the error sign produces a non-zero desired
 			// pulse, the other decays at the fall rate. SharedState sits
 			// outside the state struct, so it is only advanced on real frames.
+			var now = TimeSource.GetTimestamp();
+			var elapsedSeconds = ElapsedSeconds(state.HasTimestamp, state.LastTimestamp, now);
 			var desiredIncrease = SharedState.GetDesiredPulseMagnitude(input, RelativeDirection.Increase);
 			var desiredDecrease = SharedState.GetDesiredPulseMagnitude(input, RelativeDirection.Decrease);
-			state.IncreasePulse = Slew(state.IncreasePulse, desiredIncrease, _OutputRiseRate, _OutputFallRate);
-			state.DecreasePulse = Slew(state.DecreasePulse, desiredDecrease, _OutputRiseRate, _OutputFallRate);
+			state.IncreasePulse =
+				Slew(state.IncreasePulse, desiredIncrease, _OutputRiseSeconds, _OutputFallSeconds, elapsedSeconds);
+			state.DecreasePulse =
+				Slew(state.DecreasePulse, desiredDecrease, _OutputRiseSeconds, _OutputFallSeconds, elapsedSeconds);
 
 			// Rest is center: increase pulses push positive, decrease negative.
 			// The consumer only ever sees this NET deflection — during a
@@ -365,7 +402,9 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			var net = Math.Clamp(state.IncreasePulse, 0.0, 1.0) - Math.Clamp(state.DecreasePulse, 0.0, 1.0);
 			if (mode == ApplyMode.Update)
 			{
-				SharedState.AdvanceNet(input, net);
+				SharedState.AdvanceNet(input, net, elapsedSeconds);
+				state.LastTimestamp = now;
+				state.HasTimestamp = true;
 			}
 
 			return net;
@@ -382,21 +421,24 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		internal struct PulseState
 		{
 			public double CurrentPulseMagnitude;
+			public long LastTimestamp;
+			public bool HasTimestamp;
 		}
 
 		private readonly RelativeDirection _Direction;
 		private readonly double _RestPosition;
-		private readonly double _OutputRiseRate;
-		private readonly double _OutputFallRate;
+		private readonly double _OutputRiseSeconds;
+		private readonly double _OutputFallSeconds;
 		private readonly bool _IsDebugOwner;
 
-		public DualAxesRuntimeModifier(SharedState sharedState, RelativeDirection direction, double restPosition)
-			: base(sharedState)
+		public DualAxesRuntimeModifier(
+			SharedState sharedState, RelativeDirection direction, double restPosition, ITimeSource timeSource)
+			: base(sharedState, timeSource)
 		{
 			_Direction = direction;
 			_RestPosition = restPosition;
-			_OutputRiseRate = Math.Max(sharedState.Options.OutputRiseRate, 0.0);
-			_OutputFallRate = Math.Max(sharedState.Options.OutputFallRate, 0.0);
+			_OutputRiseSeconds = sharedState.Options.OutputRiseSeconds;
+			_OutputFallSeconds = sharedState.Options.OutputFallSeconds;
 			_IsDebugOwner = direction == RelativeDirection.Decrease;
 		}
 
@@ -407,12 +449,16 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			// run on a copy); SharedState is shared with the paired direction
 			// and sits outside the struct, so it is only advanced on real
 			// frames.
+			var now = TimeSource.GetTimestamp();
+			var elapsedSeconds = ElapsedSeconds(state.HasTimestamp, state.LastTimestamp, now);
 			var desiredPulseMagnitude = SharedState.GetDesiredPulseMagnitude(input, _Direction);
-			state.CurrentPulseMagnitude = Slew(state.CurrentPulseMagnitude, desiredPulseMagnitude, _OutputRiseRate,
-				_OutputFallRate);
+			state.CurrentPulseMagnitude = Slew(state.CurrentPulseMagnitude, desiredPulseMagnitude,
+				_OutputRiseSeconds, _OutputFallSeconds, elapsedSeconds);
 			if (mode == ApplyMode.Update)
 			{
-				SharedState.Advance(input, _Direction, state.CurrentPulseMagnitude);
+				SharedState.Advance(input, _Direction, state.CurrentPulseMagnitude, elapsedSeconds);
+				state.LastTimestamp = now;
+				state.HasTimestamp = true;
 			}
 
 			return MapPulseToSignedOutput(_RestPosition, state.CurrentPulseMagnitude);

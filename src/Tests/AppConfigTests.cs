@@ -505,7 +505,7 @@ public sealed class AppConfigTests : IDisposable
 			SourceInputMaximum = 1.0,
 			IncreaseRestPosition = 0.5,
 			DecreaseRestPosition = 0.5,
-			OutputRiseRate = 1.0,
+			OutputRiseSeconds = 0.0,  // instant: this is a wiring test, not a slew test
 			Gain = 1.0,
 		});
 
