@@ -13,9 +13,7 @@
   <Project Path="src/LinuxInput/LinuxInput.csproj" />
   <Project Path="src/LinuxNative/LinuxNative.csproj" />
   <Project Path="src/LinuxOutput/LinuxOutput.csproj" />
-  <Project Path="src/ItbMinimal/ItbMinimal.csproj">
-    <Build Solution="Release|Any CPU" Project="false" />
-  </Project>
+  <Project Path="src/ItbMinimal/ItbMinimal.csproj" />
   <Project Path="src/OutputAbstractions/OutputAbstractions.csproj" />
   <Project Path="src/PlatformDefaults/PlatformDefaults.csproj" />
   <Project Path="src/PlatformInput/PlatformInput.csproj" />
