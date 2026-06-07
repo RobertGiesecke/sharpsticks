@@ -48,7 +48,7 @@ BuildAndRunAsConsole(new()
 		}),
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
-		groupedZoomAxes.RouteWhenInRange(0.05d, 1d, VJoy1.Buttons.HoldForZoom,
+		LeftStick.Axes.BrakeLever.RouteWhenInRange(-0.95d, 1d, VJoy1.Buttons.HoldForZoom,
 			options: new()
 			{
 				IncludeMax = true,
@@ -76,8 +76,8 @@ BuildAndRunAsConsole(new()
 			IncreaseEdgeBoost = 55.5,
 			DecreaseEdgeBoost = 55.5,
 			// Output smoothing time (pulse 0→1) in seconds; small = snappy.
-			OutputRiseSeconds = 0.02,
-			OutputFallSeconds = 0.02,
+			OutputRiseSeconds = 0.2,
+			OutputFallSeconds = 0.2,
 			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
 			IncreaseSecondsToFull = 1.0,
 			DecreaseSecondsToFull = 1.0,
