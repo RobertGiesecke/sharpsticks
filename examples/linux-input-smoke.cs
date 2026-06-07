@@ -8,13 +8,13 @@ using SharpSticks.InputAbstractions;
 using SharpSticks.LinuxInput;
 
 using var devices = LinuxInputJoystickDevice.EnumerateConnected();
-Console.WriteLine($"Found {devices.Count} joystick/gamepad device(s):");
+Console.WriteLineInterpolated($"Found {devices.Count} joystick/gamepad device(s):");
 foreach (var device in devices)
 {
-	Console.WriteLine($"  [{device.DeviceId}] {device.Name}");
-	Console.WriteLine($"      instance = {device.InstanceName}  guid = {device.InstanceGuid}");
+	Console.WriteLineInterpolated($"  [{device.DeviceId}] {device.Name}");
+	Console.WriteLineInterpolated($"      instance = {device.InstanceName}  guid = {device.InstanceGuid}");
 	Console.WriteLine($"      axes     = {string.Join(", ", device.PhysicalAxes)}");
-	Console.WriteLine($"      buttons  = {device.Capabilities.NumButtons}");
+	Console.WriteLineInterpolated($"      buttons  = {device.Capabilities.NumButtons}");
 }
 
 if (devices.Count == 0)
@@ -53,6 +53,6 @@ while (DateTime.UtcNow < deadline)
 		previous = state;
 	}
 }
-Console.WriteLine($"wakes={wakes}  timeouts={timeouts}  stateChanges={stateChanges}");
+Console.WriteLineInterpolated($"wakes={wakes}  timeouts={timeouts}  stateChanges={stateChanges}");
 
 Console.WriteLine("Done.");
