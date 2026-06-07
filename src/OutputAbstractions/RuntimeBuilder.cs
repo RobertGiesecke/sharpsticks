@@ -28,15 +28,29 @@ public static class RuntimeBuilder
 				.ToPooledDictionary(device => device.DeviceId);
 			using var referencedDeviceIds = new PooledSet<int>();
 			using var routes = new PooledList<IRoute>(options.Routes.Length);
-			foreach (var route in options.Routes)
 			{
-				if(route is ICombinedRoute combinedRoute)
+				using var routesSet = new PooledSet<IRoute>();
+				foreach (var route in options.Routes)
 				{
-					routes.AddRange(combinedRoute.GetRoutes());
-				}
-				else
-				{
-					routes.Add(route);
+					if (route is ICombinedRoute combinedRoute)
+					{
+						foreach (var boundRoute in combinedRoute.GetRoutes())
+						{
+							if (!routesSet.Add(boundRoute))
+							{
+								continue;
+							}
+							routes.Add(boundRoute);
+						}
+					}
+					else
+					{
+						if (!routesSet.Add(route))
+						{
+							continue;
+						}
+						routes.Add(route);
+					}
 				}
 			}
 			
