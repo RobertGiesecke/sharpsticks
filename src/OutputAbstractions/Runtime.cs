@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace SharpSticks.OutputAbstractions;
 
@@ -306,10 +305,9 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	public void ProcessFrame(DebugLogger? debugLogger = null)
 	{
 		debugLogger ??= _DebugLogger;
-		using var debugLinesScope = debugLogger is null ? null : SharedPools.StringBuilder.GetInstance().AsNullable();
 
 		var currentStates = _CurrentStates;
-		currentStates.AsSpan().Fill(null);
+		currentStates.AsSpan().Clear();
 
 		for (var deviceIndex = 0; deviceIndex < _Devices.Length; deviceIndex++)
 		{
@@ -325,19 +323,12 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			}
 		}
 
-		var shouldLog = debugLogger?.ShouldLogNow() is true;
-		var debugLines = shouldLog ? debugLinesScope!.Value.Instance : null;
-		debugLines?.Clear();
+		var shouldLogNow = debugLogger?.ShouldLogNow() is true;
 
 		_Macros?.Step(currentStates);
 		StepAxisZones(currentStates);
-		ApplyButtons(currentStates, debugLines);
-		ApplyAxes(currentStates, debugLines);
-
-		if (shouldLog && debugLogger is not null && debugLines is not null)
-		{
-			debugLogger.WriteBlock(debugLines);
-		}
+		ApplyButtons(currentStates, shouldLogNow ? debugLogger : null);
+		ApplyAxes(currentStates, shouldLogNow ? debugLogger : null);
 	}
 
 	private void StepAxisZones(JoystickState?[] states)
@@ -363,15 +354,16 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 
 			if (route.Mode == AxisZoneTriggerMode.Hold)
 			{
-				if (inRange && !route.IsAsserting)
+				switch (inRange)
 				{
-					route.Output.IncrementPressers();
-					route.IsAsserting = true;
-				}
-				else if (!inRange && route.IsAsserting)
-				{
-					route.Output.DecrementPressers();
-					route.IsAsserting = false;
+					case true when !route.IsAsserting:
+						route.Output.IncrementPressers();
+						route.IsAsserting = true;
+						break;
+					case false when route.IsAsserting:
+						route.Output.DecrementPressers();
+						route.IsAsserting = false;
+						break;
 				}
 
 				continue;
@@ -414,7 +406,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
-	private void ApplyButtons(JoystickState?[] states, StringBuilder? debugLines)
+	private void ApplyButtons(JoystickState?[] states, DebugLogger? debugLines)
 	{
 		foreach (var route in _ButtonRoutes)
 		{
@@ -457,35 +449,20 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 
 			var isPressed = route is { Pressers: > 0, Suppressors: 0 };
 
-			if (debugLines is not null)
-			{
-				if (assertingBinding is { } bound)
-				{
-					debugLines.Append("button ");
-					debugLines.Append(bound.DeviceId);
-					debugLines.Append(':');
-					debugLines.Append(bound.ButtonNumber);
-					debugLines.Append(" -> ");
-				}
-				else if (isPressed)
-				{
-					debugLines.Append("macro -> ");
-				}
-
-				debugLines.Append("output");
-				debugLines.Append(route.OutputDevice.DeviceId);
-				debugLines.Append(':');
-				debugLines.Append(route.TargetButton);
-				debugLines.Append(" = ");
-				debugLines.AppendLine(isPressed ? "down" : "up");
-			}
+			debugLines?.WriteLine(
+				$"{(assertingBinding is { } bound
+					? Utils.FormatInterpolation($"button {bound.DeviceId}:{bound.ButtonNumber} -> ")
+					: isPressed
+						? Utils.FormatInterpolation($"macro -> ")
+						: NumberFormattingDebugInterpolatedStringHandler.Empty())}" +
+				$"output{route.OutputDevice.DeviceId}:{route.TargetButton} = {(isPressed ? "down" : "up")}");
 
 			route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
 		}
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
-	private void ApplyAxes(JoystickState?[] states, StringBuilder? debugLines)
+	private void ApplyAxes(JoystickState?[] states, DebugLogger? debugLines)
 	{
 		foreach (var route in _AxisRoutes)
 		{
@@ -504,29 +481,21 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			}
 
 			route.OutputDevice.SetAxisValue(route.OutputAxis, output);
-
-			if (debugLines is null)
-			{
-				continue;
-			}
-
-			AppendAxisDebugLine(
-				debugLines,
-				route.Source.DeviceId,
-				route.Source.Axis,
-				route.OutputDevice.DeviceId,
-				route.OutputAxis,
-				sample,
-				output);
-
-			if (route.RuntimeModifier is not IRuntimeAxisDebugView debugView ||
-			    debugView.GetDebugView() is not { Length: > 0 } debugText)
-			{
-				continue;
-			}
-
-			debugLines.Append("  ");
-			debugLines.AppendLine(debugText);
+			debugLines?.WriteLine(
+				$"axis {route.Source.DeviceId}" +
+				$"/{route.Source.Axis}" +
+				$" -> " +
+				$"output{route.OutputDevice.DeviceId}" +
+				$"/{route.OutputAxis}" +
+				$" raw={sample.RawValue}" +
+				$" range={sample.RangeMin}" +
+				$"..{sample.RangeMax}" +
+				$" decoder={sample.DecoderKind}" +
+				$" norm={sample.NormalizedValue}" +
+				$" out={output}; {(
+					route.RuntimeModifier is not IRuntimeAxisDebugView debugView
+						? NumberFormattingDebugInterpolatedStringHandler.Empty()
+						: debugView.GetDebugView())}");
 		}
 	}
 
@@ -537,48 +506,17 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			return;
 		}
 
-		foreach (var device in DevicesById.Values.OrderBy(device => device.DeviceId))
+		using var sortedDevices = DevicesById.Values.ToPooledList();
+		sortedDevices.Sort(JoystickDevice.DeviceIdComparer);
+		foreach (var device in sortedDevices)
 		{
 			debugLogger.WriteLine(
-				$"device {device.DeviceId}: {device.Name} (instance '{device.InstanceName}', axes={device.Capabilities.NumAxes}, buttons={device.Capabilities.NumButtons}, povs={device.Capabilities.NumPovs})");
+				$"device {device.DeviceId}: {device.Name} " +
+				$"(instance '{device.InstanceName}', " +
+				$"axes={device.Capabilities.NumAxes}, " +
+				$"buttons={device.Capabilities.NumButtons}, " +
+				$"povs={device.Capabilities.NumPovs})");
 		}
-	}
-
-	private static void AppendAxisDebugLine(
-		StringBuilder debugLines,
-		int deviceId,
-		Axis axis,
-		uint outputDeviceId,
-		Axis outputAxis,
-		AxisDebugSample sample,
-		double output)
-	{
-		debugLines.Append("axis ");
-		debugLines.Append(deviceId);
-		debugLines.Append('/');
-		debugLines.Append(axis);
-		debugLines.Append(" -> ");
-		debugLines.Append("output");
-		debugLines.Append(outputDeviceId);
-		debugLines.Append('/');
-		debugLines.Append(outputAxis);
-		debugLines.Append(" raw=");
-		debugLines.Append(sample.RawValue);
-		debugLines.Append(" range=");
-		debugLines.Append(sample.RangeMin);
-		debugLines.Append("..");
-		debugLines.Append(sample.RangeMax);
-		debugLines.Append(" decoder=");
-		debugLines.Append(sample.DecoderKind);
-		debugLines.Append(" norm=");
-		debugLines.Append(FormatDouble(sample.NormalizedValue));
-		debugLines.Append(" out=");
-		debugLines.AppendLine(FormatDouble(output));
-	}
-
-	private static string FormatDouble(double value)
-	{
-		return value.ToString("0.0000");
 	}
 
 	public void Dispose()

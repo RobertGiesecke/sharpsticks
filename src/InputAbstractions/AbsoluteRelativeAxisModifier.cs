@@ -306,7 +306,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			return current + Math.CopySign(maxStep, delta);
 		}
 
-		protected static string FormatDebugView(SharedState sharedState) =>
+		protected static NumberFormattingDebugInterpolatedStringHandler FormatDebugView(SharedState sharedState) =>
 			$"absrel src={sharedState.LastSourceInput} " +
 			$"target={sharedState.LastTarget} " +
 			$"current={sharedState.LastCurrentBefore}->{sharedState.LastCurrentAfter} " +
@@ -371,7 +371,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			return net;
 		}
 
-		public string? GetDebugView() => FormatDebugView(SharedState);
+		public NumberFormattingDebugInterpolatedStringHandler GetDebugView() => FormatDebugView(SharedState);
 	}
 
 	private sealed record DualAxesRuntimeModifier :
@@ -418,9 +418,9 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			return MapPulseToSignedOutput(_RestPosition, state.CurrentPulseMagnitude);
 		}
 
-		public string? GetDebugView() => _IsDebugOwner
+		public NumberFormattingDebugInterpolatedStringHandler GetDebugView() => _IsDebugOwner
 			? FormatDebugView(SharedState)
-			: null;
+			: NumberFormattingDebugInterpolatedStringHandler.Empty();
 
 		private static double MapPulseToSignedOutput(double restPosition, double pulseMagnitude)
 		{
