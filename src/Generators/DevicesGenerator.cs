@@ -1583,7 +1583,9 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		{
 			builder.Add(new()
 			{
-				IsStatic = current.IsStatic,
+				// Only the target itself may get promoted to static; outer
+				// types are entirely the user's business.
+				IsStatic = ReferenceEquals(current, target) ? ShouldEmitStatic(current) : current.IsStatic,
 				IsNested = true,
 				IsPartial = IsPartial(current),
 				Accessibility = current.DeclaredAccessibility,
@@ -1597,6 +1599,28 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		builder.Reverse();
 		return builder.ToImmutable();
 	}
+
+	// A bare `partial class Devices;` marker gets its generated counterpart
+	// declared `static` (any part with `static` makes the merged type static).
+	// The promotion only applies to a plain class the user clearly isn't
+	// shaping themselves: an explicit abstract/sealed/record declaration, a
+	// base type, an interface, or any instance member opts out and the
+	// user's modifiers are mirrored as before.
+	private static bool ShouldEmitStatic(INamedTypeSymbol target) =>
+		target.IsStatic
+		|| (target.TypeKind == TypeKind.Class
+		    && !target.IsRecord
+		    && !target.IsAbstract
+		    && !target.IsSealed
+		    && target.BaseType?.SpecialType == SpecialType.System_Object
+		    && target.AllInterfaces.IsEmpty
+		    && HasOnlyStaticOrTypeMembers(target));
+
+	private static bool HasOnlyStaticOrTypeMembers(INamedTypeSymbol target) =>
+		target.GetMembers().All(static member =>
+			member.IsStatic
+			|| member is INamedTypeSymbol
+			|| member is IMethodSymbol { MethodKind: MethodKind.Constructor, IsImplicitlyDeclared: true });
 
 	private static bool IsPartial(INamedTypeSymbol target)
 	{
@@ -1714,7 +1738,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			{
 				Name = typeSymbol.Name,
 				IsNested = typeSymbol.ContainingType is not null,
-				IsStatic = typeSymbol.IsStatic,
+				IsStatic = ShouldEmitStatic(typeSymbol),
 				IsPartial = IsPartial(typeSymbol),
 				FullyQualifiedDisplayString = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
 				DisplayString = typeSymbol.ToDisplayString(),
