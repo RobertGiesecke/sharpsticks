@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using Collections.Pooled;
-
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
 [assembly: RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
@@ -78,10 +75,12 @@ BuildAndRunAsConsole(new()
 			ErrorTolerance = 0.00003,
 			IncreaseEdgeBoost = 55.5,
 			DecreaseEdgeBoost = 55.5,
-			OutputRiseRate = 0.14,
-			OutputFallRate = 0.14,
-			IncreaseRate = 0.025,
-			DecreaseRate = 0.025,
+			// Output smoothing time (pulse 0→1) in seconds; small = snappy.
+			OutputRiseSeconds = 0.02,
+			OutputFallSeconds = 0.02,
+			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
+			IncreaseSecondsToFull = 1.0,
+			DecreaseSecondsToFull = 1.0,
 		}),
 	],
 });
