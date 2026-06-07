@@ -2,7 +2,15 @@ namespace SharpSticks.InputAbstractions;
 
 public readonly record struct AbsoluteRelativeAxisOptions()
 {
+	/// <summary>
+	/// May be the same as <see cref="DecreaseAxis"/>: the route then becomes a
+	/// single bidirectional axis that rests at center, pulsing positive on
+	/// increase and negative on decrease (the rest-position options are not
+	/// used in that mode).
+	/// </summary>
 	public required OutputAxisBinding IncreaseAxis { get; init; }
+
+	/// <inheritdoc cref="IncreaseAxis"/>
 	public required OutputAxisBinding DecreaseAxis { get; init; }
 	public double SourceInputMinimum { get; init; } = 0.0;
 	public double SourceInputMaximum { get; init; } = 1.0;

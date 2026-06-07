@@ -361,6 +361,115 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
 	}
 
+	// --- Same axis for Increase and Decrease: bidirectional mode. ---
+	// One route on the shared axis; rest is center (0), increase pulses push
+	// positive, decrease pulses negative.
+
+	[Fact]
+	public void SameAxis_AtRest_OutputsCenter()
+	{
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.5));
+
+		_Stick.SetAxisValue(Axis.X, 0.5);
+		runtime.ProcessFrame();
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_PositiveError_PulsesPositive()
+	{
+		using var runtime = BuildRuntime(
+			MakeSameAxisOptions(initial: 0.0) with { OutputRiseRate = 1.0, Gain = 1.0 });
+
+		// target=1, error=+1 → increase pulse 1 → output +1.
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		runtime.ProcessFrame();
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_NegativeError_PulsesNegative()
+	{
+		using var runtime = BuildRuntime(
+			MakeSameAxisOptions(initial: 1.0) with { OutputRiseRate = 1.0, OutputFallRate = 1.0, Gain = 1.0 });
+
+		// target=0, error=-1 → decrease pulse 1 → output -1.
+		_Stick.SetAxisValue(Axis.X, 0.0);
+		runtime.ProcessFrame();
+		Assert.Equal(-1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_ConvergesEachWay_AndReturnsToCenter()
+	{
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.0) with
+		{
+			OutputRiseRate = 1.0,
+			OutputFallRate = 1.0,
+			IncreaseRate = 0.25,
+			DecreaseRate = 0.25,
+			Gain = 10.0,
+			ErrorTolerance = 1e-6,
+		});
+
+		// Up: while error > 0, output pulses +1; Current 0 → 1 in 0.25 steps.
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		for (var i = 0; i < 4; i++)
+		{
+			runtime.ProcessFrame();
+			Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+		}
+
+		// Converged → back to center.
+		runtime.ProcessFrame();
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// Down: error flips negative, output pulses -1; Current 1 → 0.
+		_Stick.SetAxisValue(Axis.X, 0.0);
+		for (var i = 0; i < 4; i++)
+		{
+			runtime.ProcessFrame();
+			Assert.Equal(-1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+		}
+
+		// Converged again → center.
+		runtime.ProcessFrame();
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_DirectionFlip_OutputIsNetOfDecayingOppositePulse()
+	{
+		// Freeze Current (rates 0) to isolate the pulse dynamics. Slow fall
+		// rate so the increase pulse is still decaying when the decrease
+		// pulse rises — the output must be the net of the two.
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.5) with
+		{
+			OutputRiseRate = 1.0,
+			OutputFallRate = 0.4,
+			IncreaseRate = 0.0,
+			DecreaseRate = 0.0,
+			Gain = 10.0,
+		});
+
+		// error=+0.5 → increase pulse saturates at 1.
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		runtime.ProcessFrame();
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// Flip: error=-0.5 → decrease rises to 1 immediately, increase decays
+		// by 0.4 per frame. Net: 0.6-1, 0.2-1, 0-1.
+		_Stick.SetAxisValue(Axis.X, 0.0);
+		runtime.ProcessFrame();
+		Assert.Equal(-0.4, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		runtime.ProcessFrame();
+		Assert.Equal(-0.8, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		runtime.ProcessFrame();
+		Assert.Equal(-1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
 	private AbsoluteRelativeAxisOptions MakeOptions(double initial) => new()
 	{
 		IncreaseAxis = _Output.BindAxis(Axis.Slider1),
@@ -373,6 +482,13 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		IncreaseRestPosition = 0.5,
 		DecreaseRestPosition = 0.5,
 	};
+
+	private AbsoluteRelativeAxisOptions MakeSameAxisOptions(double initial) =>
+		MakeOptions(initial) with
+		{
+			IncreaseAxis = _Output.BindAxis(Axis.Slider1),
+			DecreaseAxis = _Output.BindAxis(Axis.Slider1),
+		};
 
 	private IFakesOutputRuntimeContext BuildRuntime(AbsoluteRelativeAxisOptions options)
 	{
