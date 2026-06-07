@@ -1,6 +1,6 @@
 #!/usr/bin/env dotnet
 
-#:package SharpSticks.Editor@0.1.0-linux17
+#:package SharpSticks.Editor@0.1.0-debug03
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
