@@ -12,9 +12,17 @@ public sealed record AbsoluteRelativeAxisRoute : ICombinedRoute
 			throw new InvalidOperationException("Output device ids are 1-based.");
 		}
 
+		// Same axis for both directions = bidirectional mode: one route whose
+		// modifier rests at center, pulsing positive on increase and negative
+		// on decrease. The rest-position options are not used in this mode.
 		if (Options.IncreaseAxis == Options.DecreaseAxis)
 		{
-			throw new InvalidOperationException("IncreaseAxis and DecreaseAxis must be different.");
+			return
+			[
+				Binding.RouteTo(
+					Options.IncreaseAxis,
+					modifier: AbsoluteRelativeAxisModifier.CreateBidirectional(Options)),
+			];
 		}
 
 		var (increaseModifier, decreaseModifier) = AbsoluteRelativeAxisModifier.Create(Options);
