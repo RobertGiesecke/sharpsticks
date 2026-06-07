@@ -122,7 +122,7 @@ public sealed class WhenButtonPressedOverStatefulModifierTests : IDisposable
 	{
 		NormalCurve = new AxisCurve { Max = 1.0 },
 		PrecisionCurve = new AxisCurve { Max = 0.5 },
-		ModifierAxis = _Stick.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned },
+		ModifierAxes = [_Stick.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned }],
 		Stateful = true,
 	};
 }

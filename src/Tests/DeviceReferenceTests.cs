@@ -48,7 +48,7 @@ public sealed class DeviceReferenceTests : IDisposable
 							NormalCurve = new AxisCurve { Max = 1.0 },
 							PrecisionCurve = new AxisCurve { Max = 0.2 },
 							// also device id 2 via the modifier axis
-							ModifierAxis = new(stickB.DeviceId, Axis.Slider1, AxisMode.Unsigned),
+							ModifierAxes = [new AxisBinding(stickB.DeviceId, Axis.Slider1, AxisMode.Unsigned)],
 						},
 					},
 				},

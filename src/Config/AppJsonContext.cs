@@ -4,13 +4,21 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace SharpSticks.Config;
 
-[JsonSourceGenerationOptions(WriteIndented = true, PropertyNameCaseInsensitive = true)]
+// Metadata mode (no fast-path delegates): the generated fast-path serializers
+// bypass TypeInfoResolver modifiers, silently dropping the IAxisModifier
+// polymorphism for collection elements (they serialize as the bare interface
+// contract — "{}").
+[JsonSourceGenerationOptions(
+	WriteIndented = true,
+	PropertyNameCaseInsensitive = true,
+	GenerationMode = JsonSourceGenerationMode.Metadata)]
 [JsonSerializable(typeof(AppConfig))]
 [JsonSerializable(typeof(ItbMinimalConfig))]
 [JsonSerializable(typeof(IAxisModifier))]
 [JsonSerializable(typeof(AxisCurve))]
 [JsonSerializable(typeof(BlendedAxisCurve))]
 [JsonSerializable(typeof(WhenButtonPressedAxisModifier))]
+[JsonSerializable(typeof(AxisBinding))]
 public sealed partial class AppJsonContext : JsonSerializerContext
 {
 	/// <summary>
@@ -41,6 +49,9 @@ public sealed partial class AppJsonContext : JsonSerializerContext
 					new(typeof(AxisCurve), "curve"),
 					new(typeof(BlendedAxisCurve), "blended"),
 					new(typeof(WhenButtonPressedAxisModifier), "whenButtonPressed"),
+					// An AxisBinding used as a modifier reads the bound axis
+					// (e.g. BlendedAxisCurve.ModifierAxis).
+					new(typeof(AxisBinding), "axisValue"),
 				},
 			};
 		}),
