@@ -23,6 +23,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
 	public ImmutableArray<TInputDevice> Devices => _Devices;
+	public ITimeSource TimeSource => _Time;
 
 	private record struct OutputButtonState
 	{
