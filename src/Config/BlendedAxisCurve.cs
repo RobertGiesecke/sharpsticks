@@ -4,7 +4,16 @@ public sealed record BlendedAxisCurve : IAxisModifier
 {
 	public required IAxisModifier NormalCurve { get; init; }
 	public required IAxisModifier PrecisionCurve { get; init; }
-	public required AxisBinding ModifierAxis { get; init; }
+
+	/// <summary>
+	/// Produces the blend factor each frame; the result is clamped to [0, 1]
+	/// (0 = <see cref="NormalCurve"/>, 1 = fully engaged). Typically an
+	/// <see cref="AxisBinding"/> — bind a lever that rests at the hardware
+	/// minimum with <see cref="AxisMode.Unsigned"/> so rest reads 0 and fully
+	/// engaged reads 1; a signed binding's negative half clamps to 0.
+	/// </summary>
+	public required ImmutableArray<IAxisModifier> ModifierAxes { get; init; }
+
 	public double FactorLow { get; init; }
 	public double FactorHigh { get; init; } = 1.0;
 
@@ -22,13 +31,16 @@ public sealed record BlendedAxisCurve : IAxisModifier
 	// axes that never quite reach 0.
 	public double RestThreshold { get; init; } = 1e-3;
 
-	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context) 
+	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
 		where TInputDevice : JoystickDevice =>
 		new RuntimeModifier<TInputDevice>(this, context);
 
 	public void FillDevices(ICollection<int> deviceIds)
 	{
-		deviceIds.Add(ModifierAxis.DeviceId);
+		foreach (var axisModifier in ModifierAxes)
+		{
+			axisModifier.FillDevices(deviceIds);
+		}
 	}
 
 	private sealed record RuntimeModifier<TInputDevice> :
@@ -43,8 +55,7 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			public double LastOutput;
 		}
 
-		private readonly int _ModifierAxisDeviceIndex;
-		private readonly TInputDevice _ModifierAxisDevice;
+		private readonly ImmutableArray<IRuntimeAxisModifier> _ModifierAxisModifiers;
 		private readonly IRuntimeAxisModifier _NormalCurve;
 		private readonly IRuntimeAxisModifier _PrecisionCurve;
 		private readonly BlendedAxisCurve _Source;
@@ -54,19 +65,18 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			_Source = source;
 			_NormalCurve = _Source.NormalCurve.CreateModifierRuntimeContext(runtimeContext);
 			_PrecisionCurve = _Source.PrecisionCurve.CreateModifierRuntimeContext(runtimeContext);
+			using var modifiers = new PooledList<IRuntimeAxisModifier>(source.ModifierAxes.Length);
+			foreach (var axisModifier in source.ModifierAxes)
+			{
+				modifiers.Add(axisModifier.CreateModifierRuntimeContext(runtimeContext));
+			}
 
-			_ModifierAxisDevice = runtimeContext.DevicesById[_Source.ModifierAxis.DeviceId];
-			_ModifierAxisDeviceIndex = runtimeContext.DeviceIndexesById[_Source.ModifierAxis.DeviceId];
+			_ModifierAxisModifiers = [..modifiers.Span];
 		}
 
 		protected override double Apply(double input, JoystickState?[] states, ref LatchState state, ApplyMode mode)
 		{
-			if (ReadBlend(states) is not { } readout)
-			{
-				return input;
-			}
-
-			var (blend, factorT) = readout;
+			var (blend, factorT) = ReadBlend(states, mode);
 			var normal = _NormalCurve.Apply(input, states, mode);
 			var blended = normal * (1.0 - blend) + _PrecisionCurve.Apply(input, states, mode) * blend;
 
@@ -129,19 +139,25 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			_NormalCurve.Apply(input, states, ApplyMode.Peek) * (1.0 - blend) +
 			_PrecisionCurve.Apply(input, states, ApplyMode.Peek) * blend;
 
-		private (double Blend, double FactorT)? ReadBlend(JoystickState?[] states)
+		// The modifier source ignores its input (an AxisBinding reads the
+		// bound axis; see AxisBinding's IAxisModifier implementation). A
+		// missing device reads 0 → fully at rest → the normal curve. The
+		// outer mode is forwarded — this is the source's one regular
+		// evaluation per frame, and it may be stateful (e.g. smoothed).
+		private (double Blend, double FactorT) ReadBlend(JoystickState?[] states, ApplyMode mode)
 		{
-			if (states[_ModifierAxisDeviceIndex] is not { } modifierState)
+			// Max across all sources: whichever lever is engaged furthest
+			// drives the blend. Every source still gets its one regular
+			// evaluation per frame (no early exit) so stateful sources keep
+			// advancing. Seeding at 0 doubles as the lower clamp and as the
+			// rest value for an empty array.
+			var maxValue = 0.0;
+			foreach (var axisModifier in _ModifierAxisModifiers)
 			{
-				return null;
+				maxValue = Math.Max(maxValue, axisModifier.Apply(0.0, states, mode));
 			}
 
-			var modifierValue = _ModifierAxisDevice.ReadAxisDebugSample(modifierState, _Source.ModifierAxis)
-				.NormalizedValue;
-			var factorT = _Source.ModifierAxis.Mode == AxisMode.Signed
-				? Math.Clamp((modifierValue + 1.0) * 0.5, 0.0, 1.0)
-				: Math.Clamp(modifierValue, 0.0, 1.0);
-
+			var factorT = Math.Min(maxValue, 1.0);
 			var blend = _Source.FactorLow + (_Source.FactorHigh - _Source.FactorLow) * factorT;
 			return (blend, factorT);
 		}

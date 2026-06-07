@@ -154,7 +154,7 @@ public sealed class AllocationTests : IDisposable
 		{
 			NormalCurve = new AxisCurve { Max = 1.0 },
 			PrecisionCurve = new AxisCurve { Max = 0.5 },
-			ModifierAxis = _Stick1.BindAxis(Axis.Slider1),
+			ModifierAxes = [_Stick1.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned }],
 			Stateful = true,
 		};
 

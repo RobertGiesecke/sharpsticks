@@ -280,12 +280,16 @@ public static class RuntimeExtensions
 
 		return modifier switch
 		{
+			// ModifierAxes are IAxisModifiers; only the AxisBinding form
+			// carries a device id to rewrite, other sources recurse.
 			BlendedAxisCurve blended => blended with
 			{
-				ModifierAxis = blended.ModifierAxis with
-				{
-					DeviceId = Translate(blended.ModifierAxis.DeviceId, map),
-				},
+				ModifierAxes =
+				[
+					..blended.ModifierAxes.Select(m => m is AxisBinding binding
+						? binding with { DeviceId = Translate(binding.DeviceId, map) }
+						: TranslateModifier(m, map)!),
+				],
 			},
 			WhenButtonPressedAxisModifier whenBtnPressed => whenBtnPressed with
 			{

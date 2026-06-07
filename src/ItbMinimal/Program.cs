@@ -1,13 +1,24 @@
-[assembly:GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
-[assembly:RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
-[assembly:RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
-[assembly:RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
+using System.Collections.Immutable;
+using Collections.Pooled;
+
+[assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
+[assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
+[assembly: RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
+[assembly: RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
+[assembly: RenameDevice(DeviceNames.VpcRudderPedals, "Pedals")]
+
+var groupedZoomAxes = Pedals.Axes.RightToeBrake.GroupWith(LeftStick.Axes.BrakeLever);
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
-	NormalCurve = new AxisCurve { Max = 1.0d },
-	PrecisionCurve = new AxisCurve { Max = 0.2d },
-	ModifierAxis = LeftStick.Axes.BrakeLever,
+	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 2.4d },
+	PrecisionCurve = new AxisCurve { Max = 0.11d },
+	// Whichever is engaged furthest wins — ModifierAxes takes the max.
+	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
+	ModifierAxes =
+	[
+		..groupedZoomAxes.SourceAxes.Select(a => a with { Mode = AxisMode.Unsigned }),
+	],
 	Stateful = true,
 };
 
@@ -40,7 +51,12 @@ BuildAndRunAsConsole(new()
 		}),
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
-		LeftStick.Buttons.BrakeLever.RouteTo(VJoy1.Buttons.HoldForZoom),
+		groupedZoomAxes.RouteWhenInRange(0.05d, 1d, VJoy1.Buttons.HoldForZoom,
+			options: new()
+			{
+				IncludeMax = true,
+				Mode = AxisZoneTriggerMode.Hold,
+			}),
 		RightStick.Axes.X.RouteTo(VJoy1.Axes.Roll, modifier: modifierBlendCurve),
 		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: modifierBlendCurve),
 		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: modifierBlendCurve),
@@ -48,20 +64,20 @@ BuildAndRunAsConsole(new()
 		// simulate absolute zoom with 2 virtual relative axes
 		LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
 		{
-			IncreaseAxis = VJoy1.Axes.ZoomIn,
-			DecreaseAxis = VJoy1.Axes.ZoomIn,
+			IncreaseAxis = VJoy1.Axes.ZoomInOut,
+			DecreaseAxis = VJoy1.Axes.ZoomInOut,
 			// The lever is a signed axis resting at -1. The default source
 			// range is [0, 1], which throws away the first half of the pull.
 			SourceInputMinimum = -1.0,
 			SourceInputMaximum = 1.0,
-			Gain = 6.0,
+			Gain = 8.0,
 			// Must clear the game's deadzone: pulses below it advance the
 			// model but not the game, so the zoom never reaches the stops.
 			// Tune to just above where the game starts reacting.
 			MinOutput = 0.15,
 			ErrorTolerance = 0.00003,
-			IncreaseEdgeBoost = 15.5,
-			DecreaseEdgeBoost = 15.5,
+			IncreaseEdgeBoost = 55.5,
+			DecreaseEdgeBoost = 55.5,
 			OutputRiseRate = 0.14,
 			OutputFallRate = 0.14,
 			IncreaseRate = 0.025,
@@ -70,14 +86,16 @@ BuildAndRunAsConsole(new()
 	],
 });
 
+//pedals
+[RenameAxis(DeviceNames.Pedals, Axis.Z, "Seesaw")]
+[RenameAxis(DeviceNames.Pedals, Axis.Slider1, "LeftToeBrake")]
+[RenameAxis(DeviceNames.Pedals, Axis.Slider2, "RightToeBrake")]
 // right stick
 [RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
-
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
 // left stick
 [RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
-
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
@@ -85,7 +103,6 @@ BuildAndRunAsConsole(new()
 // vjoy device
 [RenameButton(DeviceNames.VJoy1, 1, "Fire")]
 [RenameButton(DeviceNames.VJoy1, 79, "CenterHeadTracking")]
-
 [RenameAxis(DeviceNames.VJoy1, Axis.X, "Roll")]
 [RenameAxis(DeviceNames.VJoy1, Axis.Y, "Pitch")]
 [RenameAxis(DeviceNames.VJoy1, Axis.Z, "Yaw")]
@@ -93,7 +110,6 @@ BuildAndRunAsConsole(new()
 [RenameAxis(DeviceNames.VJoy1, Axis.Ry, "ZoomInOut")]
 [RenameAxis(DeviceNames.VJoy1, Axis.Slider1, "ZoomIn")]
 [RenameAxis(DeviceNames.VJoy1, Axis.Slider2, "ZoomOut")]
-
 [RenameButton(DeviceNames.VJoy1, 71, "SwitchToWeaponGroup1")]
 [RenameButton(DeviceNames.VJoy1, 72, "SwitchToWeaponGroup2")]
 [RenameButton(DeviceNames.VJoy1, 20, "HoldForZoom")]

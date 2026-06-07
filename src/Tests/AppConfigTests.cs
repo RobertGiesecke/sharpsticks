@@ -415,7 +415,7 @@ public sealed class AppConfigTests : IDisposable
 		{
 			NormalCurve = new AxisCurve { Max = 1.0 },
 			PrecisionCurve = new AxisCurve { Max = 0.5 },
-			ModifierAxis = stick.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned },
+			ModifierAxes = [stick.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned }],
 		};
 
 		var config = new AppConfig
@@ -603,7 +603,7 @@ public sealed class AppConfigTests : IDisposable
 			{
 				NormalCurve = new AxisCurve { Max = 1.0 },
 				PrecisionCurve = new AxisCurve { Max = 0.2 },
-				ModifierAxis = new(stickDeviceId, Axis.Slider1, AxisMode.Unsigned),
+				ModifierAxes = [new AxisBinding(stickDeviceId, Axis.Slider1, AxisMode.Unsigned)],
 				Stateful = true,
 			},
 			Stateful = WhenButtonPressedStateful.WhenPressed,

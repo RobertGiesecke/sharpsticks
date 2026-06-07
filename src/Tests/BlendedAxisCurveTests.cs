@@ -342,7 +342,7 @@ public sealed class BlendedAxisCurveTests : IDisposable
 	{
 		NormalCurve = new AxisCurve { Max = normalMax },
 		PrecisionCurve = new AxisCurve { Max = precisionMax },
-		ModifierAxis = _Stick.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned },
+		ModifierAxes = [_Stick.BindAxis(Axis.Slider1) with { Mode = AxisMode.Unsigned }],
 		Stateful = stateful,
 	};
 
