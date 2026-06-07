@@ -251,8 +251,20 @@ File.WriteAllText(OutputFile, content);
                  Condition="'@(_TransitiveAnalyzerProject)' != ''">
             <Output TaskParameter="TargetOutputs" ItemName="_TransitiveAnalyzerOutput"/>
         </MSBuild>
+        <!--
+            A consumer can end up holding the generator twice: file-based scripts inside
+            this repo get it from the nupkg (the #:package nuspec dependency) AND injected
+            here via a merged.props written by an earlier #:project-mode build. Two copies
+            of the same generator double every AddSource (CS0101/CS0102/CS0229 duplicates),
+            so skip any output whose assembly is already an Analyzer item — package
+            analyzers are resolved before BeforeTargets="CoreCompile" targets run.
+        -->
+        <PropertyGroup>
+            <_ExistingAnalyzerFileNames>;@(Analyzer->'%(Filename)');</_ExistingAnalyzerFileNames>
+        </PropertyGroup>
         <ItemGroup>
-            <Analyzer Include="@(_TransitiveAnalyzerOutput)"/>
+            <Analyzer Include="@(_TransitiveAnalyzerOutput)"
+                      Condition="!$(_ExistingAnalyzerFileNames.Contains(';%(_TransitiveAnalyzerOutput.Filename);'))"/>
         </ItemGroup>
     </Target>
 
