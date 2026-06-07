@@ -34,4 +34,53 @@ public abstract class JoystickDevice : IDisposable, IJoystickDevice
 	public virtual void Dispose()
 	{
 	}
+
+	internal sealed class DeviceIdComparer<TDevice> : IComparer<TDevice>, IEqualityComparer<TDevice>
+		where TDevice : JoystickDevice
+	{
+		public static DeviceIdComparer<TDevice> Instance { get; } = new();
+
+		public bool Equals(TDevice? x, TDevice? y)
+		{
+			if (ReferenceEquals(x, y))
+			{
+				return true;
+			}
+
+			if (x is null)
+			{
+				return false;
+			}
+
+			if (y is null)
+			{
+				return false;
+			}
+
+			return x.DeviceId == y.DeviceId;
+		}
+
+		public int GetHashCode(TDevice obj) => obj.DeviceId;
+
+		public int Compare(TDevice? x, TDevice? y) =>
+			(x, y) switch
+			{
+				(null, null) => 0,
+				(null, _) => -1,
+				(_, null) => 1,
+				(_, _) => x?.DeviceId.CompareTo(y?.DeviceId) ?? 0,
+			};
+	}
+}
+
+public static class JoystickDeviceExtensions
+{
+	extension<TDevice>(TDevice device)
+		where TDevice : JoystickDevice
+	{
+		public static IComparer<TDevice> DeviceIdComparer =>
+			JoystickDevice.DeviceIdComparer<TDevice>.Instance;
+		public static IEqualityComparer<TDevice> DeviceIdEqualityComparer =>
+			JoystickDevice.DeviceIdComparer<TDevice>.Instance;
+	}
 }
