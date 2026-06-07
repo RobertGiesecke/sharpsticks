@@ -26,17 +26,17 @@ public static class LinuxOutputSetup
 	{
 		if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
 		{
-			System.Console.Error.WriteLine("setup uinput only works on Linux.");
+			Console.Error.WriteLine("setup uinput only works on Linux.");
 			Environment.Exit(2);
 		}
 
 		if (!IsRoot())
 		{
-			System.Console.Error.WriteLine("setup uinput must be run as root (e.g. via sudo / doas).");
+			Console.Error.WriteLine("setup uinput must be run as root (e.g. via sudo / doas).");
 			Environment.Exit(2);
 		}
 
-		System.Console.WriteLine("Setting up uinput...");
+		Console.WriteLine("Setting up uinput...");
 
 		LoadUinputModule();
 		WriteUdevRule();
@@ -44,12 +44,12 @@ public static class LinuxOutputSetup
 		AddInvokingUserToInputGroup();
 		ValidateOutputDevices(buttonRoutes, axisRoutes, macroButtonNumbers);
 
-		System.Console.WriteLine();
-		System.Console.WriteLine("Setup complete.");
-		System.Console.WriteLine("If you were just added to the 'input' group, log out and back in");
-		System.Console.WriteLine("(or run 'newgrp input' in your current shell) for the membership");
-		System.Console.WriteLine("to take effect. After that, the application can be run as your");
-		System.Console.WriteLine("normal user — no sudo needed for input/output.");
+		Console.WriteLine();
+		Console.WriteLine("Setup complete.");
+		Console.WriteLine("If you were just added to the 'input' group, log out and back in");
+		Console.WriteLine("(or run 'newgrp input' in your current shell) for the membership");
+		Console.WriteLine("to take effect. After that, the application can be run as your");
+		Console.WriteLine("normal user — no sudo needed for input/output.");
 	}
 
 	private static bool IsRoot()
@@ -70,17 +70,17 @@ public static class LinuxOutputSetup
 		var (code, _, _) = RunCapturing("modprobe", "uinput");
 		if (code == 0)
 		{
-			System.Console.WriteLine("  ✓ uinput kernel module loaded");
+			Console.WriteLine("  ✓ uinput kernel module loaded");
 			return;
 		}
 
 		if (File.Exists("/dev/uinput"))
 		{
-			System.Console.WriteLine("  ✓ /dev/uinput already present (kernel built-in or pre-loaded)");
+			Console.WriteLine("  ✓ /dev/uinput already present (kernel built-in or pre-loaded)");
 			return;
 		}
 
-		System.Console.Error.WriteLine("  ✗ Could not load uinput module and /dev/uinput is missing.");
+		Console.Error.WriteLine("  ✗ Could not load uinput module and /dev/uinput is missing.");
 		Environment.Exit(3);
 	}
 
@@ -88,13 +88,13 @@ public static class LinuxOutputSetup
 	{
 		if (File.Exists(UdevRulePath) && File.ReadAllText(UdevRulePath) == UdevRuleBody)
 		{
-			System.Console.WriteLine($"  ✓ udev rule already present at {UdevRulePath}");
+			Console.WriteLineInterpolated($"  ✓ udev rule already present at {UdevRulePath}");
 			return;
 		}
 
 		Directory.CreateDirectory(Path.GetDirectoryName(UdevRulePath)!);
 		File.WriteAllText(UdevRulePath, UdevRuleBody);
-		System.Console.WriteLine($"  ✓ wrote udev rule {UdevRulePath}");
+		Console.WriteLineInterpolated($"  ✓ wrote udev rule {UdevRulePath}");
 	}
 
 	private static void ReloadUdev()
@@ -103,11 +103,11 @@ public static class LinuxOutputSetup
 		var trigger = RunCapturing("udevadm", "trigger", "--subsystem-match=misc", "--attr-match=name=uinput");
 		if (reload.code == 0 && trigger.code == 0)
 		{
-			System.Console.WriteLine("  ✓ udev rules reloaded and triggered");
+			Console.WriteLine("  ✓ udev rules reloaded and triggered");
 		}
 		else
 		{
-			System.Console.WriteLine("  ! udevadm reload/trigger reported non-zero — reboot may be required");
+			Console.WriteLine("  ! udevadm reload/trigger reported non-zero — reboot may be required");
 		}
 	}
 
@@ -117,26 +117,26 @@ public static class LinuxOutputSetup
 		           ?? Environment.GetEnvironmentVariable("DOAS_USER");
 		if (string.IsNullOrEmpty(user))
 		{
-			System.Console.WriteLine("  ! SUDO_USER / DOAS_USER not set; skipping group membership.");
-			System.Console.WriteLine("    Run 'usermod -aG input <user>' manually for the user that will use SharpSticks.");
+			Console.WriteLine("  ! SUDO_USER / DOAS_USER not set; skipping group membership.");
+			Console.WriteLine("    Run 'usermod -aG input <user>' manually for the user that will use SharpSticks.");
 			return;
 		}
 
 		var groups = RunCapturing("id", "-Gn", user);
 		if (groups.code == 0 && groups.stdout.Split(' ', '\t', '\n').Any(g => g.Trim() == "input"))
 		{
-			System.Console.WriteLine($"  ✓ user '{user}' already in 'input' group");
+			Console.WriteLineInterpolated($"  ✓ user '{user}' already in 'input' group");
 			return;
 		}
 
 		var addResult = RunCapturing("usermod", "-aG", "input", user);
 		if (addResult.code == 0)
 		{
-			System.Console.WriteLine($"  ✓ added user '{user}' to 'input' group");
+			Console.WriteLineInterpolated($"  ✓ added user '{user}' to 'input' group");
 		}
 		else
 		{
-			System.Console.WriteLine($"  ! usermod -aG input {user} returned exit code {addResult.code}");
+			Console.WriteLineInterpolated($"  ! usermod -aG input {user} returned exit code {addResult.code}");
 		}
 	}
 
@@ -153,7 +153,7 @@ public static class LinuxOutputSetup
 
 		if (deviceIds.Length == 0)
 		{
-			System.Console.WriteLine("  i no output devices declared in routes; skipping per-device validation");
+			Console.WriteLine("  i no output devices declared in routes; skipping per-device validation");
 			return;
 		}
 
@@ -169,14 +169,14 @@ public static class LinuxOutputSetup
 			try
 			{
 				using var probe = factory.EnumerateConnectedOutputDevices(
-					new[] { new OutputDeviceRequest(deviceId, deviceButtons, deviceAxes, deviceMacroButtons) });
-				System.Console.WriteLine(
+					[new(deviceId, deviceButtons, deviceAxes, deviceMacroButtons)]);
+				Console.WriteLineInterpolated(
 					$"  ✓ output device {deviceId} created + destroyed " +
 					$"({deviceAxes.Length} axes, {deviceButtons.Length} buttons)");
 			}
 			catch (Exception ex)
 			{
-				System.Console.Error.WriteLine($"  ✗ output device {deviceId}: {ex.Message}");
+				Console.Error.WriteLineInterpolated($"  ✗ output device {deviceId}: {ex.Message}");
 				Environment.Exit(4);
 			}
 		}

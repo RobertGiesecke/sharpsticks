@@ -51,7 +51,7 @@ catch (InvalidOperationException ex)
 	return 1;
 }
 
-Console.WriteLine($"Created virtual device id={deviceId}. Sending 5s of events...");
+Console.WriteLineInterpolated($"Created virtual device id={deviceId}. Sending 5s of events...");
 
 using (device)
 {
@@ -70,7 +70,7 @@ using (device)
 		Thread.Sleep(10);
 	}
 
-	Console.WriteLine($"Sent {count} update bursts. Dropping device.");
+	Console.WriteLineInterpolated($"Sent {count} update bursts. Dropping device.");
 }
 
 Console.WriteLine("Done.");

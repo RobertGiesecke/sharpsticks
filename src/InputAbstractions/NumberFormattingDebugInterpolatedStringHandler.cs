@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -18,6 +19,7 @@ public ref struct NumberFormattingDebugInterpolatedStringHandler
 		bool isEmpty,
 		int literalLength,
 		int formattedCount,
+		[StringSyntax(StringSyntaxAttribute.NumericFormat)]
 		string numberFormat = "0.0000",
 		int maxFormattedLength = 15)
 	{
@@ -30,6 +32,7 @@ public ref struct NumberFormattingDebugInterpolatedStringHandler
 	public NumberFormattingDebugInterpolatedStringHandler(
 		int literalLength,
 		int formattedCount,
+		[StringSyntax(StringSyntaxAttribute.NumericFormat)]
 		string numberFormat = "0.0000",
 		int maxFormattedLength = 15) : this(false, literalLength, formattedCount, numberFormat, maxFormattedLength)
 	{
@@ -59,11 +62,31 @@ public ref struct NumberFormattingDebugInterpolatedStringHandler
 		_Handler.AppendFormatted(destination);
 	}
 
-	public void AppendFormatted(DateTime value, ReadOnlySpan<char> format)
+	public void AppendFormatted(DateTime value,
+		[StringSyntax(StringSyntaxAttribute.DateTimeFormat)] ReadOnlySpan<char> format)
 	{
 		ThrowIfEmpty();
 		Span<char> destination = stackalloc char[100];
 		if (!value.TryFormat(destination, out var chars, format, CultureInfo.InvariantCulture))
+		{
+			AppendFormatted("xxxx-xx-xx");
+			return;
+		}
+
+		destination = destination[..chars];
+		_Handler.AppendFormatted(destination);
+	}
+
+	public void AppendFormatted(Guid value)
+	{
+		AppendFormatted(value, "d");
+	}
+
+	public void AppendFormatted(Guid value, [StringSyntax(StringSyntaxAttribute.GuidFormat)] ReadOnlySpan<char> format)
+	{
+		ThrowIfEmpty();
+		Span<char> destination = stackalloc char[70];
+		if (!value.TryFormat(destination, out var chars, format))
 		{
 			AppendFormatted("xxxx-xx-xx");
 			return;
