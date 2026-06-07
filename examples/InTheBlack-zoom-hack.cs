@@ -1,5 +1,5 @@
-//#:project ../src/Console/Console.csproj
-#:package SharpSticks.Editor@0.1.0-linux16
+#:project ../src/Console/Console.csproj
+//#:package SharpSticks.Editor@0.1.0-linux16
 
 [assembly:GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 [assembly:RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
@@ -16,6 +16,7 @@ var modifierBlendCurve = new BlendedAxisCurve
 
 BuildAndRunAsConsole(new()
 {
+
 	Name = "ItB minimal + scaled rotations",
 	Routes =
 	[
@@ -49,10 +50,10 @@ BuildAndRunAsConsole(new()
 		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: modifierBlendCurve),
 		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever, scale: 2, offset: -1),
 		// simulate absolute zoom with 2 virtual relative axes
-		..LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
+		LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
 		{
 			IncreaseAxis = VJoy1.Axes.ZoomIn,
-			DecreaseAxis = VJoy1.Axes.ZoomOut,
+			DecreaseAxis = VJoy1.Axes.ZoomIn,
 			Gain = 8.0,
 			MinOutput = 0.001,
 			ErrorTolerance = 0.00003,
