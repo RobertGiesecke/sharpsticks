@@ -77,14 +77,17 @@ BuildAndRunAsConsole(new()
 			// Tune to just above where the game starts reacting.
 			MinOutput = 0.15,
 			ErrorTolerance = 0.00003,
-			IncreaseEdgeBoost = 55.5,
-			DecreaseEdgeBoost = 55.5,
-			// Output smoothing time (pulse 0→1) in seconds; small = snappy.
-			OutputRiseSeconds = 0.2,
-			OutputFallSeconds = 0.2,
+			// Pin the lever at a rail → drive a full pulse that way for this
+			// long, so the game is slammed to the stop and mirrors the lever.
+			// Set ≥ the *TimeToFull below (the game's full-travel time).
+			IncreaseEdgeHoldTime = TimeSpan.FromSeconds(1.2),
+			DecreaseEdgeHoldTime = TimeSpan.FromSeconds(1.2),
+			// Output smoothing time (pulse 0→1); small = snappy.
+			OutputRiseTime = TimeSpan.FromSeconds(0.2),
+			OutputFallTime = TimeSpan.FromSeconds(0.2),
 			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
-			IncreaseSecondsToFull = 1.0,
-			DecreaseSecondsToFull = 1.0,
+			IncreaseTimeToFull = TimeSpan.FromSeconds(1),
+			DecreaseTimeToFull = TimeSpan.FromSeconds(1),
 		}),
 	],
 });

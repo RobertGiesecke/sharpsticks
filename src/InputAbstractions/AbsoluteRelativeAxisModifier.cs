@@ -5,6 +5,10 @@ namespace SharpSticks.InputAbstractions;
 
 internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 {
+	// Normalized target within this of a rail counts as "at the edge" for the
+	// edge-hold; clamped mapping yields exact 0/1 at/beyond the source extremes.
+	private const double EdgeEpsilon = 1e-9;
+
 	private readonly SharedState _SharedState;
 
 	// null = bidirectional: both directions on one output axis, resting at
@@ -85,8 +89,10 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		public double LastActualIncrease { get; private set; }
 		public double LastActualDecrease { get; private set; }
 		public RelativeDirection? LastActiveDirection { get; private set; }
-		public double LastIncreaseBias { get; private set; } = 1.0;
-		public double LastDecreaseBias { get; private set; } = 1.0;
+
+		/// <summary>The target, normalized to [0,1] across the range — 1 at the
+		/// top rail, 0 at the bottom. Used to detect the edge-hold extremes.</summary>
+		public double NormalizedTargetFor(double input) => NormalizeTarget(MapInputToTarget(input));
 
 		public double GetDesiredPulseMagnitude(double input, RelativeDirection direction)
 		{
@@ -113,26 +119,6 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			}
 
 			var output = Math.Abs(error) * _Options.Gain;
-			var normalizedTarget = NormalizeTarget(target);
-			var edgeBias = direction switch
-			{
-				RelativeDirection.Increase => 1.0 + Math.Max(0.0, _Options.IncreaseEdgeBoost) * normalizedTarget,
-				RelativeDirection.Decrease =>
-					1.0 + Math.Max(0.0, _Options.DecreaseEdgeBoost) * (1.0 - normalizedTarget),
-				_ => 1.0,
-			};
-			if (direction == RelativeDirection.Increase)
-			{
-				LastIncreaseBias = edgeBias;
-				LastDecreaseBias = 1.0 + Math.Max(0.0, _Options.DecreaseEdgeBoost) * (1.0 - normalizedTarget);
-			}
-			else
-			{
-				LastDecreaseBias = edgeBias;
-				LastIncreaseBias = 1.0 + Math.Max(0.0, _Options.IncreaseEdgeBoost) * normalizedTarget;
-			}
-
-			output *= edgeBias;
 			var outputMagnitude = Math.Min(output, Math.Abs(_Options.MaxOutput));
 			if (outputMagnitude <= 0.0)
 			{
@@ -223,13 +209,13 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		}
 
 		// Range-per-second the model advances at full pulse for a direction.
-		// A non-finite or non-positive SecondsToFull freezes the model (0).
+		// A zero or negative TimeToFull freezes the model (0).
 		private double UnitsPerSecond(RelativeDirection direction)
 		{
-			var secondsToFull = direction == RelativeDirection.Increase
-				? _Options.IncreaseSecondsToFull
-				: _Options.DecreaseSecondsToFull;
-			return double.IsFinite(secondsToFull) && secondsToFull > 0.0
+			var secondsToFull = (direction == RelativeDirection.Increase
+				? _Options.IncreaseTimeToFull
+				: _Options.DecreaseTimeToFull).TotalSeconds;
+			return secondsToFull > 0.0
 				? (_Maximum - _Minimum) / secondsToFull
 				: 0.0;
 		}
@@ -348,10 +334,8 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 				null => "none",
 			}} " +
 #pragma warning restore CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
-			$"bias+={sharedState.LastIncreaseBias} " +
 			$"desired+={sharedState.LastDesiredIncrease} " +
 			$"actual+={sharedState.LastActualIncrease} " +
-			$"bias-={sharedState.LastDecreaseBias} " +
 			$"desired-={sharedState.LastDesiredDecrease} " +
 			$"actual-={sharedState.LastActualDecrease}";
 	}
@@ -365,18 +349,27 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		{
 			public double IncreasePulse;
 			public double DecreasePulse;
+			public double IncreaseEdgeHeldSeconds;
+			public double DecreaseEdgeHeldSeconds;
 			public long LastTimestamp;
 			public bool HasTimestamp;
 		}
 
 		private readonly double _OutputRiseSeconds;
 		private readonly double _OutputFallSeconds;
+		private readonly double _MaxOutput;
+		private readonly double _IncreaseEdgeHoldSeconds;
+		private readonly double _DecreaseEdgeHoldSeconds;
 
 		public BidirectionalRuntimeModifier(SharedState sharedState, ITimeSource timeSource)
 			: base(sharedState, timeSource)
 		{
-			_OutputRiseSeconds = sharedState.Options.OutputRiseSeconds;
-			_OutputFallSeconds = sharedState.Options.OutputFallSeconds;
+			var options = sharedState.Options;
+			_OutputRiseSeconds = options.OutputRiseTime.TotalSeconds;
+			_OutputFallSeconds = options.OutputFallTime.TotalSeconds;
+			_MaxOutput = Math.Abs(options.MaxOutput);
+			_IncreaseEdgeHoldSeconds = options.IncreaseEdgeHoldTime.TotalSeconds;
+			_DecreaseEdgeHoldSeconds = options.DecreaseEdgeHoldTime.TotalSeconds;
 		}
 
 		protected override double Apply(double input, JoystickState?[] states, ref PulseState state, ApplyMode mode)
@@ -389,6 +382,23 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			var elapsedSeconds = ElapsedSeconds(state.HasTimestamp, state.LastTimestamp, now);
 			var desiredIncrease = SharedState.GetDesiredPulseMagnitude(input, RelativeDirection.Increase);
 			var desiredDecrease = SharedState.GetDesiredPulseMagnitude(input, RelativeDirection.Decrease);
+
+			// Edge hold: while the input is pinned at a rail, force full drive
+			// for the configured time so the consumer is slammed to that rail
+			// no matter what the model believes.
+			var normalizedTarget = SharedState.NormalizedTargetFor(input);
+			var atTop = normalizedTarget >= 1.0 - EdgeEpsilon;
+			var atBottom = normalizedTarget <= EdgeEpsilon;
+			if (atTop && state.IncreaseEdgeHeldSeconds < _IncreaseEdgeHoldSeconds)
+			{
+				desiredIncrease = _MaxOutput;
+			}
+
+			if (atBottom && state.DecreaseEdgeHeldSeconds < _DecreaseEdgeHoldSeconds)
+			{
+				desiredDecrease = _MaxOutput;
+			}
+
 			state.IncreasePulse =
 				Slew(state.IncreasePulse, desiredIncrease, _OutputRiseSeconds, _OutputFallSeconds, elapsedSeconds);
 			state.DecreasePulse =
@@ -402,6 +412,8 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			var net = Math.Clamp(state.IncreasePulse, 0.0, 1.0) - Math.Clamp(state.DecreasePulse, 0.0, 1.0);
 			if (mode == ApplyMode.Update)
 			{
+				state.IncreaseEdgeHeldSeconds = atTop ? state.IncreaseEdgeHeldSeconds + elapsedSeconds : 0.0;
+				state.DecreaseEdgeHeldSeconds = atBottom ? state.DecreaseEdgeHeldSeconds + elapsedSeconds : 0.0;
 				SharedState.AdvanceNet(input, net, elapsedSeconds);
 				state.LastTimestamp = now;
 				state.HasTimestamp = true;
@@ -421,6 +433,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		internal struct PulseState
 		{
 			public double CurrentPulseMagnitude;
+			public double EdgeHeldSeconds;
 			public long LastTimestamp;
 			public bool HasTimestamp;
 		}
@@ -429,16 +442,23 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		private readonly double _RestPosition;
 		private readonly double _OutputRiseSeconds;
 		private readonly double _OutputFallSeconds;
+		private readonly double _MaxOutput;
+		private readonly double _EdgeHoldSeconds;
 		private readonly bool _IsDebugOwner;
 
 		public DualAxesRuntimeModifier(
 			SharedState sharedState, RelativeDirection direction, double restPosition, ITimeSource timeSource)
 			: base(sharedState, timeSource)
 		{
+			var options = sharedState.Options;
 			_Direction = direction;
 			_RestPosition = restPosition;
-			_OutputRiseSeconds = sharedState.Options.OutputRiseSeconds;
-			_OutputFallSeconds = sharedState.Options.OutputFallSeconds;
+			_OutputRiseSeconds = options.OutputRiseTime.TotalSeconds;
+			_OutputFallSeconds = options.OutputFallTime.TotalSeconds;
+			_MaxOutput = Math.Abs(options.MaxOutput);
+			_EdgeHoldSeconds = (direction == RelativeDirection.Increase
+				? options.IncreaseEdgeHoldTime
+				: options.DecreaseEdgeHoldTime).TotalSeconds;
 			_IsDebugOwner = direction == RelativeDirection.Decrease;
 		}
 
@@ -452,10 +472,23 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			var now = TimeSource.GetTimestamp();
 			var elapsedSeconds = ElapsedSeconds(state.HasTimestamp, state.LastTimestamp, now);
 			var desiredPulseMagnitude = SharedState.GetDesiredPulseMagnitude(input, _Direction);
+
+			// Edge hold: this direction's own rail (top for Increase, bottom for
+			// Decrease) — force full drive there for the configured time.
+			var normalizedTarget = SharedState.NormalizedTargetFor(input);
+			var atEdge = _Direction == RelativeDirection.Increase
+				? normalizedTarget >= 1.0 - EdgeEpsilon
+				: normalizedTarget <= EdgeEpsilon;
+			if (atEdge && state.EdgeHeldSeconds < _EdgeHoldSeconds)
+			{
+				desiredPulseMagnitude = _MaxOutput;
+			}
+
 			state.CurrentPulseMagnitude = Slew(state.CurrentPulseMagnitude, desiredPulseMagnitude,
 				_OutputRiseSeconds, _OutputFallSeconds, elapsedSeconds);
 			if (mode == ApplyMode.Update)
 			{
+				state.EdgeHeldSeconds = atEdge ? state.EdgeHeldSeconds + elapsedSeconds : 0.0;
 				SharedState.Advance(input, _Direction, state.CurrentPulseMagnitude, elapsedSeconds);
 				state.LastTimestamp = now;
 				state.HasTimestamp = true;
