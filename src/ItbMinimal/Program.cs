@@ -11,7 +11,7 @@ var groupedZoomAxes = Pedals.Axes.RightToeBrake.GroupWith(LeftStick.Axes.BrakeLe
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 2.4d },
-	PrecisionCurve = new AxisCurve { Max = 0.11d },
+	PrecisionCurve = new AxisCurve { Max = 0.05d },
 	// Whichever is engaged furthest wins — ModifierAxes takes the max.
 	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
 	ModifierAxes =
@@ -73,7 +73,7 @@ BuildAndRunAsConsole(new()
 			// Must clear the game's deadzone: pulses below it advance the
 			// model but not the game, so the zoom never reaches the stops.
 			// Tune to just above where the game starts reacting.
-			MinOutput = 0.15,
+			MinOutput = 0.015,
 			ErrorTolerance = 0.00003,
 			// Pin the lever at a rail → drive a full pulse that way for this
 			// long, so the game is slammed to the stop and mirrors the lever.
@@ -84,8 +84,8 @@ BuildAndRunAsConsole(new()
 			OutputRiseTime = FromSeconds(0.2),
 			OutputFallTime = FromSeconds(0.2),
 			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
-			IncreaseTimeToFull = FromSeconds(1),
-			DecreaseTimeToFull = FromSeconds(1),
+			IncreaseTimeToFull = FromSeconds(1.2),
+			DecreaseTimeToFull = FromSeconds(1.2),
 		}),
 	],
 });
