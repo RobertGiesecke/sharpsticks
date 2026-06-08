@@ -5,10 +5,10 @@ namespace SharpSticks.Tests;
 /// (`BindingExtensions.RouteAbsoluteRelative`). Each test drives the runtime
 /// frame-by-frame with <see cref="Step"/>, which advances virtual time by
 /// exactly one second per frame. The model rate is wall-clock based
-/// (<c>step = pulse · (range / SecondsToFull) · elapsedSeconds</c>), so with a
-/// 1 s frame and range 1 a <c>SecondsToFull</c> of <c>N</c> advances the model
-/// by <c>pulse / N</c> per frame — e.g. <c>SecondsToFull = 4</c> ⇒ 0.25/frame.
-/// <see cref="double.PositiveInfinity"/> freezes the model (used to isolate the
+/// (<c>step = pulse · (range / TimeToFull) · elapsedSeconds</c>), so with a
+/// 1 s frame and range 1 a <c>TimeToFull</c> of <c>N</c> s advances the model
+/// by <c>pulse / N</c> per frame — e.g. <c>TimeToFull = 4 s</c> ⇒ 0.25/frame.
+/// <see cref="TimeSpan.Zero"/> freezes the model (used to isolate the
 /// output pulse). <c>IncreaseRestPosition=DecreaseRestPosition=0.5</c> in most
 /// tests so the signed-output mapping simplifies to <c>output == pulse</c>.
 /// </summary>
@@ -56,7 +56,7 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	public void PositiveError_PulsesIncreaseAxis_DecreaseHoldsRest()
 	{
 		using var runtime = BuildRuntime(
-			MakeOptions(initial: 0.0) with { OutputRiseSeconds = 1.0, Gain = 1.0 });
+			MakeOptions(initial: 0.0) with { OutputRiseTime = TimeSpan.FromSeconds(1.0), Gain = 1.0 });
 
 		// target=1, error=1 → desired pulse = error*Gain = 1, capped at MaxOutput=1.
 		_Stick.SetAxisValue(Axis.X, 1.0);
@@ -69,7 +69,7 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	public void NegativeError_PulsesDecreaseAxis_IncreaseHoldsRest()
 	{
 		using var runtime = BuildRuntime(
-			MakeOptions(initial: 1.0) with { OutputRiseSeconds = 1.0, OutputFallSeconds = 1.0, Gain = 1.0 });
+			MakeOptions(initial: 1.0) with { OutputRiseTime = TimeSpan.FromSeconds(1.0), OutputFallTime = TimeSpan.FromSeconds(1.0), Gain = 1.0 });
 
 		// target=0, error=-1 → Decrease pulses at magnitude 1.
 		_Stick.SetAxisValue(Axis.X, 0.0);
@@ -83,9 +83,9 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
-			IncreaseSecondsToFull = 4.0,  // full range in 4 s → 0.25/frame at 1 s/frame
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.FromSeconds(4.0),  // full range in 4 s → 0.25/frame at 1 s/frame
 			Gain = 10.0,                  // saturate pulse to MaxOutput while error > 0.1
 			ErrorTolerance = 1e-6,
 		});
@@ -114,9 +114,9 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 			SourceInputMaximum = 0.8,
 			Minimum = 0.0,
 			Maximum = 1.0,
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,  // freeze Current so we inspect pulse alone
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.Zero,  // freeze Current so we inspect pulse alone
 			Gain = 1.0,
 		});
 
@@ -149,9 +149,9 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,  // freeze Current
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.Zero,  // freeze Current
 			Gain = gain,
 		});
 
@@ -165,8 +165,8 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.Zero,
 			Gain = 10.0,
 			MaxOutput = 0.3,
 		});
@@ -181,8 +181,8 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.Zero,
 			Gain = 0.1,
 			MinOutput = 0.2,
 		});
@@ -198,8 +198,8 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.5) with
 		{
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
 			Gain = 10.0,
 			ErrorTolerance = 0.05,
 		});
@@ -212,13 +212,13 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	}
 
 	[Fact]
-	public void OutputRiseSeconds_LimitsPulseRiseSpeed()
+	public void OutputRiseTime_LimitsPulseRiseSpeed()
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 5.0,  // 0→1 over 5 s → 0.2/frame at 1 s/frame
-			OutputFallSeconds = 5.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,  // freeze Current so desired stays saturated
+			OutputRiseTime = TimeSpan.FromSeconds(5.0),  // 0→1 over 5 s → 0.2/frame at 1 s/frame
+			OutputFallTime = TimeSpan.FromSeconds(5.0),
+			IncreaseTimeToFull = TimeSpan.Zero,  // freeze Current so desired stays saturated
 			Gain = 10.0,
 			Maximum = 10.0,      // keep error large
 		});
@@ -237,13 +237,13 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	}
 
 	[Fact]
-	public void OutputFallSeconds_LimitsPulseFallSpeed_WhenDesiredDropsToZero()
+	public void OutputFallTime_LimitsPulseFallSpeed_WhenDesiredDropsToZero()
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 4.0,  // 1→0 over 4 s → 0.25/frame at 1 s/frame
-			IncreaseSecondsToFull = double.PositiveInfinity,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(4.0),  // 1→0 over 4 s → 0.25/frame at 1 s/frame
+			IncreaseTimeToFull = TimeSpan.Zero,
 			Gain = 1.0,
 		});
 
@@ -263,49 +263,81 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	}
 
 	[Fact]
-	public void IncreaseEdgeBoost_AmplifiesPulse_AsTargetApproachesMax()
+	public void IncreaseEdgeHoldTime_ForcesFullPulse_WhileInputPinnedAtTop()
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,
-			Gain = 0.1,
-			IncreaseEdgeBoost = 2.0,
+			OutputRiseTime = TimeSpan.Zero,  // instant slew → output == desired pulse
+			OutputFallTime = TimeSpan.Zero,
+			IncreaseTimeToFull = TimeSpan.Zero,  // freeze the model
+			Gain = 0.1,                          // normal pulse would be a tiny 0.1
+			IncreaseEdgeHoldTime = TimeSpan.FromSeconds(2),
 		});
 
-		// Target at midpoint: edgeBias = 1 + 2 * 0.5 = 2. Base = 0.5*0.1 = 0.05. Out = 0.1.
-		_Stick.SetAxisValue(Axis.X, 0.5);
-		Step(runtime);
-		Assert.Equal(0.1, _Output.GetAxisValue(Axis.Slider1), Precision);
-
-		// Target at max: edgeBias = 1 + 2 * 1 = 3. Base = 1*0.1 = 0.1. Out = 0.3.
+		// Input pinned at top → full MaxOutput pulse forced for 2 s (frames 1-2),
+		// then the dwell expires and the pulse falls back to the normal 0.1.
 		_Stick.SetAxisValue(Axis.X, 1.0);
-		Step(runtime);
-		Assert.Equal(0.3, _Output.GetAxisValue(Axis.Slider1), Precision);
+		Step(runtime);  // held 0 → 1 s
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		Step(runtime);  // held 1 → 2 s
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		Step(runtime);  // held ≥ 2 s → dwell over → normal pulse |error|*Gain = 0.1
+		Assert.Equal(0.1, _Output.GetAxisValue(Axis.Slider1), Precision);
 	}
 
 	[Fact]
-	public void DecreaseEdgeBoost_AmplifiesPulse_AsTargetApproachesMin()
+	public void EdgeHoldTimer_RestartsEachTimeInputReEntersTheEdge()
+	{
+		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
+		{
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+			IncreaseTimeToFull = TimeSpan.Zero,
+			Gain = 0.1,
+			IncreaseEdgeHoldTime = TimeSpan.FromSeconds(2),
+		});
+
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		Step(runtime);  // at top, held → 1 s, forced full
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// Leave the top → timer resets to 0; target=0.5 with frozen model gives
+		// normal pulse 0.5*0.1 = 0.05.
+		_Stick.SetAxisValue(Axis.X, 0.5);
+		Step(runtime);
+		Assert.Equal(0.05, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// Re-enter the top → fresh 2 s dwell, full pulse again.
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		Step(runtime);
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void DecreaseEdgeHoldTime_ForcesFullPulse_WhileInputPinnedAtBottom()
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 1.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,
-			DecreaseSecondsToFull = double.PositiveInfinity,  // freeze Current on the Decrease side too
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+			IncreaseTimeToFull = TimeSpan.Zero,
+			DecreaseTimeToFull = TimeSpan.Zero,  // freeze the model on the Decrease side
 			Gain = 0.1,
-			DecreaseEdgeBoost = 2.0,
+			DecreaseEdgeHoldTime = TimeSpan.FromSeconds(2),
 		});
 
-		// Target at midpoint: edgeBias = 1 + 2 * (1 - 0.5) = 2. Base = 0.5*0.1 = 0.05. Out = 0.1.
-		_Stick.SetAxisValue(Axis.X, 0.5);
-		Step(runtime);
-		Assert.Equal(0.1, _Output.GetAxisValue(Axis.Slider2), Precision);
-
-		// Target at min: edgeBias = 1 + 2 * 1 = 3. Base = 1*0.1 = 0.1. Out = 0.3.
+		// Input pinned at bottom → full decrease pulse forced for 2 s, then 0.1.
 		_Stick.SetAxisValue(Axis.X, 0.0);
 		Step(runtime);
-		Assert.Equal(0.3, _Output.GetAxisValue(Axis.Slider2), Precision);
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider2), Precision);
+
+		Step(runtime);
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider2), Precision);
+
+		Step(runtime);
+		Assert.Equal(0.1, _Output.GetAxisValue(Axis.Slider2), Precision);
 	}
 
 	[Fact]
@@ -316,9 +348,9 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		{
 			IncreaseRestPosition = 0.0,
 			DecreaseRestPosition = 0.0,
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.Zero,
 			Gain = 1.0,
 		});
 
@@ -345,8 +377,8 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		{
 			Minimum = 1.0,
 			Maximum = 0.0,
-			OutputRiseSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.Zero,
 			Gain = 1.0,
 		});
 
@@ -363,9 +395,9 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		{
 			Minimum = 0.0,
 			Maximum = 1.0,
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
-			IncreaseSecondsToFull = double.PositiveInfinity,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.Zero,
 			Gain = 1.0,
 		});
 
@@ -393,7 +425,7 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	public void SameAxis_PositiveError_PulsesPositive()
 	{
 		using var runtime = BuildRuntime(
-			MakeSameAxisOptions(initial: 0.0) with { OutputRiseSeconds = 1.0, Gain = 1.0 });
+			MakeSameAxisOptions(initial: 0.0) with { OutputRiseTime = TimeSpan.FromSeconds(1.0), Gain = 1.0 });
 
 		// target=1, error=+1 → increase pulse 1 → output +1.
 		_Stick.SetAxisValue(Axis.X, 1.0);
@@ -405,7 +437,7 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	public void SameAxis_NegativeError_PulsesNegative()
 	{
 		using var runtime = BuildRuntime(
-			MakeSameAxisOptions(initial: 1.0) with { OutputRiseSeconds = 1.0, OutputFallSeconds = 1.0, Gain = 1.0 });
+			MakeSameAxisOptions(initial: 1.0) with { OutputRiseTime = TimeSpan.FromSeconds(1.0), OutputFallTime = TimeSpan.FromSeconds(1.0), Gain = 1.0 });
 
 		// target=0, error=-1 → decrease pulse 1 → output -1.
 		_Stick.SetAxisValue(Axis.X, 0.0);
@@ -418,10 +450,10 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	{
 		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.0) with
 		{
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 1.0,
-			IncreaseSecondsToFull = 4.0,  // 0.25/frame at 1 s/frame
-			DecreaseSecondsToFull = 4.0,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.FromSeconds(4.0),  // 0.25/frame at 1 s/frame
+			DecreaseTimeToFull = TimeSpan.FromSeconds(4.0),
 			Gain = 10.0,
 			ErrorTolerance = 1e-6,
 		});
@@ -459,10 +491,10 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		// the decrease pulse rises — the output must be the net of the two.
 		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.5) with
 		{
-			OutputRiseSeconds = 1.0,
-			OutputFallSeconds = 2.5,  // 1→0 over 2.5 s → 0.4/frame at 1 s/frame
-			IncreaseSecondsToFull = double.PositiveInfinity,
-			DecreaseSecondsToFull = double.PositiveInfinity,
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(2.5),  // 1→0 over 2.5 s → 0.4/frame at 1 s/frame
+			IncreaseTimeToFull = TimeSpan.Zero,
+			DecreaseTimeToFull = TimeSpan.Zero,
 			Gain = 10.0,
 		});
 

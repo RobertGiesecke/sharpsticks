@@ -11,13 +11,13 @@ namespace SharpSticks.InputAbstractions;
 /// It is a closed loop with two halves you must calibrate <b>to each other</b>:
 /// <list type="number">
 ///   <item><b>The pulse the consumer sees</b> — sized by <see cref="Gain"/>,
-///   bounded by <see cref="MinOutput"/>/<see cref="MaxOutput"/>, shaped by
-///   <see cref="IncreaseEdgeBoost"/>/<see cref="DecreaseEdgeBoost"/>, and
-///   smoothed by <see cref="OutputRiseSeconds"/>/<see cref="OutputFallSeconds"/>.</item>
+///   bounded by <see cref="MinOutput"/>/<see cref="MaxOutput"/>, forced to full
+///   at the rails by <see cref="IncreaseEdgeHoldTime"/>/<see cref="DecreaseEdgeHoldTime"/>,
+///   and smoothed by <see cref="OutputRiseTime"/>/<see cref="OutputFallTime"/>.</item>
 ///   <item><b>The internal model</b> — advanced by
-///   <see cref="IncreaseSecondsToFull"/>/<see cref="DecreaseSecondsToFull"/>.
-///   When the model reaches the target (within <see cref="ErrorTolerance"/>) it
-///   stops pulsing.</item>
+///   <see cref="IncreaseTimeToFull"/>/<see cref="DecreaseTimeToFull"/>. When the
+///   model reaches the target (within <see cref="ErrorTolerance"/>) it stops
+///   pulsing.</item>
 /// </list>
 /// The cardinal failure mode is a mismatch between the two: if the model
 /// advances faster than the consumer actually moves, it declares "arrived" and
@@ -30,15 +30,19 @@ namespace SharpSticks.InputAbstractions;
 ///   make full physical travel map to full target travel.</item>
 ///   <item><see cref="MinOutput"/> — raise until a slow pull reliably moves the
 ///   consumer (clears its deadzone), no higher.</item>
-///   <item><see cref="IncreaseSecondsToFull"/>/<see cref="DecreaseSecondsToFull"/>
-///   — set to the real device's full-travel time at 100% pulse, then nudge
-///   until holding the lever steady parks the consumer at the matching spot
-///   with no residual undershoot/overshoot. This is the calibration knob.</item>
-///   <item><see cref="Gain"/>, then the edge boosts and slew rates — for feel.</item>
+///   <item><see cref="IncreaseTimeToFull"/>/<see cref="DecreaseTimeToFull"/> —
+///   set to the real device's full-travel time at 100% pulse, then nudge until
+///   holding the lever steady parks the consumer at the matching spot with no
+///   residual undershoot/overshoot. This is the calibration knob.</item>
+///   <item><see cref="IncreaseEdgeHoldTime"/>/<see cref="DecreaseEdgeHoldTime"/>
+///   — if pinning the lever at a rail still doesn't quite bottom/top the
+///   consumer, set this to guarantee a full-drive burst there.</item>
+///   <item><see cref="Gain"/> and the slew times — for feel.</item>
 /// </list></para>
 ///
-/// Every rate here is wall-clock based (seconds), so behavior is independent
-/// of the device's USB report rate and stays stable as that rate drifts.
+/// Every duration is a <see cref="TimeSpan"/> integrated against wall-clock
+/// elapsed time, so behavior is independent of the device's USB report rate and
+/// stays stable as that rate drifts.
 /// </summary>
 public readonly record struct AbsoluteRelativeAxisOptions()
 {
@@ -92,8 +96,8 @@ public readonly record struct AbsoluteRelativeAxisOptions()
 	/// <summary>
 	/// Bottom of the simulated value's range and of the target the input maps
 	/// into. The scale is arbitrary but the rate knobs are expressed against
-	/// it, so changing it means re-tuning <see cref="IncreaseSecondsToFull"/>/
-	/// <see cref="DecreaseSecondsToFull"/> and <see cref="ErrorTolerance"/>. If
+	/// it, so changing it means re-tuning <see cref="IncreaseTimeToFull"/>/
+	/// <see cref="DecreaseTimeToFull"/> and <see cref="ErrorTolerance"/>. If
 	/// <see cref="Minimum"/> &gt; <see cref="Maximum"/> the two are swapped.
 	/// </summary>
 	public double Minimum { get; init; } = 0.0;
@@ -111,11 +115,11 @@ public readonly record struct AbsoluteRelativeAxisOptions()
 
 	/// <summary>
 	/// Proportional gain: the raw desired pulse is <c>|error| · Gain</c> (before
-	/// edge boost, and before the <see cref="MinOutput"/>/<see cref="MaxOutput"/>
-	/// clamp). Higher reaches <see cref="MaxOutput"/> sooner and corrects harder
-	/// when far from target; the pulse saturates while <c>|error| · Gain ≥
-	/// MaxOutput</c>, so very high values lose the proportional ease-in near the
-	/// target. Too low feels sluggish and may never exceed <see cref="MinOutput"/>.
+	/// the <see cref="MinOutput"/>/<see cref="MaxOutput"/> clamp). Higher reaches
+	/// <see cref="MaxOutput"/> sooner and corrects harder when far from target;
+	/// the pulse saturates while <c>|error| · Gain ≥ MaxOutput</c>, so very high
+	/// values lose the proportional ease-in near the target. Too low feels
+	/// sluggish and may never exceed <see cref="MinOutput"/>.
 	/// </summary>
 	public double Gain { get; init; } = 4.0;
 
@@ -146,53 +150,57 @@ public readonly record struct AbsoluteRelativeAxisOptions()
 	public double ErrorTolerance { get; init; } = 0.001;
 
 	/// <summary>
-	/// Multiplies the pulse as the target nears <see cref="Maximum"/>:
-	/// <c>bias = 1 + IncreaseEdgeBoost · proximityToMax</c>. Compensates for
-	/// consumers whose value crawls near the top end. <c>0</c> = off (linear);
-	/// large values strongly accelerate the final push to the top stop.
+	/// While the input is pinned at the <b>top</b> (target = <see cref="Maximum"/>),
+	/// drive a full (<see cref="MaxOutput"/>) increase pulse for this long,
+	/// regardless of what the model believes. Guarantees the consumer is slammed
+	/// all the way to the rail so it mirrors a fully-engaged lever — set it to
+	/// roughly the consumer's full-travel time (≥ <see cref="IncreaseTimeToFull"/>)
+	/// to be sure. The timer restarts each time the input re-enters the top.
+	/// <see cref="TimeSpan.Zero"/> = off.
 	/// </summary>
-	public double IncreaseEdgeBoost { get; init; }
+	public TimeSpan IncreaseEdgeHoldTime { get; init; } = TimeSpan.Zero;
 
 	/// <summary>
-	/// Multiplies the pulse as the target nears <see cref="Minimum"/>:
-	/// <c>bias = 1 + DecreaseEdgeBoost · proximityToMin</c>.
-	/// <inheritdoc cref="IncreaseEdgeBoost"/>
+	/// While the input is pinned at the <b>bottom</b> (target = <see cref="Minimum"/>),
+	/// drive a full decrease pulse for this long.
+	/// <inheritdoc cref="IncreaseEdgeHoldTime"/>
 	/// </summary>
-	public double DecreaseEdgeBoost { get; init; }
+	public TimeSpan DecreaseEdgeHoldTime { get; init; } = TimeSpan.Zero;
 
 	/// <summary>
-	/// Seconds for the emitted pulse to ramp across its full 0→1 magnitude at
-	/// the slew limit (wall-clock, frame-rate independent) — smoothing so the
-	/// output doesn't snap between pulse levels while rising. Larger = smoother
-	/// but laggier onset; <c>0</c> (or negative) = instant, no smoothing.
+	/// Time for the emitted pulse to ramp across its full 0→1 magnitude at the
+	/// slew limit (wall-clock, frame-rate independent) — smoothing so the output
+	/// doesn't snap between pulse levels while rising. Larger = smoother but
+	/// laggier onset; <see cref="TimeSpan.Zero"/> (or negative) = instant, no
+	/// smoothing.
 	/// </summary>
-	public double OutputRiseSeconds { get; init; } = 0.05;
+	public TimeSpan OutputRiseTime { get; init; } = TimeSpan.FromMilliseconds(50);
 
 	/// <summary>
-	/// Seconds for the emitted pulse to ramp across its full range at the slew
-	/// limit while falling (e.g. when the target is reached or the direction
-	/// flips). <inheritdoc cref="OutputRiseSeconds"/>
+	/// Time for the emitted pulse to ramp across its full range while falling
+	/// (e.g. when the target is reached or the direction flips).
+	/// <inheritdoc cref="OutputRiseTime"/>
 	/// </summary>
-	public double OutputFallSeconds { get; init; } = 0.05;
+	public TimeSpan OutputFallTime { get; init; } = TimeSpan.FromMilliseconds(50);
 
 	/// <summary>
-	/// <b>The calibration knob.</b> Seconds the consumer takes to traverse the
+	/// <b>The calibration knob.</b> Time the consumer takes to traverse the
 	/// <em>whole</em> range (<see cref="Minimum"/>→<see cref="Maximum"/>) at a
 	/// full (100%) pulse — i.e. how fast the real device responds. The model
-	/// advances <c>Current</c> by <c>pulse · (range / IncreaseSecondsToFull) ·
-	/// elapsedSeconds</c> each frame, so this is wall-clock based and
-	/// frame-rate independent: measure it once ("a 100% pulse drives the
-	/// consumer fully in ~1 s" → <c>1.0</c>) and it holds regardless of report
+	/// advances <c>Current</c> by <c>pulse · (range / IncreaseTimeToFull) ·
+	/// elapsed</c> each frame, so this is wall-clock based and frame-rate
+	/// independent: measure it once ("a 100% pulse drives the consumer fully in
+	/// ~1 s" → <c>TimeSpan.FromSeconds(1)</c>) and it holds regardless of report
 	/// rate. Too small makes the model think it arrived early → stops pulsing →
 	/// <b>undershoot</b>; too large lags the consumer → <b>overshoot</b>.
-	/// <c>0</c>, negative, or <see cref="double.PositiveInfinity"/> freezes the
-	/// model (it never advances — useful for isolating the output pulse).
+	/// <see cref="TimeSpan.Zero"/> or negative freezes the model (it never
+	/// advances — useful for isolating the output pulse).
 	/// </summary>
-	public double IncreaseSecondsToFull { get; init; } = 1.0;
+	public TimeSpan IncreaseTimeToFull { get; init; } = TimeSpan.FromSeconds(1);
 
 	/// <summary>
-	/// Seconds to traverse the whole range at full pulse while decreasing.
-	/// <inheritdoc cref="IncreaseSecondsToFull"/>
+	/// Time to traverse the whole range at full pulse while decreasing.
+	/// <inheritdoc cref="IncreaseTimeToFull"/>
 	/// </summary>
-	public double DecreaseSecondsToFull { get; init; } = 1.0;
+	public TimeSpan DecreaseTimeToFull { get; init; } = TimeSpan.FromSeconds(1);
 }

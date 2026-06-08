@@ -1,3 +1,5 @@
+using static System.TimeSpan;
+
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
 [assembly: RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
@@ -33,7 +35,7 @@ BuildAndRunAsConsole(new()
 				VJoy1.Buttons.Fire.Release(),
 				// switch to weapon group 2
 				VJoy1.Buttons.SwitchToWeaponGroup2.Press(),
-				WaitFor(TimeSpan.FromMilliseconds(15)),
+				WaitFor(FromMilliseconds(15)),
 				VJoy1.Buttons.SwitchToWeaponGroup2.Release(),
 			],
 			OnRelease =
@@ -42,7 +44,7 @@ BuildAndRunAsConsole(new()
 				VJoy1.Buttons.Fire.Release(),
 				// switch to weapon group 1
 				VJoy1.Buttons.SwitchToWeaponGroup1.Press(),
-				WaitFor(TimeSpan.FromMilliseconds(15)),
+				WaitFor(FromMilliseconds(15)),
 				VJoy1.Buttons.SwitchToWeaponGroup1.Release(),
 			],
 		}),
@@ -73,14 +75,17 @@ BuildAndRunAsConsole(new()
 			// Tune to just above where the game starts reacting.
 			MinOutput = 0.15,
 			ErrorTolerance = 0.00003,
-			IncreaseEdgeBoost = 55.5,
-			DecreaseEdgeBoost = 55.5,
-			// Output smoothing time (pulse 0→1) in seconds; small = snappy.
-			OutputRiseSeconds = 0.2,
-			OutputFallSeconds = 0.2,
+			// Pin the lever at a rail → drive a full pulse that way for this
+			// long, so the game is slammed to the stop and mirrors the lever.
+			// Set ≥ the *TimeToFull below (the game's full-travel time).
+			IncreaseEdgeHoldTime = FromSeconds(1.2),
+			DecreaseEdgeHoldTime = FromSeconds(1.2),
+			// Output smoothing time (pulse 0→1); small = snappy.
+			OutputRiseTime = FromSeconds(0.2),
+			OutputFallTime = FromSeconds(0.2),
 			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
-			IncreaseSecondsToFull = 1.0,
-			DecreaseSecondsToFull = 1.0,
+			IncreaseTimeToFull = FromSeconds(1),
+			DecreaseTimeToFull = FromSeconds(1),
 		}),
 	],
 });
