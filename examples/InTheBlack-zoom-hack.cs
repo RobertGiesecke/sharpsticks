@@ -1,6 +1,8 @@
 #!/usr/bin/env dotnet
 
-#:package SharpSticks.Editor@0.1.0-debug03
+#:package SharpSticks.Editor@0.1.0-debug04
+
+using static System.TimeSpan;
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
@@ -13,7 +15,7 @@ var groupedZoomAxes = Pedals.Axes.RightToeBrake.GroupWith(LeftStick.Axes.BrakeLe
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 2.4d },
-	PrecisionCurve = new AxisCurve { Max = 0.11d },
+	PrecisionCurve = new AxisCurve { Max = 0.05d },
 	// Whichever is engaged furthest wins — ModifierAxes takes the max.
 	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
 	ModifierAxes =
@@ -37,7 +39,7 @@ BuildAndRunAsConsole(new()
 				VJoy1.Buttons.Fire.Release(),
 				// switch to weapon group 2
 				VJoy1.Buttons.SwitchToWeaponGroup2.Press(),
-				WaitFor(TimeSpan.FromMilliseconds(15)),
+				WaitFor(FromMilliseconds(15)),
 				VJoy1.Buttons.SwitchToWeaponGroup2.Release(),
 			],
 			OnRelease =
@@ -46,7 +48,7 @@ BuildAndRunAsConsole(new()
 				VJoy1.Buttons.Fire.Release(),
 				// switch to weapon group 1
 				VJoy1.Buttons.SwitchToWeaponGroup1.Press(),
-				WaitFor(TimeSpan.FromMilliseconds(15)),
+				WaitFor(FromMilliseconds(15)),
 				VJoy1.Buttons.SwitchToWeaponGroup1.Release(),
 			],
 		}),
@@ -75,19 +77,19 @@ BuildAndRunAsConsole(new()
 			// Must clear the game's deadzone: pulses below it advance the
 			// model but not the game, so the zoom never reaches the stops.
 			// Tune to just above where the game starts reacting.
-			MinOutput = 0.15,
+			MinOutput = 0.015,
 			ErrorTolerance = 0.00003,
 			// Pin the lever at a rail → drive a full pulse that way for this
 			// long, so the game is slammed to the stop and mirrors the lever.
 			// Set ≥ the *TimeToFull below (the game's full-travel time).
-			IncreaseEdgeHoldTime = TimeSpan.FromSeconds(1.2),
-			DecreaseEdgeHoldTime = TimeSpan.FromSeconds(1.2),
+			IncreaseEdgeHoldTime = FromSeconds(1.2),
+			DecreaseEdgeHoldTime = FromSeconds(1.2),
 			// Output smoothing time (pulse 0→1); small = snappy.
-			OutputRiseTime = TimeSpan.FromSeconds(0.2),
-			OutputFallTime = TimeSpan.FromSeconds(0.2),
+			OutputRiseTime = FromSeconds(0.2),
+			OutputFallTime = FromSeconds(0.2),
 			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
-			IncreaseTimeToFull = TimeSpan.FromSeconds(1),
-			DecreaseTimeToFull = TimeSpan.FromSeconds(1),
+			IncreaseTimeToFull = FromSeconds(1.2),
+			DecreaseTimeToFull = FromSeconds(1.2),
 		}),
 	],
 });
