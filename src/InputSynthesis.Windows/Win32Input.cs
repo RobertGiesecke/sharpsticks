@@ -32,12 +32,13 @@ internal static partial class Win32Input
 	public struct Input
 	{
 		public uint Type;
-		public InputUnion U;
+		public InputUnion Union;
 	}
 
 	[StructLayout(LayoutKind.Explicit)]
 	public struct InputUnion
 	{
+		// ReSharper disable once MemberHidesStaticFromOuterClass
 		[FieldOffset(0)] public MouseInput Mouse;
 		[FieldOffset(0)] public KeyboardInput Keyboard;
 	}
@@ -85,10 +86,10 @@ internal static partial class Win32Input
 			flags |= KeyEventKeyUp;
 		}
 
-		return new Input
+		return new()
 		{
 			Type = InputKeyboard,
-			U = new InputUnion { Keyboard = new KeyboardInput { Scan = scancode, Flags = flags } },
+			Union = new() { Keyboard = new() { Scan = scancode, Flags = flags } },
 		};
 	}
 
@@ -100,10 +101,10 @@ internal static partial class Win32Input
 			flags |= KeyEventKeyUp;
 		}
 
-		return new Input
+		return new()
 		{
 			Type = InputKeyboard,
-			U = new InputUnion { Keyboard = new KeyboardInput { Vk = vk, Flags = flags } },
+			Union = new() { Keyboard = new() { Vk = vk, Flags = flags } },
 		};
 	}
 
@@ -111,6 +112,6 @@ internal static partial class Win32Input
 		new()
 		{
 			Type = InputMouse,
-			U = new InputUnion { Mouse = new MouseInput { Flags = flags, MouseData = mouseData } },
+			Union = new() { Mouse = new() { Flags = flags, MouseData = mouseData } },
 		};
 }
