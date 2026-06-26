@@ -1,11 +1,10 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public interface IRuntimeContext<TInputDevice>
-	where TInputDevice : JoystickDevice
+public interface IRuntimeContext
 {
-	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
-	public ImmutableArray<TInputDevice> Devices { get; }
+
+	public OutputButtonStateIndex? TryGetOutputStateIndex(OutputButtonBinding binding);
 
 	/// <summary>
 	/// The runtime's clock — modifiers that integrate over wall-clock time
@@ -13,4 +12,11 @@ public interface IRuntimeContext<TInputDevice>
 	/// frames. Tests inject a fake to advance virtual time deterministically.
 	/// </summary>
 	public ITimeSource TimeSource { get; }
+}
+
+public interface IRuntimeContext<TInputDevice> : IRuntimeContext
+	where TInputDevice : JoystickDevice
+{
+	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
+	public ImmutableArray<TInputDevice> Devices { get; }
 }

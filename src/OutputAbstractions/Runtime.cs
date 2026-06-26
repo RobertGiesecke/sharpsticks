@@ -10,10 +10,11 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	public string Name { get; }
 	private readonly DebugLogger? _DebugLogger;
 	private readonly ImmutableArray<OutputAxisRoute> _AxisRoutes;
+	private readonly OutputButtonState[] _OutputButtonStates;
 	private readonly ImmutableArray<OutputButtonWithBindings> _ButtonRoutes;
 	private readonly ImmutableArray<OutputAxisToButtonRoute> _AxisToButtonRoutes;
 	private long? _AxisZoneNextDeadlineTicks;
-	private readonly FrozenDictionary<OutputButtonBinding, OutputButtonWithBindings> _ButtonRoutesByBinding;
+	private readonly FrozenDictionary<OutputButtonBinding, OutputButtonStateIndex> _OutputButtonStateIndexByBinding;
 	private readonly ImmutableArray<TInputDevice> _Devices;
 	private readonly ImmutableArray<TOutputDevice> _OutputDevices;
 	private readonly MacroEngine? _Macros;
@@ -25,36 +26,14 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	public ImmutableArray<TInputDevice> Devices => _Devices;
 	public ITimeSource TimeSource => _Time;
 
+	public OutputButtonStateIndex? TryGetOutputStateIndex(OutputButtonBinding binding) =>
+		_OutputButtonStateIndexByBinding.TryGetValue(binding, out var index) ? index : null;
+
 	private record struct OutputButtonState
 	{
 		public int Pressers;
 		public int Suppressors;
 		public bool WasRouteAssertingLastFrame;
-	}
-
-	/// <summary>
-	/// One entry per distinct output button (route- or macro-targeted, or both).
-	/// Tracks current assertions across all sources via <see cref="Pressers"/>
-	/// and macro release-overrides via <see cref="Suppressors"/>. The button is
-	/// held when <c>Pressers &gt; 0 &amp;&amp; Suppressors == 0</c>.
-	/// </summary>
-	private sealed class OutputButtonWithBindings
-	{
-		public required TOutputDevice OutputDevice { get; init; }
-		public required int TargetButton { get; init; }
-		public required OutputButtonBinding TargetBinding { get; init; }
-		public required ImmutableArray<ButtonBindingWithDeviceId> Bindings { get; init; }
-
-		private OutputButtonState _OutputButtonState;
-		public int Pressers => _OutputButtonState.Pressers;
-		public int Suppressors => _OutputButtonState.Suppressors;
-		public bool WasRouteAssertingLastFrame => _OutputButtonState.WasRouteAssertingLastFrame;
-
-		public void SetWasRouteAssertingLastFrame(bool value)
-		{
-			ref var outputButtonState = ref _OutputButtonState;
-			outputButtonState.WasRouteAssertingLastFrame = value;
-		}
 
 		public static void IncrementPressers(ref OutputButtonState outputButtonState) => outputButtonState.Pressers++;
 
@@ -65,16 +44,24 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			outputButtonState.Suppressors--;
 
 		public static void DecrementPressers(ref OutputButtonState outputButtonState) => outputButtonState.Pressers--;
-
-		public void IncrementPressers() => IncrementPressers(ref _OutputButtonState);
-		public void IncrementSuppressors() => IncrementSuppressors(ref _OutputButtonState);
-		public void DecrementSuppressors() => DecrementSuppressors(ref _OutputButtonState);
-		public void DecrementPressers() => DecrementPressers(ref _OutputButtonState);
 	}
 
-	private sealed class ButtonBindingWithDeviceId
+	/// <summary>
+	/// One entry per distinct output button (route- or macro-targeted, or both).
+	/// Tracks current assertions across all sources via <see cref="Pressers"/>
+	/// and macro release-overrides via <see cref="Suppressors"/>. The button is
+	/// held when <c>Pressers &gt; 0 &amp;&amp; Suppressors == 0</c>.
+	/// </summary>
+	private sealed class OutputButtonWithBindings
 	{
-		public required ButtonBinding ButtonBinding { get; init; }
+		public required OutputButtonStateIndex OutputButtonStateIndex { get; init; }
+		public required TOutputDevice OutputDevice { get; init; }
+		public required int TargetButton { get; init; }
+		public required OutputButtonBinding TargetBinding { get; init; }
+
+		public required bool IsFirstBinding { get; init; }
+		public required bool IsLastBinding { get; init; }
+		public required ButtonBinding? ButtonBinding { get; init; }
 		public required int SourceDeviceIndex { get; init; }
 	}
 
@@ -101,7 +88,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public required bool IncludeMax { get; init; }
 		public required AxisZoneTriggerMode Mode { get; init; }
 		public required long PulseDurationTicks { get; init; }
-		public required OutputButtonWithBindings Output { get; init; }
+		public required OutputButtonStateIndex OutputButtonStateIndex { get; init; }
 
 		public bool IsAsserting;
 		public long PulseDeadlineTicks;
@@ -170,31 +157,60 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			.GroupBy(t => t.OutputBinding)
 			.ToPooledDictionary(g => g.Key, g => g.ToArray());
 
-		_ButtonRoutes =
-		[
-			..allOutputButtons.Select(binding =>
+		{
+			using var flattenedButtonBindings = new PooledList<OutputButtonWithBindings>();
+			using var outputButtonsStates = new PooledList<OutputButtonState>(allOutputButtons.Count);
+			using var outputButtonStateIndexByBinding = new PooledDictionary<OutputButtonBinding, OutputButtonStateIndex>(allOutputButtons.Count);
+
+			foreach (var binding in allOutputButtons)
 			{
-				// ReSharper disable once AccessToDisposedClosure
+				outputButtonsStates.Add(new());
+				var outputButtonStateIndex = new OutputButtonStateIndex(outputButtonsStates.Count - 1);
+				outputButtonStateIndexByBinding.Add(binding, outputButtonStateIndex);
 				var sources = bindingsByOutput.GetValueOrDefault(binding, []);
-				return new OutputButtonWithBindings
+				if (sources is not { Length: > 0 })
 				{
-					// ReSharper disable once AccessToDisposedClosure
-					OutputDevice = outputDevices[outputDeviceIndexes[binding.OutputDeviceId]],
-					TargetButton = binding.ButtonNumber,
-					TargetBinding = binding,
-					Bindings =
-					[
-						..sources.Select(t => t.Binding)
-							.Distinct()
-							.Select(t => new ButtonBindingWithDeviceId
-							{
-								ButtonBinding = t,
-								SourceDeviceIndex = DeviceIndexesById[t.DeviceId],
-							}),
-					],
-				};
-			}),
-		];
+					flattenedButtonBindings.Add(new()
+					{
+						OutputButtonStateIndex = outputButtonStateIndex,
+						// ReSharper disable once AccessToDisposedClosure
+						OutputDevice = outputDevices[outputDeviceIndexes[binding.OutputDeviceId]],
+						TargetButton = binding.ButtonNumber,
+						TargetBinding = binding,
+						ButtonBinding = default,
+						SourceDeviceIndex = -1,
+						IsFirstBinding = true,
+						IsLastBinding = true,
+					});
+					continue;
+				}
+				var lastIndex = sources.Length - 1;
+				for (var i = 0; i < sources.Length; i++)
+				{
+					var t = sources[i].Binding;
+					flattenedButtonBindings.Add(new()
+					{
+						OutputButtonStateIndex = outputButtonStateIndex,
+						// ReSharper disable once AccessToDisposedClosure
+						OutputDevice = outputDevices[outputDeviceIndexes[binding.OutputDeviceId]],
+						TargetButton = binding.ButtonNumber,
+						TargetBinding = binding,
+						ButtonBinding = t,
+						SourceDeviceIndex = DeviceIndexesById[t.DeviceId],
+						IsFirstBinding = i == 0,
+						IsLastBinding = i == lastIndex,
+					});
+				}
+			}
+
+			_OutputButtonStates = [..outputButtonsStates.Span];
+			_OutputButtonStateIndexByBinding = outputButtonStateIndexByBinding.ToFrozenDictionary();
+			_ButtonRoutes =
+			[
+				..flattenedButtonBindings.Span,
+			];
+		}
+
 		_AxisRoutes =
 		[
 			..mergedAxisRoutes.Select(route => new OutputAxisRoute
@@ -212,7 +228,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			})
 		];
 		_OutputDevices = outputDevices;
-		_ButtonRoutesByBinding = _ButtonRoutes.ToFrozenDictionary(r => r.TargetBinding);
+		
 		_AxisToButtonRoutes =
 		[
 			..mergedAxisToButtonRoutes.Select(route =>
@@ -229,7 +245,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 					IncludeMax = route.IncludeMax,
 					Mode = route.Mode,
 					PulseDurationTicks = durationTicks,
-					Output = _ButtonRoutesByBinding[route.OutputBinding],
+					OutputButtonStateIndex = _OutputButtonStateIndexByBinding[route.OutputBinding],
 				};
 			})
 		];
@@ -240,17 +256,39 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			: new MacroEngine(
 				mergedMacroRoutes,
 				DeviceIndexesById,
-				timeSource,
+				this,
 				IncrementPressers,
 				DecrementPressers,
 				IncrementSuppressors,
 				DecrementSuppressors);
 	}
 
-	private void IncrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].IncrementPressers();
-	private void DecrementPressers(OutputButtonBinding b) => _ButtonRoutesByBinding[b].DecrementPressers();
-	private void IncrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].IncrementSuppressors();
-	private void DecrementSuppressors(OutputButtonBinding b) => _ButtonRoutesByBinding[b].DecrementSuppressors();
+	private ref OutputButtonState GetRefOutputButtonState(OutputButtonStateIndex b) => 
+		ref _OutputButtonStates[b.Value];
+
+	private void IncrementPressers(OutputButtonStateIndex b)
+	{
+		ref var x = ref GetRefOutputButtonState(b);
+		OutputButtonState.IncrementPressers(ref x);
+	}
+
+	private void DecrementPressers(OutputButtonStateIndex b)
+	{
+		ref var x = ref GetRefOutputButtonState(b);
+		OutputButtonState.DecrementPressers(ref x);
+	}
+
+	private void IncrementSuppressors(OutputButtonStateIndex b)
+	{
+		ref var x = ref GetRefOutputButtonState(b);
+		OutputButtonState.IncrementSuppressors(ref x);
+	}
+
+	private void DecrementSuppressors(OutputButtonStateIndex b)
+	{
+		ref var x = ref GetRefOutputButtonState(b);
+		OutputButtonState.DecrementSuppressors(ref x);
+	}
 
 	private readonly JoystickState?[] _CurrentStates;
 	private readonly PooledSet<int> _LastReportedReadFailure;
@@ -372,11 +410,11 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 				switch (inRange)
 				{
 					case true when !route.IsAsserting:
-						route.Output.IncrementPressers();
+						OutputButtonState.IncrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
 						route.IsAsserting = true;
 						break;
 					case false when route.IsAsserting:
-						route.Output.DecrementPressers();
+						OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
 						route.IsAsserting = false;
 						break;
 				}
@@ -389,7 +427,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			{
 				if (now >= route.PulseDeadlineTicks)
 				{
-					route.Output.DecrementPressers();
+					OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
 					route.IsAsserting = false;
 					route.PulseCooldown = inRange;
 				}
@@ -407,7 +445,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			}
 			else if (inRange)
 			{
-				route.Output.IncrementPressers();
+				OutputButtonState.IncrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
 				route.IsAsserting = true;
 				route.PulseDeadlineTicks = now + route.PulseDurationTicks;
 				if (earliestDeadline is null || route.PulseDeadlineTicks < earliestDeadline)
@@ -423,57 +461,75 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
 	private void ApplyButtons(JoystickState?[] states, DebugLogger? debugLines)
 	{
+		ButtonBinding? assertingBinding = null;
+
 		foreach (var route in _ButtonRoutes)
 		{
-			ButtonBinding? assertingBinding = null;
-			foreach (var buttonBindingW in route.Bindings)
+			if (route.IsFirstBinding)
 			{
-				if (states[buttonBindingW.SourceDeviceIndex] is not { } state)
-				{
-					continue;
-				}
-
-				var buttonBinding = buttonBindingW.ButtonBinding;
-
-				if (!state.IsButtonPressed(buttonBinding.ButtonNumber))
-				{
-					continue;
-				}
-
-				assertingBinding = buttonBinding;
-				break;
+				assertingBinding = null;
 			}
 
-			var routeAsserting = assertingBinding is not null;
-			if (routeAsserting != route.WasRouteAssertingLastFrame)
+			if (route is not { SourceDeviceIndex: >= 0, ButtonBinding: { } buttonBinding } ||
+			    states[route.SourceDeviceIndex] is not { } state)
 			{
-				if (routeAsserting)
-				{
-					route.IncrementPressers();
-				}
-				else
-				{
-					route.DecrementPressers();
-					// Falling edge ends the macro suppression window: a route's
-					// next press cycle should be free to assert again.
-					_Macros?.ClearSuppressionFor(route.TargetBinding);
-				}
-
-				route.SetWasRouteAssertingLastFrame(routeAsserting);
+				UpdateRouteButtonState(assertingBinding, route, debugLines);
+				continue;
 			}
 
-			var isPressed = route is { Pressers: > 0, Suppressors: 0 };
+			if (!state.IsButtonPressed(buttonBinding.ButtonNumber))
+			{
+				UpdateRouteButtonState(assertingBinding, route, debugLines);
+				continue;
+			}
 
-			debugLines?.WriteLine(
-				$"{(assertingBinding is { } bound
-					? Utils.FormatInterpolation($"button {bound.DeviceId}:{bound.ButtonNumber} -> ")
-					: isPressed
-						? Utils.FormatInterpolation($"macro -> ")
-						: NumberFormattingDebugInterpolatedStringHandler.Empty())}" +
-				$"output{route.OutputDevice.DeviceId}:{route.TargetButton} = {(isPressed ? "down" : "up")}");
-
-			route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
+			assertingBinding = buttonBinding;
+			UpdateRouteButtonState(assertingBinding, route, debugLines);
+			break;
 		}
+	}
+
+	private void UpdateRouteButtonState(
+		in ButtonBinding? assertingBinding,
+		in OutputButtonWithBindings route,
+		DebugLogger? debugLines)
+	{
+		if (!route.IsLastBinding)
+		{
+			return;
+		}
+
+		var routeAsserting = assertingBinding is not null;
+		ref var x = ref _OutputButtonStates[route.OutputButtonStateIndex.Value];
+
+		if (routeAsserting != x.WasRouteAssertingLastFrame)
+		{
+			if (routeAsserting)
+			{
+				OutputButtonState.IncrementPressers(ref x);
+			}
+			else
+			{
+				OutputButtonState.DecrementPressers(ref x);
+				// Falling edge ends the macro suppression window: a route's
+				// next press cycle should be free to assert again.
+				_Macros?.ClearSuppressionFor(route.OutputButtonStateIndex);
+			}
+
+			x.WasRouteAssertingLastFrame = routeAsserting;
+		}
+
+		var isPressed = x is { Pressers: > 0, Suppressors: 0 };
+
+		debugLines?.WriteLine(
+			$"{(assertingBinding is { } bound
+				? Utils.FormatInterpolation($"button {bound.DeviceId}:{bound.ButtonNumber} -> ")
+				: isPressed
+					? Utils.FormatInterpolation($"macro -> ")
+					: NumberFormattingDebugInterpolatedStringHandler.Empty())}" +
+			$"output{route.OutputDevice.DeviceId}:{route.TargetButton} = {(isPressed ? "down" : "up")}");
+
+		route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]

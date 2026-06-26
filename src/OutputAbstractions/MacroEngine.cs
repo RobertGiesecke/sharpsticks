@@ -22,22 +22,26 @@ internal sealed class MacroEngine : IDisposable
 
 	private readonly ImmutableArray<MacroRouteState> _Routes;
 	private readonly ITimeSource _Time;
-	private readonly Action<OutputButtonBinding> _IncPress;
-	private readonly Action<OutputButtonBinding> _DecPress;
-	private readonly Action<OutputButtonBinding> _IncSuppress;
-	private readonly Action<OutputButtonBinding> _DecSuppress;
+	public IRuntimeContext RuntimeContext { get; }
+	private readonly HandleOutputButtonBinding _IncPress;
+	private readonly HandleOutputButtonBinding _DecPress;
+	private readonly HandleOutputButtonBinding _IncSuppress;
+	private readonly HandleOutputButtonBinding _DecSuppress;
 	private readonly PooledStack<MacroSession> _SessionPool;
 
+	public delegate void HandleOutputButtonBinding(OutputButtonStateIndex button);
+	
 	public MacroEngine(
 		ImmutableArray<ButtonMacroRoute> routes,
 		FrozenDictionary<int, int> deviceIndexesById,
-		ITimeSource time,
-		Action<OutputButtonBinding> incrementPressers,
-		Action<OutputButtonBinding> decrementPressers,
-		Action<OutputButtonBinding> incrementSuppressors,
-		Action<OutputButtonBinding> decrementSuppressors)
+		IRuntimeContext runtimeContext,
+		HandleOutputButtonBinding incrementPressers,
+		HandleOutputButtonBinding decrementPressers,
+		HandleOutputButtonBinding incrementSuppressors,
+		HandleOutputButtonBinding decrementSuppressors)
 	{
-		_Time = time;
+		_Time = runtimeContext.TimeSource;
+		RuntimeContext = runtimeContext;
 		_IncPress = incrementPressers;
 		_DecPress = decrementPressers;
 		_IncSuppress = incrementSuppressors;
@@ -48,14 +52,14 @@ internal sealed class MacroEngine : IDisposable
 				this,
 				r,
 				deviceIndexesById[r.Binding.DeviceId],
-				time.Frequency)),
+				_Time.Frequency)),
 		];
 
 		var poolSize = Math.Max(DefaultSessionPoolSize, _Routes.Length);
 		_SessionPool = new(poolSize);
 		for (var i = 0; i < poolSize; i++)
 		{
-			_SessionPool.Push(new(this, time.Frequency));
+			_SessionPool.Push(new(this, _Time.Frequency));
 		}
 	}
 
@@ -99,7 +103,7 @@ internal sealed class MacroEngine : IDisposable
 	/// macro that has the button latched as "released-override" drops the
 	/// override so the next route press can assert again.
 	/// </summary>
-	public void ClearSuppressionFor(OutputButtonBinding button)
+	public void ClearSuppressionFor(OutputButtonStateIndex button)
 	{
 		foreach (var route in _Routes)
 		{
@@ -110,7 +114,7 @@ internal sealed class MacroEngine : IDisposable
 		}
 	}
 
-	internal void OnPress(MacroRouteState route, OutputButtonBinding button)
+	internal void OnPress(MacroRouteState route, OutputButtonStateIndex button)
 	{
 		if (route.ReleasedButtons.Remove(button))
 		{
@@ -123,7 +127,7 @@ internal sealed class MacroEngine : IDisposable
 		}
 	}
 
-	internal void OnRelease(MacroRouteState route, OutputButtonBinding button)
+	internal void OnRelease(MacroRouteState route, OutputButtonStateIndex button)
 	{
 		if (route.PressedButtons.Remove(button))
 		{
@@ -185,13 +189,66 @@ internal sealed class MacroRouteState : IDisposable
 {
 	private readonly MacroEngine _Engine;
 	private readonly long _Frequency;
+	private readonly ImmutableArray<IRuntimeMacroAction> _OnPress;
+	private readonly ImmutableArray<IRuntimeMacroAction> _OnRelease;
 
-	public MacroRouteState(MacroEngine engine, ButtonMacroRoute route, int sourceDeviceIndex, long frequency)
+	public MacroRouteState(
+		MacroEngine engine,
+		ButtonMacroRoute route,
+		int sourceDeviceIndex,
+		long frequency)
 	{
 		_Engine = engine;
 		Route = route;
 		SourceDeviceIndex = sourceDeviceIndex;
 		_Frequency = frequency;
+
+		_OnPress = CreateRuntimeActions(route.OnPress);
+		_OnRelease = CreateRuntimeActions(route.OnRelease);
+
+		// A route can press/release at most the distinct output buttons its
+		// actions can ever touch. Pre-size both sets to that bound so their
+		// backing is allocated here at build time, never lazily on the first
+		// macro fire inside the per-frame hot path.
+		var maxButtons = Math.Max(1, CountDistinctOutputs(route));
+		PressedButtons = new(maxButtons);
+		ReleasedButtons = new(maxButtons);
+	}
+
+	private static int CountDistinctOutputs(ButtonMacroRoute route)
+	{
+		using var outputs = new PooledSet<OutputButtonBinding>();
+		FillOutputs(route.OnPress, outputs);
+		FillOutputs(route.OnRelease, outputs);
+		return outputs.Count;
+
+		static void FillOutputs(ImmutableArray<IMacroAction> actions, ICollection<OutputButtonBinding> sink)
+		{
+			if (actions.IsDefaultOrEmpty)
+			{
+				return;
+			}
+
+			foreach (var action in actions)
+			{
+				action.FillOutputs(sink);
+			}
+		}
+	}
+
+	private ImmutableArray<IRuntimeMacroAction> CreateRuntimeActions(ImmutableArray<IMacroAction> actions)
+	{
+		if (actions.IsDefaultOrEmpty)
+		{
+			return [];
+		}
+		using var list = new PooledList<IRuntimeMacroAction>(actions.Length);
+		foreach (var macroAction in actions)
+		{
+			list.Add(macroAction.CreateRuntimeAction(_Engine.RuntimeContext));
+		}
+
+		return [..list.Span];
 	}
 
 	public ButtonMacroRoute Route { get; }
@@ -200,10 +257,10 @@ internal sealed class MacroRouteState : IDisposable
 	public PooledQueue<TriggerKind> Pending { get; } = new(4);
 
 	/// <summary>Buttons this route currently asserts via <c>Press</c>.</summary>
-	public PooledSet<OutputButtonBinding> PressedButtons { get; } = new();
+	public PooledSet<OutputButtonStateIndex> PressedButtons { get; }
 
 	/// <summary>Buttons this route currently force-releases via <c>Release</c>.</summary>
-	public PooledSet<OutputButtonBinding> ReleasedButtons { get; } = new();
+	public PooledSet<OutputButtonStateIndex> ReleasedButtons { get; }
 
 	public MacroSession? Running { get; private set; }
 	public long? NextDeadlineTicks { get; private set; }
@@ -281,10 +338,9 @@ internal sealed class MacroRouteState : IDisposable
 
 	private void StartFromQueue()
 	{
-		while (Pending.Count > 0)
+		while (Pending.TryDequeue(out var kind))
 		{
-			var kind = Pending.Dequeue();
-			var actions = kind is TriggerKind.OnPress ? Route.OnPress : Route.OnRelease;
+			var actions = kind is TriggerKind.OnPress ? _OnPress : _OnRelease;
 			if (actions.IsDefaultOrEmpty)
 			{
 				continue;
@@ -345,7 +401,7 @@ internal sealed class MacroSession : IDisposable, IMacroOutputSink
 		_FrameFreePool.Push(new());
 	}
 
-	public void Reset(MacroRouteState route, ImmutableArray<IMacroAction> actions)
+	public void Reset(MacroRouteState route, ImmutableArray<IRuntimeMacroAction> actions)
 	{
 		_Route = route;
 		NextStepDeadline = null;
@@ -368,8 +424,8 @@ internal sealed class MacroSession : IDisposable, IMacroOutputSink
 		NextStepDeadline = null;
 	}
 
-	void IMacroOutputSink.Press(OutputButtonBinding button) => _Engine.OnPress(_Route!, button);
-	void IMacroOutputSink.Release(OutputButtonBinding button) => _Engine.OnRelease(_Route!, button);
+	void IMacroOutputSink.Press(OutputButtonStateIndex button) => _Engine.OnPress(_Route!, button);
+	void IMacroOutputSink.Release(OutputButtonStateIndex button) => _Engine.OnRelease(_Route!, button);
 
 	public SessionStepResult Step(long now)
 	{
@@ -413,7 +469,7 @@ internal sealed class MacroSession : IDisposable, IMacroOutputSink
 		}
 	}
 
-	private void PushFrame(ImmutableArray<IMacroAction> actions)
+	private void PushFrame(ImmutableArray<IRuntimeMacroAction> actions)
 	{
 		MacroFrame frame;
 		if (_FrameFreePool.Count > 0)
@@ -439,6 +495,6 @@ internal sealed class MacroSession : IDisposable, IMacroOutputSink
 
 internal sealed class MacroFrame
 {
-	public ImmutableArray<IMacroAction> Actions;
+	public ImmutableArray<IRuntimeMacroAction> Actions;
 	public int Cursor;
 }
