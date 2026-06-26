@@ -205,7 +205,7 @@ public static class RuntimeBuilder
 
 				using var openedOutputs = CreateOutputDeviceList();
 
-				var outputDevices = openedOutputs.ToImmutableArray();
+				ImmutableArray<TOutputDevice> outputDevices = [..openedOutputs.Span];
 				try
 				{
 					return new Runtime<TInputDevice, TOutputDevice>(
