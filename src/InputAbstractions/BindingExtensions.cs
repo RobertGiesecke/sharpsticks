@@ -19,6 +19,31 @@ public static class BindingExtensions
 			SourceAxes = [binding, ..otherAxes],
 		};
 
+	public static GroupedSourceAxesWithModifiers WithModifier(
+		this GroupedSourceAxes sourceAxes,
+		IAxisModifier modifier) => new()
+	{
+		SourceAxes = [..sourceAxes.SourceAxes.WithModifier(modifier)],
+	};
+
+	public static IEnumerable<AxisBindingWithModifier> WithModifier(
+		this IEnumerable<AxisBinding> sourceAxes,
+		IAxisModifier modifier) =>
+		sourceAxes.Select(a => new AxisBindingWithModifier
+		{
+			SourceAxis = a,
+			Modifier = modifier,
+		});
+
+	public static AxisBindingWithModifier WithModifier(
+		this AxisBinding sourceAxis,
+		IAxisModifier modifier) =>
+		new()
+		{
+			SourceAxis = sourceAxis,
+			Modifier = modifier,
+		};
+
 	public static ImmutableArray<AxisRoute> RouteToSameAxesOnOutput(
 		this GroupedSourceAxes bindings,
 		uint outputDeviceId,
@@ -260,7 +285,9 @@ public static class BindingExtensions
 		}
 
 		return builder.MoveToImmutable();
-	}	public static IEnumerable<MultiAxesToButtonRoute> RouteZones(
+	}
+
+	public static IEnumerable<MultiAxesToButtonRoute> RouteZones(
 		this GroupedSourceAxes axes,
 		IEnumerable<AxisZone> zones,
 		AxisZoneOptions? options = null)
