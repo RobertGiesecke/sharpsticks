@@ -19,12 +19,14 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private readonly ImmutableArray<TOutputDevice> _OutputDevices;
 	private readonly MacroEngine? _Macros;
 	private readonly ITimeSource _Time;
+	private readonly IInputSynthesizer? _InputSynthesizer;
 
 	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
 	public ImmutableArray<TInputDevice> Devices => _Devices;
 	public ITimeSource TimeSource => _Time;
+	public IInputSynthesizer? InputSynthesizer => _InputSynthesizer;
 
 	public OutputButtonStateIndex? TryGetOutputStateIndex(OutputButtonBinding binding) =>
 		_OutputButtonStateIndexByBinding.TryGetValue(binding, out var index) ? index : null;
@@ -105,11 +107,13 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
-		ImmutableArray<TOutputDevice> outputDevices)
+		ImmutableArray<TOutputDevice> outputDevices,
+		IInputSynthesizer? inputSynthesizer = null)
 	{
 		Name = name;
 		_DebugLogger = debugLogger;
 		_Time = timeSource;
+		_InputSynthesizer = inputSynthesizer;
 		_Devices = [..devices.Values];
 		DevicesById = devices.ToFrozenDictionary();
 		{
@@ -379,6 +383,9 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		var shouldLogNow = debugLogger?.ShouldLogNow() is true;
 
 		_Macros?.Step(currentStates);
+		// Macros are the only source of synthesized key/mouse events; commit them
+		// once here. No-op when no synthesizer is configured or none were emitted.
+		_InputSynthesizer?.Flush();
 		StepAxisZones(currentStates);
 		ApplyButtons(currentStates, shouldLogNow ? debugLogger : null);
 		ApplyAxes(currentStates, shouldLogNow ? debugLogger : null);

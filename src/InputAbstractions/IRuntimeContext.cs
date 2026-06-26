@@ -12,6 +12,14 @@ public interface IRuntimeContext
 	/// frames. Tests inject a fake to advance virtual time deterministically.
 	/// </summary>
 	public ITimeSource TimeSource { get; }
+
+	/// <summary>
+	/// OS keyboard/mouse event sink that key/mouse macro actions drive, or
+	/// <c>null</c> when the profile doesn't synthesize input. Resolved once at
+	/// build time by the action; building a key/mouse macro against a runtime
+	/// with no synthesizer is a configuration error.
+	/// </summary>
+	public IInputSynthesizer? InputSynthesizer { get; }
 }
 
 public interface IRuntimeContext<TInputDevice> : IRuntimeContext
