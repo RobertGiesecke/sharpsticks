@@ -23,4 +23,5 @@
   <Project Path="src/Testing/Testing.csproj" />
   <Project Path="src/Tests/Tests.csproj" />
   <Project Path="src/VJoy/VJoy.csproj" />
+  <Project Path="src/InputSynthesis.Windows/InputSynthesis.Windows.csproj" />
 </Solution>

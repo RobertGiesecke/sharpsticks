@@ -7,13 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Collections.Pooled.V2" Version="2.4.1" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />
-      <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj" />
-      <ProjectReference Include="..\InputSynthesis.Windows\InputSynthesis.Windows.csproj" />
     </ItemGroup>
 
 </Project>
