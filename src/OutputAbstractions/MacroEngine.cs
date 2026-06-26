@@ -12,14 +12,6 @@ namespace SharpSticks.OutputAbstractions;
 /// </summary>
 internal sealed class MacroEngine : IDisposable
 {
-	/// <summary>
-	/// Floor on the number of pre-allocated <see cref="MacroSession"/> instances.
-	/// At runtime the pool can only ever drain to one borrow per macro route
-	/// (each route runs at most one session at a time), so a value well above
-	/// typical route counts keeps <see cref="RentSession"/> from ever allocating.
-	/// </summary>
-	internal const int DefaultSessionPoolSize = 100;
-
 	private readonly ImmutableArray<MacroRouteState> _Routes;
 	private readonly ITimeSource _Time;
 	public IRuntimeContext RuntimeContext { get; }
@@ -55,7 +47,12 @@ internal sealed class MacroEngine : IDisposable
 				_Time.Frequency)),
 		];
 
-		var poolSize = Math.Max(DefaultSessionPoolSize, _Routes.Length);
+		// Each route runs at most one session at a time (its single Running field;
+		// the reentry policies queue/drop/cancel rather than parallelize), so the
+		// pool can drain to at most one borrow per route. Pre-seeding exactly that
+		// many makes RentSession exhaustion-proof — it never allocates in the hot
+		// path — without over-allocating.
+		var poolSize = _Routes.Length;
 		_SessionPool = new(poolSize);
 		for (var i = 0; i < poolSize; i++)
 		{
