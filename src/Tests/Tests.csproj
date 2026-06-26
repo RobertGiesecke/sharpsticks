@@ -17,6 +17,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Config\Config.csproj" />
+        <ProjectReference Include="..\InputSynthesis.Windows\InputSynthesis.Windows.csproj" />
         <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj" />
         <ProjectReference Include="..\Testing\Testing.csproj" />
     </ItemGroup>

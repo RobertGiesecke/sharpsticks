@@ -10,4 +10,8 @@
       <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="SharpSticks.Tests" />
+    </ItemGroup>
+
 </Project>

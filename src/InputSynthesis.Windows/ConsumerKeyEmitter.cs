@@ -11,7 +11,14 @@ namespace SharpSticks.InputSynthesis.Windows;
 /// </summary>
 internal static class ConsumerKeyEmitter
 {
-	public static bool CanEmit(int usage) => TryGetVirtualKey(usage) is not null;
+	/// <summary>
+	/// Builds the <c>SendInput</c> event for a consumer-page key, or <c>null</c>
+	/// if the usage has no virtual-key mapping. Pure — does not send.
+	/// </summary>
+	public static Win32Input.Input? TryBuild(Key key, bool down) =>
+		TryGetVirtualKey(key.Usage) is { } vk
+			? Win32Input.KeyByVirtualKey(vk, up: !down)
+			: null;
 
 	private static ushort? TryGetVirtualKey(int usage) => usage switch
 	{
@@ -31,15 +38,4 @@ internal static class ConsumerKeyEmitter
 		0x018A => 0xB4, // Mail         -> VK_LAUNCH_MAIL
 		_ => null,
 	};
-
-	public static void Emit(Key key, bool down)
-	{
-		if (TryGetVirtualKey(key.Usage) is not { } vk)
-		{
-			throw new NotSupportedException(
-				$"No virtual-key mapping for consumer HID usage 0x{key.Usage:X} ({key}).");
-		}
-
-		Win32Input.Send(Win32Input.KeyByVirtualKey(vk, up: !down));
-	}
 }
