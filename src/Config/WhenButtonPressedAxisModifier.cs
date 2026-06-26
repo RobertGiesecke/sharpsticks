@@ -8,7 +8,9 @@ public enum WhenButtonPressedStateful
 	Both,
 }
 
-public sealed record WhenButtonPressedAxisModifier : IAxisModifier
+public sealed record WhenButtonPressedAxisModifier :
+	IAxisModifier,
+	IMergeableObject<WhenButtonPressedAxisModifier>
 {
 	public required ImmutableArray<ButtonBinding> Buttons { get; init; }
 	public IAxisModifier? WhenPressed { get; init; }
@@ -147,5 +149,23 @@ public sealed record WhenButtonPressedAxisModifier : IAxisModifier
 
 		WhenPressed?.FillDevices(deviceIds);
 		WhenNotPressed?.FillDevices(deviceIds);
+	}
+
+	public WhenButtonPressedAxisModifier Merge(MergeObjectContext context)
+	{
+		var hasChanged = false;
+		var x1 = WhenNotPressed?.MergeOrGet(context, ref hasChanged);
+		var x2 = WhenPressed?.MergeOrGet(context, ref hasChanged);
+
+		if (!hasChanged)
+		{
+			return this;
+		}
+
+		return this with
+		{
+			WhenNotPressed = x1,
+			WhenPressed = x2,
+		};
 	}
 }

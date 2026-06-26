@@ -1,12 +1,13 @@
 namespace SharpSticks.InputAbstractions;
 
-internal sealed class MergeAxesModifier : IAxisModifier
+internal sealed record MergeAxesModifier : IAxisModifier,
+	IMergeableObject<MergeAxesModifier>
 {
-	private readonly AxisBinding _Second;
+	private AxisBinding Second { get; init; }
 	private readonly double _SecondScale;
 	private readonly double _SecondOffset;
-	private readonly IAxisModifier? _SecondModifier;
-	private readonly IAxisModifier? _FirstModifier;
+	private IAxisModifier? SecondModifier { get; init; }
+	private IAxisModifier? FirstModifier { get; init; }
 	private readonly MergeMode _Mode;
 
 	public MergeAxesModifier(
@@ -17,31 +18,31 @@ internal sealed class MergeAxesModifier : IAxisModifier
 		IAxisModifier? firstModifier,
 		MergeMode mode)
 	{
-		_Second = second;
+		Second = second;
 		_SecondScale = secondScale;
 		_SecondOffset = secondOffset;
-		_SecondModifier = secondModifier;
-		_FirstModifier = firstModifier;
+		SecondModifier = secondModifier;
+		FirstModifier = firstModifier;
 		_Mode = mode;
 	}
 
 	public void FillDevices(ICollection<int> deviceIds)
 	{
-		deviceIds.Add(_Second.DeviceId);
-		_SecondModifier?.FillDevices(deviceIds);
-		_FirstModifier?.FillDevices(deviceIds);
+		deviceIds.Add(Second.DeviceId);
+		SecondModifier?.FillDevices(deviceIds);
+		FirstModifier?.FillDevices(deviceIds);
 	}
 
 	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
 		where TInputDevice : JoystickDevice =>
 		new RuntimeModifier<TInputDevice>(
-			context.DevicesById[_Second.DeviceId],
-			context.DeviceIndexesById[_Second.DeviceId],
-			_Second,
+			context.DevicesById[Second.DeviceId],
+			context.DeviceIndexesById[Second.DeviceId],
+			Second,
 			_SecondScale,
 			_SecondOffset,
-			_SecondModifier?.CreateModifierRuntimeContext(context),
-			_FirstModifier?.CreateModifierRuntimeContext(context),
+			SecondModifier?.CreateModifierRuntimeContext(context),
+			FirstModifier?.CreateModifierRuntimeContext(context),
 			_Mode);
 
 	private sealed class RuntimeModifier<TInputDevice>(
@@ -90,5 +91,22 @@ internal sealed class MergeAxesModifier : IAxisModifier
 				_ => first + second,
 			};
 		}
+	}
+
+	public MergeAxesModifier Merge(MergeObjectContext context)
+	{
+		var hasChanged = false;
+		var x1 = FirstModifier?.MergeOrGet(context, ref hasChanged);
+		var x2 = SecondModifier?.MergeOrGet(context, ref hasChanged);
+		var x3 = Second.MergeOrGet(context, ref hasChanged);
+
+		return !hasChanged
+			? this
+			: this with
+			{
+				FirstModifier = x1,
+				SecondModifier = x2,
+				Second = x3,
+			};
 	}
 }
