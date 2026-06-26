@@ -6,15 +6,33 @@ public static class Macros
 	public static IMacroAction Release(this OutputButtonBinding button) => new ReleaseAction(button);
 	public static IMacroAction WaitFor(TimeSpan duration) => new WaitAction(duration);
 
+	private static OutputButtonStateIndex GetOutputStateIndexOrThrow(IRuntimeContext runtimeContext, OutputButtonBinding button)
+	{
+		return runtimeContext.TryGetOutputStateIndex(button) ?? throw new InvalidOperationException($"Could not find output state for button {button}");
+	}
+
 	private sealed class PressAction(OutputButtonBinding button) : IMacroAction, IMergeableObject<PressAction>
 	{
-		public MacroStatus Step(MacroContext ctx)
-		{
-			ctx.Press(button);
-			return MacroStatus.Done;
-		}
-
 		public void FillOutputs(ICollection<OutputButtonBinding> outputs) => outputs.Add(button);
+
+		IRuntimeMacroAction IMacroAction.CreateRuntimeAction(IRuntimeContext runtimeContext) =>
+			new RuntimeAction(GetOutputStateIndexOrThrow(runtimeContext, button));
+
+
+		sealed class RuntimeAction : IRuntimeMacroAction
+		{
+			private readonly OutputButtonStateIndex _OutputStateIndex;
+
+			public RuntimeAction(OutputButtonStateIndex outputStateIndex)
+			{
+				_OutputStateIndex = outputStateIndex;
+			}
+			public MacroStatus Step(MacroContext ctx)
+			{
+				ctx.Press(_OutputStateIndex);
+				return MacroStatus.Done;
+			}
+		}
 
 		public PressAction Merge(MergeObjectContext context)
 		{
@@ -29,10 +47,23 @@ public static class Macros
 
 	private sealed class ReleaseAction(OutputButtonBinding button) : IMacroAction, IMergeableObject<ReleaseAction>
 	{
-		public MacroStatus Step(MacroContext ctx)
+		IRuntimeMacroAction IMacroAction.CreateRuntimeAction(IRuntimeContext runtimeContext) => 
+			new RuntimeAction(GetOutputStateIndexOrThrow(runtimeContext, button));
+
+		sealed class RuntimeAction : IRuntimeMacroAction
 		{
-			ctx.Release(button);
-			return MacroStatus.Done;
+			private readonly OutputButtonStateIndex _OutputStateIndex;
+
+			public RuntimeAction(OutputButtonStateIndex outputStateIndex)
+			{
+				_OutputStateIndex = outputStateIndex;
+			}
+
+			public MacroStatus Step(MacroContext ctx)
+			{
+				ctx.Release(_OutputStateIndex);
+				return MacroStatus.Done;
+			}
 		}
 
 		public void FillOutputs(ICollection<OutputButtonBinding> outputs) => outputs.Add(button);
@@ -49,9 +80,23 @@ public static class Macros
 
 	private sealed class WaitAction(TimeSpan duration) : IMacroAction, IMergeableObject<WaitAction>
 	{
-		public MacroStatus Step(MacroContext ctx) =>
-			MacroStatus.WaitUntil(ctx.DeadlineFromNow(duration));
+		IRuntimeMacroAction IMacroAction.CreateRuntimeAction(IRuntimeContext runtimeContext)
+		{
+			return new RuntimeAction(duration);
+		}
 
+		sealed class RuntimeAction : IRuntimeMacroAction
+		{
+			private readonly TimeSpan _Duration;
+
+			public RuntimeAction(TimeSpan duration)
+			{
+				_Duration = duration;
+			}
+
+			public MacroStatus Step(MacroContext ctx) => 
+				MacroStatus.WaitUntil(ctx.DeadlineFromNow(_Duration));
+		}
 		public void FillOutputs(ICollection<OutputButtonBinding> outputs)
 		{
 		}

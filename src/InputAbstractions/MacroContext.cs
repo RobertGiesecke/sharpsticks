@@ -18,8 +18,8 @@ public sealed class MacroContext
 	public long Now { get; private set; }
 	public long Frequency { get; }
 
-	public void Press(OutputButtonBinding button) => _Sink.Press(button);
-	public void Release(OutputButtonBinding button) => _Sink.Release(button);
+	public void Press(OutputButtonStateIndex button) => _Sink.Press(button);
+	public void Release(OutputButtonStateIndex button) => _Sink.Release(button);
 
 	/// <summary>
 	/// Convert a duration relative to "now" into an absolute tick deadline in
@@ -27,6 +27,9 @@ public sealed class MacroContext
 	/// </summary>
 	public long DeadlineFromNow(TimeSpan duration) =>
 		Now + (long)(duration.TotalSeconds * Frequency);
+
+	public long DeadlineFromNow(long durationInTicks) =>
+		Now + durationInTicks;
 
 	/// <summary>
 	/// Engine-only: refresh <see cref="Now"/> before stepping the next action.
@@ -43,6 +46,6 @@ public sealed class MacroContext
 /// </summary>
 public interface IMacroOutputSink
 {
-	void Press(OutputButtonBinding button);
-	void Release(OutputButtonBinding button);
+	void Press(OutputButtonStateIndex button);
+	void Release(OutputButtonStateIndex button);
 }
