@@ -10,6 +10,13 @@ public static class RuntimeBuilder
 		public DebugLogger? DebugLogger { get; init; }
 		public IOutputDeviceFactory<TOutputDevice>? OutputDeviceFactory { get; init; }
 		public ITimeSource? TimeSource { get; init; }
+
+		/// <summary>
+		/// OS keyboard/mouse event sink for key/mouse macro actions. Optional —
+		/// leave null for profiles that don't synthesize input. A profile that
+		/// uses key/mouse macro actions without one fails fast at build.
+		/// </summary>
+		public IInputSynthesizer? InputSynthesizer { get; init; }
 		public required ImmutableArray<TInputDevice> ConnectedDevices { get; init; }
 		public ImmutableArray<IRoute> Routes { get; init; } = [];
 	}
@@ -218,7 +225,8 @@ public static class RuntimeBuilder
 						[..axisToButtonRoutes.Span],
 						[..auxiliaryOutputButtons],
 						timeSource,
-						outputDevices);
+						outputDevices,
+						options.InputSynthesizer);
 				}
 				catch
 				{
