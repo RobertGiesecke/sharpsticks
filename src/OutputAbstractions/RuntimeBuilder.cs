@@ -18,7 +18,8 @@ public static class RuntimeBuilder
 		where TInputDevice : JoystickDevice
 		where TOutputDevice : OutputDevice
 	{
-		public static IOutputRuntimeContext<TInputDevice, TOutputDevice> Build(BuildOptions<TInputDevice, TOutputDevice> options)
+		public static IOutputRuntimeContext<TInputDevice, TOutputDevice> Build(
+			BuildOptions<TInputDevice, TOutputDevice> options)
 		{
 			var optionsOutputDeviceFactory = options.OutputDeviceFactory ??
 			                                 throw new ArgumentNullException(nameof(options.OutputDeviceFactory));
@@ -27,10 +28,16 @@ public static class RuntimeBuilder
 			using var connectedDevicesById = options.ConnectedDevices
 				.ToPooledDictionary(device => device.DeviceId);
 			using var referencedDeviceIds = new PooledSet<int>();
-			using var routes = new PooledList<IRoute>(options.Routes.Length);
+
+			var mergeOrGetAllOptions = new MergeableObjectExtensions.MergeOrGetAllOptions() { ReturnUniqueItems = true };
+
+			var usedSourceRoutes = options.Routes.MergeOrGetAll(mergeOrGetAllOptions);
+
 			{
+				using var routes = new PooledList<IRoute>(usedSourceRoutes.Length);
+
 				using var routesSet = new PooledSet<IRoute>();
-				foreach (var route in options.Routes)
+				foreach (var route in usedSourceRoutes)
 				{
 					if (route is ICombinedRoute combinedRoute)
 					{
@@ -40,6 +47,7 @@ public static class RuntimeBuilder
 							{
 								continue;
 							}
+
 							routes.Add(boundRoute);
 						}
 					}
@@ -49,15 +57,19 @@ public static class RuntimeBuilder
 						{
 							continue;
 						}
+
 						routes.Add(route);
 					}
 				}
+
+				usedSourceRoutes = [..routes.Span];
+				usedSourceRoutes = usedSourceRoutes.MergeOrGetAll(mergeOrGetAllOptions);
 			}
-			
-			using var buttonRoutes = routes.OfType<ButtonRoute>().ToPooledList();
-			using var axisRoutes = routes.OfType<AxisRoute>().ToPooledList();
-			using var macroRoutes = routes.OfType<ButtonMacroRoute>().ToPooledList();
-			using var axisToButtonRoutes = routes.OfType<AxisToButtonRoute>().ToPooledList();
+
+			using var buttonRoutes = usedSourceRoutes.OfType<ButtonRoute>().ToPooledList();
+			using var axisRoutes = usedSourceRoutes.OfType<AxisRoute>().ToPooledList();
+			using var macroRoutes = usedSourceRoutes.OfType<ButtonMacroRoute>().ToPooledList();
+			using var axisToButtonRoutes = usedSourceRoutes.OfType<AxisToButtonRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
 			using var auxiliaryOutputButtons = new PooledSet<OutputButtonBinding>();
@@ -200,10 +212,10 @@ public static class RuntimeBuilder
 						options.Name,
 						options.DebugLogger,
 						devices,
-						[..buttonRoutes],
-						[..axisRoutes],
-						[..macroRoutes],
-						[..axisToButtonRoutes],
+						[..buttonRoutes.Span],
+						[..axisRoutes.Span],
+						[..macroRoutes.Span],
+						[..axisToButtonRoutes.Span],
 						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices);

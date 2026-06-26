@@ -1,6 +1,6 @@
 namespace SharpSticks.InputAbstractions;
 
-public sealed record AxisToButtonRoute : BoundRoute
+public sealed record AxisToButtonRoute : BoundRoute<AxisToButtonRoute>
 {
 	public required AxisBinding Source { get; init; }
 	public required OutputButtonBinding OutputBinding { get; init; }
@@ -21,4 +21,18 @@ public sealed record AxisToButtonRoute : BoundRoute
 
 	protected override InputBinding InputBinding => Source;
 	protected override uint OutputDeviceId => OutputBinding.OutputDeviceId;
+
+	protected override AxisToButtonRoute Merge(MergeObjectContext context)
+	{
+		var hasChanges = false;
+		var x1 = Source.MergeOrGet(context, ref hasChanges);
+		var x2 = OutputBinding.MergeOrGet(context, ref hasChanges);
+		return !hasChanges
+			? this
+			: this with
+			{
+				Source = x1,
+				OutputBinding = x2,
+			};
+	}
 }

@@ -13,7 +13,9 @@ public sealed record AxisBinding(
 	Axis Axis,
 	AxisMode Mode = AxisMode.Signed,
 	bool Invert = false,
-	double Deadzone = 0.0) : InputBinding(DeviceId), IAxisModifier
+	double Deadzone = 0.0) : InputBinding(DeviceId),
+	IAxisModifier,
+	IMergeableObject<AxisBinding>
 {
 	public void FillDevices(ICollection<int> deviceIds) => deviceIds.Add(DeviceId);
 
@@ -35,4 +37,6 @@ public sealed record AxisBinding(
 				? device.ReadNormalizedAxisValue(state, binding)
 				: 0.0;
 	}
+
+	public AxisBinding Merge(MergeObjectContext context) => this;
 }

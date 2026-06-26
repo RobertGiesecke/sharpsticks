@@ -20,4 +20,26 @@ public sealed record ButtonMacroRoute : IBoundRoute
 	// A macro can write to multiple output devices; the actual targets are
 	// discovered by walking actions via IMacroAction.FillOutputs.
 	uint IBoundRoute.OutputDeviceId => 0;
+
+	public IMergeableObject Merge(MergeObjectContext context)
+	{
+		var hasChanges = false;
+		var x1 = Binding.MergeOrGet(context, ref hasChanges);
+
+		var mergeOrGetAllOptions = new MergeableObjectExtensions.MergeOrGetAllOptions
+		{
+			ReturnUniqueItems = false,
+		};
+		var x2 = OnPress.MergeOrGetAll(context, ref hasChanges, mergeOrGetAllOptions);
+		var x3 = OnRelease.MergeOrGetAll(context, ref hasChanges, mergeOrGetAllOptions);
+
+		return !hasChanges
+			? this
+			: this with
+			{
+				Binding = x1,
+				OnPress = x2,
+				OnRelease = x3,
+			};
+	}
 }

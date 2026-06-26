@@ -3,13 +3,15 @@ using System.Text;
 
 namespace SharpSticks.InputAbstractions;
 
-internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
+internal sealed record AbsoluteRelativeAxisModifier :
+	IAxisModifier,
+	IMergeableObject<AbsoluteRelativeAxisModifier>
 {
 	// Normalized target within this of a rail counts as "at the edge" for the
 	// edge-hold; clamped mapping yields exact 0/1 at/beyond the source extremes.
 	private const double EdgeEpsilon = 1e-9;
 
-	private readonly SharedState _SharedState;
+	private SharedStateClass SharedState { get; init; }
 
 	// null = bidirectional: both directions on one output axis, resting at
 	// center, increase pulsing positive and decrease negative.
@@ -19,7 +21,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 	public static (AbsoluteRelativeAxisModifier Increase, AbsoluteRelativeAxisModifier Decrease) Create(
 		AbsoluteRelativeAxisOptions options)
 	{
-		var sharedState = new SharedState(options);
+		var sharedState = new SharedStateClass(options);
 		var increaseModifier = new AbsoluteRelativeAxisModifier(
 			sharedState,
 			RelativeDirection.Increase,
@@ -40,9 +42,10 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 	public static IAxisModifier CreateBidirectional(AbsoluteRelativeAxisOptions options) =>
 		new AbsoluteRelativeAxisModifier(new(options), direction: null, restPosition: 0.5);
 
-	private AbsoluteRelativeAxisModifier(SharedState sharedState, RelativeDirection? direction, double restPosition)
+	private AbsoluteRelativeAxisModifier(SharedStateClass sharedState, RelativeDirection? direction,
+		double restPosition)
 	{
-		_SharedState = sharedState;
+		SharedState = sharedState;
 		_Direction = direction;
 		_RestPosition = Math.Clamp(restPosition, 0.0, 1.0);
 	}
@@ -54,8 +57,8 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 	public IRuntimeAxisModifier CreateModifierRuntimeContext<TInputDevice>(IRuntimeContext<TInputDevice> context)
 		where TInputDevice : JoystickDevice =>
 		_Direction is { } direction
-			? new DualAxesRuntimeModifier(_SharedState, direction, _RestPosition, context.TimeSource)
-			: new BidirectionalRuntimeModifier(_SharedState, context.TimeSource);
+			? new DualAxesRuntimeModifier(SharedState, direction, _RestPosition, context.TimeSource)
+			: new BidirectionalRuntimeModifier(SharedState, context.TimeSource);
 
 	private enum RelativeDirection
 	{
@@ -63,13 +66,13 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		Decrease,
 	}
 
-	private sealed class SharedState
+	private sealed class SharedStateClass : IMergeableObject<SharedStateClass>
 	{
 		private readonly AbsoluteRelativeAxisOptions _Options;
 		private readonly double _Minimum;
 		private readonly double _Maximum;
 
-		public SharedState(AbsoluteRelativeAxisOptions options)
+		public SharedStateClass(AbsoluteRelativeAxisOptions options)
 		{
 			_Options = options;
 			_Minimum = Math.Min(options.Minimum, options.Maximum);
@@ -268,16 +271,17 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		}
 
 		private double Clamp(double value) => Math.Clamp(value, _Minimum, _Maximum);
+		public SharedStateClass Merge(MergeObjectContext context) => this;
 	}
 
 	private abstract record RuntimeModifier<TState> : StatefulRuntimeInputModifier<double, TState>
 		where TState : struct
 	{
-		protected SharedState SharedState { get; }
+		protected SharedStateClass SharedState { get; }
 		protected ITimeSource TimeSource { get; }
 		private readonly long _StartTimestamp;
 
-		protected RuntimeModifier(SharedState sharedState, ITimeSource timeSource)
+		protected RuntimeModifier(SharedStateClass sharedState, ITimeSource timeSource)
 		{
 			SharedState = sharedState;
 			TimeSource = timeSource;
@@ -322,7 +326,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			return current + Math.CopySign(maxStep, delta);
 		}
 
-		protected static NumberFormattingDebugInterpolatedStringHandler FormatDebugView(SharedState sharedState) =>
+		protected static NumberFormattingDebugInterpolatedStringHandler FormatDebugView(SharedStateClass sharedState) =>
 			$"absrel src={sharedState.LastSourceInput} " +
 			$"target={sharedState.LastTarget} " +
 			$"current={sharedState.LastCurrentBefore}->{sharedState.LastCurrentAfter} " +
@@ -361,7 +365,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		private readonly double _IncreaseEdgeHoldSeconds;
 		private readonly double _DecreaseEdgeHoldSeconds;
 
-		public BidirectionalRuntimeModifier(SharedState sharedState, ITimeSource timeSource)
+		public BidirectionalRuntimeModifier(SharedStateClass sharedState, ITimeSource timeSource)
 			: base(sharedState, timeSource)
 		{
 			var options = sharedState.Options;
@@ -447,7 +451,7 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 		private readonly bool _IsDebugOwner;
 
 		public DualAxesRuntimeModifier(
-			SharedState sharedState, RelativeDirection direction, double restPosition, ITimeSource timeSource)
+			SharedStateClass sharedState, RelativeDirection direction, double restPosition, ITimeSource timeSource)
 			: base(sharedState, timeSource)
 		{
 			var options = sharedState.Options;
@@ -508,5 +512,18 @@ internal sealed record AbsoluteRelativeAxisModifier : IAxisModifier
 			var restSigned = clampedRest * 2.0 - 1.0;
 			return restSigned + clampedPulse * (1.0 - restSigned);
 		}
+	}
+
+	public AbsoluteRelativeAxisModifier Merge(MergeObjectContext context)
+	{
+		var hasChanged = false;
+		var x1 = SharedState.MergeOrGet(context, ref hasChanged);
+
+		return !hasChanged
+			? this
+			: this with
+			{
+				SharedState = x1,
+			};
 	}
 }

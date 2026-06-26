@@ -142,17 +142,31 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		// Macro / axis-zone output buttons get an OutputButtonWithBindings entry
 		// too so ApplyButtons can OR their held sets in for them.
 		using var allOutputButtons = new PooledSet<OutputButtonBinding>();
-		foreach (var route in buttonRoutes)
+
+		using var mergedObjectsLookup = new PooledDictionary<IMergeableObject, IMergeableObject>();
+		var mergeObjectContext = new MergeObjectContext
+		{
+			MergedObjects = mergedObjectsLookup,
+		};
+
+		var mergedButtonRoutes = buttonRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAuxiliaryOutputButtons = auxiliaryOutputButtons.MergeOrGetAll(mergeObjectContext);
+		var mergedMacroRoutes = macroRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisRoutes = axisRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisToButtonRoutes = axisToButtonRoutes.MergeOrGetAll(mergeObjectContext);
+
+		foreach (var route in mergedButtonRoutes)
 		{
 			allOutputButtons.Add(route.OutputBinding);
 		}
 
-		foreach (var binding in auxiliaryOutputButtons)
+
+		foreach (var binding in mergedAuxiliaryOutputButtons)
 		{
 			allOutputButtons.Add(binding);
 		}
 
-		using var bindingsByOutput = buttonRoutes
+		using var bindingsByOutput = mergedButtonRoutes
 			.GroupBy(t => t.OutputBinding)
 			.ToPooledDictionary(g => g.Key, g => g.ToArray());
 
@@ -183,7 +197,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		];
 		_AxisRoutes =
 		[
-			..axisRoutes.Select(route => new OutputAxisRoute
+			..mergedAxisRoutes.Select(route => new OutputAxisRoute
 			{
 				// ReSharper disable once AccessToDisposedClosure
 				OutputDevice = outputDevices[outputDeviceIndexes[route.OutputBinding.OutputDeviceId]],
@@ -201,7 +215,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		_ButtonRoutesByBinding = _ButtonRoutes.ToFrozenDictionary(r => r.TargetBinding);
 		_AxisToButtonRoutes =
 		[
-			..axisToButtonRoutes.Select(route =>
+			..mergedAxisToButtonRoutes.Select(route =>
 			{
 				var durationSeconds = route.PulseDuration.TotalSeconds;
 				var durationTicks = (long)(durationSeconds * timeSource.Frequency);
@@ -221,10 +235,10 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		];
 		_CurrentStates = new JoystickState?[DevicesById.Count];
 		_LastReportedReadFailure = new();
-		_Macros = macroRoutes.IsEmpty
+		_Macros = mergedMacroRoutes.IsEmpty
 			? null
 			: new MacroEngine(
-				macroRoutes,
+				mergedMacroRoutes,
 				DeviceIndexesById,
 				timeSource,
 				IncrementPressers,

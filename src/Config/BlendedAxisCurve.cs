@@ -1,6 +1,8 @@
 namespace SharpSticks.Config;
 
-public sealed record BlendedAxisCurve : IAxisModifier
+public sealed record BlendedAxisCurve :
+	IAxisModifier,
+	IMergeableObject<BlendedAxisCurve>
 {
 	public required IAxisModifier NormalCurve { get; init; }
 	public required IAxisModifier PrecisionCurve { get; init; }
@@ -161,5 +163,25 @@ public sealed record BlendedAxisCurve : IAxisModifier
 			var blend = _Source.FactorLow + (_Source.FactorHigh - _Source.FactorLow) * factorT;
 			return (blend, factorT);
 		}
+	}
+
+	public BlendedAxisCurve Merge(MergeObjectContext context)
+	{
+		var hasChanged = false;
+		var x1 = NormalCurve.MergeOrGet(context, ref hasChanged);
+		var x2 = PrecisionCurve.MergeOrGet(context, ref hasChanged);
+		var x3 = ModifierAxes.MergeOrGetAll(context, ref hasChanged, new()
+		{
+			ReturnUniqueItems = true,
+		});
+
+		return !hasChanged
+			? this
+			: this with
+			{
+				NormalCurve = x1,
+				PrecisionCurve = x2,
+				ModifierAxes = x3,
+			};
 	}
 }
