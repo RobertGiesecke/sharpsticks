@@ -16,7 +16,8 @@ var modifierBlendCurve = new BlendedAxisCurve
 	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
 	ModifierAxes =
 	[
-		..groupedZoomAxes.SourceAxes.Select(a => a with { Mode = AxisMode.Unsigned }),
+		..groupedZoomAxes.SourceAxes.Select(a => a with { Mode = AxisMode.Unsigned })
+			.WithModifier(new AxisCurve { Max = 1.0d, Exponent = 2.4d }),
 	],
 	Stateful = true,
 };
