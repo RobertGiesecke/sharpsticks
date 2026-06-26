@@ -461,44 +461,53 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
 	private void ApplyButtons(JoystickState?[] states, DebugLogger? debugLines)
 	{
-		ButtonBinding? assertingBinding = null;
-
-		foreach (var route in _ButtonRoutes)
+		// Bindings are laid out flat but grouped per output button, each group
+		// running from IsFirstBinding to IsLastBinding. Within a group the
+		// bindings OR together: the first pressed one wins, at which point we
+		// fast-forward to the group's last binding — emulating the old inner-loop
+		// `break` — and apply the state there. A group with no press falls
+		// through to its last binding and applies "released". OutputButtonStateIndex,
+		// OutputDevice and TargetButton are identical across a group, so applying
+		// on the last binding is equivalent to applying on the one that asserted.
+		var routes = _ButtonRoutes;
+		for (var i = 0; i < routes.Length; i++)
 		{
-			if (route.IsFirstBinding)
+			ButtonBinding? assertingBinding = null;
+
+			while (true)
 			{
-				assertingBinding = null;
+				var route = routes[i];
+				if (route is { SourceDeviceIndex: >= 0, ButtonBinding: { } buttonBinding } &&
+				    states[route.SourceDeviceIndex] is { } state &&
+				    state.IsButtonPressed(buttonBinding.ButtonNumber))
+				{
+					assertingBinding = buttonBinding;
+					while (!routes[i].IsLastBinding)
+					{
+						i++;
+					}
+
+					break;
+				}
+
+				if (route.IsLastBinding)
+				{
+					break;
+				}
+
+				i++;
 			}
 
-			if (route is not { SourceDeviceIndex: >= 0, ButtonBinding: { } buttonBinding } ||
-			    states[route.SourceDeviceIndex] is not { } state)
-			{
-				UpdateRouteButtonState(assertingBinding, route, debugLines);
-				continue;
-			}
-
-			if (!state.IsButtonPressed(buttonBinding.ButtonNumber))
-			{
-				UpdateRouteButtonState(assertingBinding, route, debugLines);
-				continue;
-			}
-
-			assertingBinding = buttonBinding;
-			UpdateRouteButtonState(assertingBinding, route, debugLines);
-			break;
+			UpdateRouteButtonState(assertingBinding, routes[i], debugLines);
 		}
 	}
 
+	// Precondition: called only for a group's last binding (IsLastBinding).
 	private void UpdateRouteButtonState(
 		in ButtonBinding? assertingBinding,
 		in OutputButtonWithBindings route,
 		DebugLogger? debugLines)
 	{
-		if (!route.IsLastBinding)
-		{
-			return;
-		}
-
 		var routeAsserting = assertingBinding is not null;
 		ref var x = ref _OutputButtonStates[route.OutputButtonStateIndex.Value];
 
