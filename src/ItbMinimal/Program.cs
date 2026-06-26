@@ -50,6 +50,12 @@ BuildAndRunAsConsole(new()
 		}),
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
+		groupedZoomAxes.RouteWhenInRange(-0.00d, 1d, VJoy1.Buttons.PrecisionMode,
+			options: new()
+			{
+				IncludeMax = true,
+				Mode = AxisZoneTriggerMode.Hold,
+			}),
 		LeftStick.Axes.BrakeLever.RouteWhenInRange(-0.95d, 1d, VJoy1.Buttons.HoldForZoom,
 			options: new()
 			{
@@ -117,4 +123,5 @@ BuildAndRunAsConsole(new()
 [RenameButton(DeviceNames.VJoy1, 71, "SwitchToWeaponGroup1")]
 [RenameButton(DeviceNames.VJoy1, 72, "SwitchToWeaponGroup2")]
 [RenameButton(DeviceNames.VJoy1, 20, "HoldForZoom")]
+[RenameButton(DeviceNames.VJoy1, 21, "PrecisionMode")]
 partial class Devices;
