@@ -12,7 +12,14 @@ namespace SharpSticks.InputSynthesis.Windows;
 /// </summary>
 internal static class ScancodeKeyEmitter
 {
-	public static bool CanEmit(int usage) => TryGetScancode(usage) is not null;
+	/// <summary>
+	/// Builds the <c>SendInput</c> event for a keyboard-page key, or <c>null</c>
+	/// if the usage has no scancode mapping. Pure — does not send.
+	/// </summary>
+	public static Win32Input.Input? TryBuild(Key key, bool down) =>
+		TryGetScancode(key.Usage) is { } entry
+			? Win32Input.KeyByScancode(entry.Scan, entry.Extended, up: !down)
+			: null;
 
 	// HID keyboard usage (0x07 page) -> (PS/2 Set-1 make code, E0-extended).
 	private static (ushort Scan, bool Extended)? TryGetScancode(int usage) => usage switch
@@ -63,15 +70,4 @@ internal static class ScancodeKeyEmitter
 		0xE4 => (0x1D, true), 0xE5 => (0x36, false), 0xE6 => (0x38, true), 0xE7 => (0x5C, true),
 		_ => null,
 	};
-
-	public static void Emit(Key key, bool down)
-	{
-		if (TryGetScancode(key.Usage) is not { } entry)
-		{
-			throw new NotSupportedException(
-				$"No scancode mapping for keyboard HID usage 0x{key.Usage:X2} ({key}).");
-		}
-
-		Win32Input.Send(Win32Input.KeyByScancode(entry.Scan, entry.Extended, up: !down));
-	}
 }
