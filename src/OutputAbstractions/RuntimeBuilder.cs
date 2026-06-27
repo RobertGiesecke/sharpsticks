@@ -91,6 +91,7 @@ public static class RuntimeBuilder
 			using var macroRoutes = usedSourceRoutes.OfType<ButtonMacroRoute>().ToPooledList();
 			using var axisToButtonRoutes = usedSourceRoutes.OfType<AxisToButtonRoute>().ToPooledList();
 			using var axisToMouseRoutes = usedSourceRoutes.OfType<AxisToMouseRoute>().ToPooledList();
+			using var buttonToMouseRoutes = usedSourceRoutes.OfType<ButtonToMouseRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
 			using var auxiliaryOutputButtons = new PooledSet<OutputButtonBinding>();
@@ -192,6 +193,16 @@ public static class RuntimeBuilder
 				route.Modifier?.FillDevices(referencedDeviceIds);
 			}
 
+			foreach (var route in buttonToMouseRoutes)
+			{
+				if (route.Source.ButtonNumber < 1)
+				{
+					throw new InvalidOperationException("Source buttons are 1-based.");
+				}
+
+				referencedDeviceIds.Add(route.Source.DeviceId);
+			}
+
 			foreach (var output in auxiliaryOutputButtons)
 			{
 				if (output.OutputDeviceId < 1)
@@ -244,6 +255,7 @@ public static class RuntimeBuilder
 						[..macroRoutes.Span],
 						[..axisToButtonRoutes.Span],
 						[..axisToMouseRoutes.Span],
+						[..buttonToMouseRoutes.Span],
 						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices,

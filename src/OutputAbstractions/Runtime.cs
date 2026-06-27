@@ -23,6 +23,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private readonly IInputSynthesizer? _InputSynthesizer;
 	private readonly bool _InitializeInputSynthesizer;
 	private readonly ImmutableArray<OutputMouseAxisRoute> _MouseAxisRoutes;
+	private readonly ImmutableArray<OutputMouseButtonGroup> _MouseButtonRoutes;
 	private long _MouseMoveLastTicks;
 	private bool _MouseMoveHasLast;
 
@@ -85,6 +86,13 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
 	}
 
+	private sealed class OutputMouseButtonGroup
+	{
+		public required OutputMouseButton Button { get; init; }
+		public required ImmutableArray<(int SourceDeviceIndex, int ButtonNumber)> Sources { get; init; }
+		public bool WasAsserted;
+	}
+
 	private sealed class OutputMouseAxisRoute
 	{
 		public required int SourceDeviceIndex { get; init; }
@@ -125,6 +133,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ImmutableArray<ButtonMacroRoute> macroRoutes,
 		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
 		ImmutableArray<AxisToMouseRoute> axisToMouseRoutes,
+		ImmutableArray<ButtonToMouseRoute> buttonToMouseRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
 		ImmutableArray<TOutputDevice> outputDevices,
@@ -168,6 +177,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		var mergedAxisRoutes = axisRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisToButtonRoutes = axisToButtonRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisToMouseRoutes = axisToMouseRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedButtonToMouseRoutes = buttonToMouseRoutes.MergeOrGetAll(mergeObjectContext);
 
 		foreach (var route in mergedButtonRoutes)
 		{
@@ -296,6 +306,19 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 					RuntimeModifier = route.Modifier?.CreateModifierRuntimeContext(this),
 				};
 			})
+		];
+		_MouseButtonRoutes =
+		[
+			..mergedButtonToMouseRoutes
+				.GroupBy(route => route.Button)
+				.Select(group => new OutputMouseButtonGroup
+				{
+					Button = group.Key,
+					Sources =
+					[
+						..group.Select(route => (DeviceIndexesById[route.Source.DeviceId], route.Source.ButtonNumber)),
+					],
+				})
 		];
 		_CurrentStates = new JoystickState?[DevicesById.Count];
 		_LastReportedReadFailure = new();
@@ -438,9 +461,43 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ApplyButtons(currentStates, shouldLogNow ? debugLogger : null);
 		ApplyAxes(currentStates, shouldLogNow ? debugLogger : null);
 		StepMouseAxes(currentStates);
-		// Commit this frame's synthesized events (macro keys + mouse moves) in one
-		// batch. No-op when no synthesizer is configured or none were emitted.
+		StepMouseButtons(currentStates);
+		// Commit this frame's synthesized events (macro keys + mouse moves/buttons)
+		// in one batch. No-op when no synthesizer is configured or none were emitted.
 		_InputSynthesizer?.Flush();
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
+	private void StepMouseButtons(JoystickState?[] states)
+	{
+		foreach (var group in _MouseButtonRoutes)
+		{
+			var asserted = false;
+			foreach (var (sourceDeviceIndex, buttonNumber) in group.Sources)
+			{
+				if (states[sourceDeviceIndex] is { } state && state.IsButtonPressed(buttonNumber))
+				{
+					asserted = true;
+					break;
+				}
+			}
+
+			if (asserted == group.WasAsserted)
+			{
+				continue;
+			}
+
+			if (asserted)
+			{
+				_InputSynthesizer?.MouseButtonDown(group.Button);
+			}
+			else
+			{
+				_InputSynthesizer?.MouseButtonUp(group.Button);
+			}
+
+			group.WasAsserted = asserted;
+		}
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
