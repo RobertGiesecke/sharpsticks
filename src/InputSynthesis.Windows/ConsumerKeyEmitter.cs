@@ -1,4 +1,4 @@
-using SharpSticks.InputAbstractions.Keyboard;
+using SharpSticks.InputSynthesis.Keyboard;
 
 namespace SharpSticks.InputSynthesis.Windows;
 

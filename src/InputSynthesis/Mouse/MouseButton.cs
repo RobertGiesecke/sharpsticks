@@ -1,4 +1,4 @@
-namespace SharpSticks.InputAbstractions.Mouse;
+namespace SharpSticks.InputSynthesis.Mouse;
 
 /// <summary>
 /// Any mouse button readable as input — the value type input bindings carry.

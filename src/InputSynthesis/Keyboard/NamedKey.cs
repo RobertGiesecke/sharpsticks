@@ -1,4 +1,4 @@
-namespace SharpSticks.InputAbstractions.Keyboard;
+namespace SharpSticks.InputSynthesis.Keyboard;
 
 /// <summary>
 /// Recognizable keys with friendly names, each carrying its USB HID usage (see
