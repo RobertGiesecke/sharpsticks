@@ -12,6 +12,8 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	public static LinuxOutputDeviceFactory Instance { get; } = new();
 
 	string ISupportsOutputSetup.SetupSubcommandName => LinuxOutputSetup.SubcommandName;
+	
+	public IInputSynthesizer InputSynthesizer => LinuxInputSynthesizer.Instance;
 
 	void ISupportsOutputSetup.RunSetup(
 		IReadOnlyCollection<ButtonRoute> buttonRoutes,

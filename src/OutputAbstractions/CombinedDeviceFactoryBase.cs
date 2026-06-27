@@ -16,6 +16,8 @@ public abstract class CombinedDeviceFactoryBase<TInput, TOutput> : ICombinedDevi
 		_OutputDeviceFactory = outputDeviceFactory ?? throw new ArgumentNullException(nameof(outputDeviceFactory));
 	}
 
+	public IInputSynthesizer? InputSynthesizer => _OutputDeviceFactory.InputSynthesizer;
+
 	public PooledList<TInput> EnumerateConnectedInputDevices() =>
 		_JoystickDeviceFactory.EnumerateConnectedInputDevices();
 

@@ -14,9 +14,9 @@ public static class ConsoleExtensions<TInputDevice, TOutputDevice>
 		public IOutputDeviceFactory<TOutputDevice>? OutputDeviceFactory { get; init; }
 
 		/// <summary>
-		/// OS keyboard/mouse sink for key/mouse macro actions. Leave null to use
-		/// the platform default (<see cref="IOutputDeviceWithFactory{TSelf}.DefaultInputSynthesizer"/>);
-		/// set it to override or to opt out with a no-op.
+		/// OS keyboard/mouse sink for key/mouse macro actions. Leave null to use the
+		/// output backend's default (<see cref="IOutputDeviceFactory.InputSynthesizer"/>);
+		/// set it to override, or to opt out with a no-op.
 		/// </summary>
 		public IInputSynthesizer? InputSynthesizer { get; init; }
 
