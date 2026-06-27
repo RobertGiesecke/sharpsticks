@@ -18,13 +18,4 @@ public interface IOutputDeviceWithFactory<TSelf> : IOutputDevice
 	where TSelf : OutputDevice
 {
 	static abstract IOutputDeviceFactory<TSelf> Factory { get; }
-
-	/// <summary>
-	/// Platform default keyboard/mouse synthesizer for this output kind, used by
-	/// the console build path when the profile doesn't supply one. The output
-	/// device type doubles as the platform marker (vJoy ⇒ Windows), so the
-	/// Windows output returns a <c>SendInput</c>-backed synthesizer; platforms
-	/// without one yet (Linux uinput) inherit the default <c>null</c>.
-	/// </summary>
-	static virtual IInputSynthesizer? DefaultInputSynthesizer => null;
 }

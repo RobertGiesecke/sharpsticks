@@ -53,4 +53,11 @@ public interface IOutputDeviceFactory
 	/// time (e.g. by the source generator). Backends that materialize devices on demand
 	/// (Linux uinput) return empty.
 	ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs() => ImmutableArray<AvailableOutputDevice>.Empty;
+
+	/// <summary>
+	/// Platform sink for synthesized keyboard/mouse events (the macro key/mouse
+	/// actions drive it), or <c>null</c> when this backend doesn't synthesize input.
+	/// The runtime uses it as the default synthesizer unless the build supplies one.
+	/// </summary>
+	IInputSynthesizer? InputSynthesizer { get; }
 }

@@ -1,5 +1,4 @@
 using Collections.Pooled;
-using SharpSticks.InputSynthesis.Windows;
 
 namespace SharpSticks.VJoy;
 
@@ -11,10 +10,6 @@ public sealed class VJoyDevice : OutputDevice, IOutputDeviceWithFactory<VJoyDevi
 
 	public static VJoyDeviceFactory Factory => VJoyDeviceFactory.Instance;
 	static IOutputDeviceFactory<VJoyDevice> IOutputDeviceWithFactory<VJoyDevice>.Factory => Factory;
-
-	// vJoy is the Windows output marker, so the Windows SendInput synthesizer is
-	// the platform default for key/mouse macro output.
-	public static IInputSynthesizer? DefaultInputSynthesizer => WindowsInputSynthesizer.Instance;
 
 	public VJoyDevice(uint deviceId, FrozenDictionary<Axis, AxisLimits> axisLimits)
 		: base(deviceId)

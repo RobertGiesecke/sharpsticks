@@ -41,6 +41,9 @@ public static class RuntimeBuilder
 			var optionsOutputDeviceFactory = options.OutputDeviceFactory ??
 			                                 throw new ArgumentNullException(nameof(options.OutputDeviceFactory));
 			var timeSource = options.TimeSource ?? StopwatchTimeSource.Instance;
+			// An explicit synthesizer wins; otherwise take the output backend's
+			// platform default (vJoy → SendInput, uinput → uinput).
+			var inputSynthesizer = options.InputSynthesizer ?? optionsOutputDeviceFactory.InputSynthesizer;
 
 			using var connectedDevicesById = options.ConnectedDevices
 				.ToPooledDictionary(device => device.DeviceId);
@@ -236,7 +239,7 @@ public static class RuntimeBuilder
 						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices,
-						options.InputSynthesizer,
+						inputSynthesizer,
 						options.InitializeInputSynthesizer);
 				}
 				catch
