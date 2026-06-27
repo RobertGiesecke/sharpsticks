@@ -22,6 +22,9 @@ public interface IInputSynthesizer
 	void MouseButtonDown(OutputMouseButton button);
 	void MouseButtonUp(OutputMouseButton button);
 
+	/// <summary>Move the pointer by a relative pixel delta (mouse-space, not absolute).</summary>
+	void MoveMouseRelative(int dx, int dy);
+
 	/// <summary>
 	/// Eagerly prepare the backend so the first event has no setup cost and any
 	/// setup failure surfaces at runtime start rather than mid-session. Idempotent.

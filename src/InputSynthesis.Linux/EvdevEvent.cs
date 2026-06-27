@@ -13,8 +13,15 @@ internal static class EvdevEvent
 	public const ushort BtnSide = 0x113;
 	public const ushort BtnExtra = 0x114;
 
+	// evdev REL_* relative axis codes.
+	public const ushort RelX = 0x00;
+	public const ushort RelY = 0x01;
+
 	public static LinuxInputEvent Key(ushort code, bool down) =>
 		new() { Type = EvType.Key, Code = code, Value = down ? 1 : 0 };
+
+	public static LinuxInputEvent Rel(ushort code, int value) =>
+		new() { Type = EvType.Rel, Code = code, Value = value };
 
 	/// <summary>The SYN_REPORT that commits the events written since the last one.</summary>
 	public static LinuxInputEvent SynReport() =>

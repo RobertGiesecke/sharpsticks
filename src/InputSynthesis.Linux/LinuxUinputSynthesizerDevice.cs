@@ -27,6 +27,7 @@ internal sealed partial class LinuxUinputSynthesizerDevice : ILinuxInputEventSen
 	private static uint UiDevSetup => LinuxIoctl.Iow(IocType, 3, UinputSetup.Size);
 	private static uint UiSetEvBit => LinuxIoctl.Iow(IocType, 100, sizeof(int));
 	private static uint UiSetKeyBit => LinuxIoctl.Iow(IocType, 101, sizeof(int));
+	private static uint UiSetRelBit => LinuxIoctl.Iow(IocType, 102, sizeof(int));
 
 	private int _Fd = -1;
 	private bool _Initialized;
@@ -58,6 +59,11 @@ internal sealed partial class LinuxUinputSynthesizerDevice : ILinuxInputEventSen
 			{
 				Check(LinuxLibc.IoctlInt(fd, UiSetKeyBit, code), "UI_SET_KEYBIT");
 			}
+
+			// Relative pointer: this is a combined keyboard+mouse virtual device.
+			Check(LinuxLibc.IoctlInt(fd, UiSetEvBit, (int)EvType.Rel), "UI_SET_EVBIT(EV_REL)");
+			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelX), "UI_SET_RELBIT(REL_X)");
+			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelY), "UI_SET_RELBIT(REL_Y)");
 
 			var setup = new UinputSetup
 			{

@@ -50,6 +50,7 @@ public enum EvType : ushort
 {
 	Syn = 0x00,
 	Key = 0x01,
+	Rel = 0x02,
 	Abs = 0x03,
 	Msc = 0x04,
 	Max = 0x1f,

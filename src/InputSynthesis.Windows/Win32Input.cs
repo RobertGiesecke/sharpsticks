@@ -22,6 +22,7 @@ internal static partial class Win32Input
 	public const uint MouseEventRightUp = 0x0010;
 	public const uint MouseEventMiddleDown = 0x0020;
 	public const uint MouseEventMiddleUp = 0x0040;
+	public const uint MouseEventMove = 0x0001;
 	public const uint MouseEventXDown = 0x0080;
 	public const uint MouseEventXUp = 0x0100;
 
@@ -113,5 +114,12 @@ internal static partial class Win32Input
 		{
 			Type = InputMouse,
 			Union = new() { Mouse = new() { Flags = flags, MouseData = mouseData } },
+		};
+
+	public static Input MouseMove(int dx, int dy) =>
+		new()
+		{
+			Type = InputMouse,
+			Union = new() { Mouse = new() { Dx = dx, Dy = dy, Flags = MouseEventMove } },
 		};
 }

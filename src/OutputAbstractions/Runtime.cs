@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using SharpSticks.InputSynthesis.Mouse;
 
 namespace SharpSticks.OutputAbstractions;
 
@@ -21,6 +22,9 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private readonly ITimeSource _Time;
 	private readonly IInputSynthesizer? _InputSynthesizer;
 	private readonly bool _InitializeInputSynthesizer;
+	private readonly ImmutableArray<OutputMouseAxisRoute> _MouseAxisRoutes;
+	private long _MouseMoveLastTicks;
+	private bool _MouseMoveHasLast;
 
 	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
@@ -81,6 +85,20 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
 	}
 
+	private sealed class OutputMouseAxisRoute
+	{
+		public required int SourceDeviceIndex { get; init; }
+		public required TInputDevice SourceDevice { get; init; }
+		public required AxisBinding Source { get; init; }
+		public required MouseDirection Direction { get; init; }
+		public required double Sensitivity { get; init; }
+		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
+
+		// Sub-pixel remainder carried across frames so slow movement isn't lost to
+		// integer truncation.
+		public double Accumulator;
+	}
+
 	private sealed class OutputAxisToButtonRoute
 	{
 		public required int SourceDeviceIndex { get; init; }
@@ -106,6 +124,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ImmutableArray<AxisRoute> axisRoutes,
 		ImmutableArray<ButtonMacroRoute> macroRoutes,
 		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
+		ImmutableArray<AxisToMouseRoute> axisToMouseRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
 		ImmutableArray<TOutputDevice> outputDevices,
@@ -148,6 +167,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		var mergedMacroRoutes = macroRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisRoutes = axisRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisToButtonRoutes = axisToButtonRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisToMouseRoutes = axisToMouseRoutes.MergeOrGetAll(mergeObjectContext);
 
 		foreach (var route in mergedButtonRoutes)
 		{
@@ -253,6 +273,27 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 					Mode = route.Mode,
 					PulseDurationTicks = durationTicks,
 					OutputButtonStateIndex = _OutputButtonStateIndexByBinding[route.OutputBinding],
+				};
+			})
+		];
+		_MouseAxisRoutes =
+		[
+			..mergedAxisToMouseRoutes.Select(route =>
+			{
+				if (route.Movement.Kind != MovementKind.Relative)
+				{
+					throw new NotSupportedException(
+						"Only relative mouse movement is implemented; absolute is not yet supported.");
+				}
+
+				return new OutputMouseAxisRoute
+				{
+					SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
+					SourceDevice = DevicesById[route.Source.DeviceId],
+					Source = route.Source,
+					Direction = route.Direction,
+					Sensitivity = route.Sensitivity,
+					RuntimeModifier = route.Modifier?.CreateModifierRuntimeContext(this),
 				};
 			})
 		];
@@ -393,12 +434,61 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		var shouldLogNow = debugLogger?.ShouldLogNow() is true;
 
 		_Macros?.Step(currentStates);
-		// Macros are the only source of synthesized key/mouse events; commit them
-		// once here. No-op when no synthesizer is configured or none were emitted.
-		_InputSynthesizer?.Flush();
 		StepAxisZones(currentStates);
 		ApplyButtons(currentStates, shouldLogNow ? debugLogger : null);
 		ApplyAxes(currentStates, shouldLogNow ? debugLogger : null);
+		StepMouseAxes(currentStates);
+		// Commit this frame's synthesized events (macro keys + mouse moves) in one
+		// batch. No-op when no synthesizer is configured or none were emitted.
+		_InputSynthesizer?.Flush();
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
+	private void StepMouseAxes(JoystickState?[] states)
+	{
+		if (_MouseAxisRoutes.IsEmpty)
+		{
+			return;
+		}
+
+		var now = _Time.GetTimestamp();
+		var elapsedSeconds = _MouseMoveHasLast ? (now - _MouseMoveLastTicks) / (double)_Time.Frequency : 0.0;
+		_MouseMoveLastTicks = now;
+		_MouseMoveHasLast = true;
+
+		var dx = 0;
+		var dy = 0;
+		foreach (var route in _MouseAxisRoutes)
+		{
+			if (states[route.SourceDeviceIndex] is not { } state)
+			{
+				continue;
+			}
+
+			var value = route.SourceDevice.ReadNormalizedAxisValue(state, route.Source);
+			if (route.RuntimeModifier is { } m)
+			{
+				value = m.Apply(value, states);
+			}
+
+			route.Accumulator += value * route.Sensitivity * elapsedSeconds;
+			var step = (int)route.Accumulator; // truncates toward zero; remainder carries
+			route.Accumulator -= step;
+
+			if (route.Direction == MouseDirection.X)
+			{
+				dx += step;
+			}
+			else
+			{
+				dy += step;
+			}
+		}
+
+		if (dx != 0 || dy != 0)
+		{
+			_InputSynthesizer?.MoveMouseRelative(dx, dy);
+		}
 	}
 
 	private void StepAxisZones(JoystickState?[] states)

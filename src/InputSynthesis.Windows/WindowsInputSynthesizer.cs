@@ -49,6 +49,8 @@ public sealed class WindowsInputSynthesizer : IInputSynthesizer
 	public void MouseButtonDown(OutputMouseButton button) => _Send(BuildMouse(button, down: true));
 	public void MouseButtonUp(OutputMouseButton button) => _Send(BuildMouse(button, down: false));
 
+	public void MoveMouseRelative(int dx, int dy) => _Send(Win32Input.MouseMove(dx, dy));
+
 	internal static Win32Input.Input BuildMouse(OutputMouseButton button, bool down) => button switch
 	{
 		OutputMouseButton.Left =>
