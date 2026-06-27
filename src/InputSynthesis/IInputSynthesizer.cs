@@ -1,7 +1,7 @@
-using SharpSticks.InputAbstractions.Keyboard;
-using SharpSticks.InputAbstractions.Mouse;
+using SharpSticks.InputSynthesis.Keyboard;
+using SharpSticks.InputSynthesis.Mouse;
 
-namespace SharpSticks.InputAbstractions;
+namespace SharpSticks.InputSynthesis;
 
 /// <summary>
 /// Synthesizes keyboard and mouse events at the OS level — the sink that macro

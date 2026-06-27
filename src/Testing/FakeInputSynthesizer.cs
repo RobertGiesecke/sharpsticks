@@ -1,5 +1,5 @@
-using SharpSticks.InputAbstractions.Keyboard;
-using SharpSticks.InputAbstractions.Mouse;
+using SharpSticks.InputSynthesis.Keyboard;
+using SharpSticks.InputSynthesis.Mouse;
 
 namespace SharpSticks.Testing;
 

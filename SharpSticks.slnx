@@ -10,6 +10,7 @@
   <Project Path="src/Editor/Editor.csproj" />
   <Project Path="src/Generators/Generators.csproj" />
   <Project Path="src/InputAbstractions/InputAbstractions.csproj" />
+  <Project Path="src/InputSynthesis/InputSynthesis.csproj" />
   <Project Path="src/LinuxInput/LinuxInput.csproj" />
   <Project Path="src/LinuxNative/LinuxNative.csproj" />
   <Project Path="src/LinuxOutput/LinuxOutput.csproj" />

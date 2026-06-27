@@ -1,4 +1,4 @@
-namespace SharpSticks.InputAbstractions.Keyboard;
+namespace SharpSticks.InputSynthesis.Keyboard;
 
 /// <summary>
 /// Any keyboard key, named or not — the value type bindings actually carry.

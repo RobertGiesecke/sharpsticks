@@ -1,9 +1,8 @@
-namespace SharpSticks.InputAbstractions.Keyboard;
+namespace SharpSticks.InputSynthesis.Keyboard;
 
 /// <summary>
-/// Reads a keyboard key. The keyboard is a singleton, so unlike
-/// <see cref="ButtonBinding"/> there is no device id — the key identifies
-/// everything.
+/// Reads a keyboard key. The keyboard is a singleton, so unlike a joystick button
+/// binding there is no device id — the key identifies everything.
 /// </summary>
 public sealed record KeyBinding(Key Key);
 

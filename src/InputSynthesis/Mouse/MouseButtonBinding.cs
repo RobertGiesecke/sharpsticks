@@ -1,4 +1,4 @@
-namespace SharpSticks.InputAbstractions.Mouse;
+namespace SharpSticks.InputSynthesis.Mouse;
 
 /// <summary>
 /// Reads a mouse button. The mouse is a singleton, so there is no device id. Uses
