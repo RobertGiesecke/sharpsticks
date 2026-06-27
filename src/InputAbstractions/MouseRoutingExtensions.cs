@@ -26,4 +26,12 @@ public static class MouseRoutingExtensions
 			Sensitivity = sensitivity,
 			Modifier = modifier,
 		};
+
+	/// <summary>Route this button to a synthesized mouse button (held while the source is held).</summary>
+	public static ButtonToMouseRoute RouteToMouse(this ButtonBinding source, OutputMouseButton button) =>
+		new()
+		{
+			Source = source,
+			Button = button,
+		};
 }
