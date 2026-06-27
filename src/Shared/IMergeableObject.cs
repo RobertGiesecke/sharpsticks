@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace SharpSticks.InputAbstractions;
+namespace SharpSticks.Shared;
 
 /// <summary>
 /// Can be merged to a single instance based on equality

@@ -10,5 +10,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\InputSynthesis\InputSynthesis.csproj" />
+        <ProjectReference Include="..\Shared\Shared.csproj" />
     </ItemGroup>
 </Project>
