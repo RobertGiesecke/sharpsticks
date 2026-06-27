@@ -1,3 +1,4 @@
+using SharpSticks.InputSynthesis.Mouse;
 using static System.TimeSpan;
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
@@ -27,6 +28,13 @@ BuildAndRunAsConsole(new()
 	Name = "ItB minimal + scaled rotations",
 	Routes =
 	[
+		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X),
+		RightStick.Axes.Ry.RouteToMouse(MouseDirection.Y),
+		RightStick.Buttons.ThumbStick.ComplexRoute(new()
+		{
+			OnPress = [ PressMouseButton(OutputMouseButton.Left) ],
+			OnRelease = [ ReleaseMouseButton(OutputMouseButton.Left) ],
+		}),
 		// switch to gimbals while holding cm hat east
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()
 		{
@@ -103,6 +111,7 @@ BuildAndRunAsConsole(new()
 [RenameAxis(DeviceNames.Pedals, Axis.Slider2, "RightToeBrake")]
 // right stick
 [RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
+[RenameButton(DeviceNames.RightVpcStickWarBRD, 6, "ThumbStick")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
 // left stick
