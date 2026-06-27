@@ -181,7 +181,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 						OutputDevice = outputDevices[outputDeviceIndexes[binding.OutputDeviceId]],
 						TargetButton = binding.ButtonNumber,
 						TargetBinding = binding,
-						ButtonBinding = default,
+						ButtonBinding = null,
 						SourceDeviceIndex = -1,
 						IsFirstBinding = true,
 						IsLastBinding = true,
