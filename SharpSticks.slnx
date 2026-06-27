@@ -21,6 +21,7 @@
   <Project Path="src/PlatformDefaults/PlatformDefaults.csproj" />
   <Project Path="src/PlatformInput/PlatformInput.csproj" />
   <Project Path="src/PlatformOutput/PlatformOutput.csproj" />
+  <Project Path="src/Shared/Shared.csproj" />
   <Project Path="src/Testing/Testing.csproj" />
   <Project Path="src/Tests/Tests.csproj" />
   <Project Path="src/VJoy/VJoy.csproj" />
