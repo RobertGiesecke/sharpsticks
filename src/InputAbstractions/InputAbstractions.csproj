@@ -5,10 +5,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Collections.Pooled.V2" Version="2.4.1"/>
-    </ItemGroup>
-
-    <ItemGroup>
         <ProjectReference Include="..\InputSynthesis\InputSynthesis.csproj" />
         <ProjectReference Include="..\Shared\Shared.csproj" />
     </ItemGroup>
