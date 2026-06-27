@@ -16,9 +16,15 @@ public sealed class FakeInputSynthesizer : IInputSynthesizer
 		KeyUp,
 		MouseButtonDown,
 		MouseButtonUp,
+		MouseMove,
 	}
 
-	public readonly record struct Event(EventKind Kind, Key Key = default, OutputMouseButton MouseButton = default);
+	public readonly record struct Event(
+		EventKind Kind,
+		Key Key = default,
+		OutputMouseButton MouseButton = default,
+		int Dx = 0,
+		int Dy = 0);
 
 	private readonly List<Event> _Events = [];
 
@@ -29,5 +35,6 @@ public sealed class FakeInputSynthesizer : IInputSynthesizer
 	public void KeyUp(Key key) => _Events.Add(new(EventKind.KeyUp, Key: key));
 	public void MouseButtonDown(OutputMouseButton button) => _Events.Add(new(EventKind.MouseButtonDown, MouseButton: button));
 	public void MouseButtonUp(OutputMouseButton button) => _Events.Add(new(EventKind.MouseButtonUp, MouseButton: button));
+	public void MoveMouseRelative(int dx, int dy) => _Events.Add(new(EventKind.MouseMove, Dx: dx, Dy: dy));
 	public void Flush() => FlushCount++;
 }

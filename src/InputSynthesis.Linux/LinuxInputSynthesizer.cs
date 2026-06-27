@@ -63,6 +63,19 @@ public sealed class LinuxInputSynthesizer : IInputSynthesizer, IDisposable
 	public void MouseButtonDown(OutputMouseButton button) => Emit(EvdevEvent.Key(MouseCode(button), down: true));
 	public void MouseButtonUp(OutputMouseButton button) => Emit(EvdevEvent.Key(MouseCode(button), down: false));
 
+	public void MoveMouseRelative(int dx, int dy)
+	{
+		if (dx != 0)
+		{
+			Emit(EvdevEvent.Rel(EvdevEvent.RelX, dx));
+		}
+
+		if (dy != 0)
+		{
+			Emit(EvdevEvent.Rel(EvdevEvent.RelY, dy));
+		}
+	}
+
 	private static ushort MouseCode(OutputMouseButton button) => button switch
 	{
 		OutputMouseButton.Left => EvdevEvent.BtnLeft,

@@ -90,6 +90,7 @@ public static class RuntimeBuilder
 			using var axisRoutes = usedSourceRoutes.OfType<AxisRoute>().ToPooledList();
 			using var macroRoutes = usedSourceRoutes.OfType<ButtonMacroRoute>().ToPooledList();
 			using var axisToButtonRoutes = usedSourceRoutes.OfType<AxisToButtonRoute>().ToPooledList();
+			using var axisToMouseRoutes = usedSourceRoutes.OfType<AxisToMouseRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
 			using var auxiliaryOutputButtons = new PooledSet<OutputButtonBinding>();
@@ -185,6 +186,12 @@ public static class RuntimeBuilder
 				auxiliaryOutputButtons.Add(route.OutputBinding);
 			}
 
+			foreach (var route in axisToMouseRoutes)
+			{
+				referencedDeviceIds.Add(route.Source.DeviceId);
+				route.Modifier?.FillDevices(referencedDeviceIds);
+			}
+
 			foreach (var output in auxiliaryOutputButtons)
 			{
 				if (output.OutputDeviceId < 1)
@@ -236,6 +243,7 @@ public static class RuntimeBuilder
 						[..axisRoutes.Span],
 						[..macroRoutes.Span],
 						[..axisToButtonRoutes.Span],
+						[..axisToMouseRoutes.Span],
 						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices,
