@@ -17,6 +17,10 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 	public static LinuxOutputDeviceFactory Factory => LinuxOutputDeviceFactory.Instance;
 	static IOutputDeviceFactory<LinuxOutputDevice> IOutputDeviceWithFactory<LinuxOutputDevice>.Factory => Factory;
 
+	// uinput is the Linux output marker, so the uinput-backed synthesizer is the
+	// platform default for key/mouse macro output.
+	public static IInputSynthesizer? DefaultInputSynthesizer => LinuxInputSynthesizer.Instance;
+
 	internal LinuxOutputDevice(
 		uint deviceId,
 		int fd,

@@ -20,6 +20,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private readonly MacroEngine? _Macros;
 	private readonly ITimeSource _Time;
 	private readonly IInputSynthesizer? _InputSynthesizer;
+	private readonly bool _InitializeInputSynthesizer;
 
 	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
@@ -108,12 +109,14 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
 		ImmutableArray<TOutputDevice> outputDevices,
-		IInputSynthesizer? inputSynthesizer = null)
+		IInputSynthesizer? inputSynthesizer = null,
+		bool initializeInputSynthesizer = true)
 	{
 		Name = name;
 		_DebugLogger = debugLogger;
 		_Time = timeSource;
 		_InputSynthesizer = inputSynthesizer;
+		_InitializeInputSynthesizer = initializeInputSynthesizer;
 		_Devices = [..devices.Values];
 		DevicesById = devices.ToFrozenDictionary();
 		{
@@ -302,6 +305,13 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		debugLogger ??= _DebugLogger;
 		try
 		{
+			// Prepare the synthesizer backend (e.g. create the uinput device) as the
+			// runtime starts, unless the build opted out; first use covers it lazily.
+			if (_InitializeInputSynthesizer)
+			{
+				_InputSynthesizer?.EnsureInitialized();
+			}
+
 			LogStartup(debugLogger);
 
 			var waitHandles = DevicesById.Values
