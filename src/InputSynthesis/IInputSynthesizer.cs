@@ -22,6 +22,14 @@ public interface IInputSynthesizer
 	void MouseButtonDown(OutputMouseButton button);
 	void MouseButtonUp(OutputMouseButton button);
 
+	/// <summary>
+	/// Eagerly prepare the backend so the first event has no setup cost and any
+	/// setup failure surfaces at runtime start rather than mid-session. Idempotent.
+	/// The runtime calls this when it starts unless the build opts out; backends
+	/// that need no setup (Windows SendInput, fakes) leave it a no-op.
+	/// </summary>
+	void EnsureInitialized() { }
+
 	/// <summary>Commit any buffered events. No-op for backends that emit eagerly.</summary>
 	void Flush();
 }

@@ -19,6 +19,13 @@ public static class ConsoleExtensions<TInputDevice, TOutputDevice>
 		/// set it to override or to opt out with a no-op.
 		/// </summary>
 		public IInputSynthesizer? InputSynthesizer { get; init; }
+
+		/// <summary>
+		/// Initialize the synthesizer's backend at startup (the Linux uinput device,
+		/// etc.). Default true. Set false on a profile that doesn't synthesize input
+		/// to keep the synthetic device from being created.
+		/// </summary>
+		public bool InitializeInputSynthesizer { get; init; } = true;
 		public ImmutableArray<TInputDevice>? ConnectedDevices { get; init; }
 		public ImmutableArray<IRoute> Routes { get; init; } = [];
 	}

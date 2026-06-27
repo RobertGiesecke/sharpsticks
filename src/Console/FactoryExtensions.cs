@@ -90,6 +90,7 @@ public static class FactoryExtensions
 			DebugLogger = o.DebugLogger,
 			OutputDeviceFactory = o.OutputDeviceFactory,
 			InputSynthesizer = o.InputSynthesizer ?? TOutputDevice.DefaultInputSynthesizer,
+			InitializeInputSynthesizer = o.InitializeInputSynthesizer,
 			ConnectedDevices = o.ConnectedDevices ?? [..joystickDevices!],
 			Routes = o.Routes,
 		};

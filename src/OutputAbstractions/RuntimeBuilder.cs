@@ -17,6 +17,16 @@ public static class RuntimeBuilder
 		/// uses key/mouse macro actions without one fails fast at build.
 		/// </summary>
 		public IInputSynthesizer? InputSynthesizer { get; init; }
+
+		/// <summary>
+		/// Whether <see cref="Runtime{TInputDevice,TOutputDevice}.Run"/> calls
+		/// <see cref="IInputSynthesizer.EnsureInitialized"/> as it starts, so the
+		/// backend (e.g. the Linux uinput device) is created up front and any failure
+		/// surfaces at startup. Set false to defer setup to first use — e.g. a
+		/// joystick-only profile that never wants the synthetic device created.
+		/// Default true; no-op when there is no synthesizer.
+		/// </summary>
+		public bool InitializeInputSynthesizer { get; init; } = true;
 		public required ImmutableArray<TInputDevice> ConnectedDevices { get; init; }
 		public ImmutableArray<IRoute> Routes { get; init; } = [];
 	}
@@ -226,7 +236,8 @@ public static class RuntimeBuilder
 						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices,
-						options.InputSynthesizer);
+						options.InputSynthesizer,
+						options.InitializeInputSynthesizer);
 				}
 				catch
 				{
