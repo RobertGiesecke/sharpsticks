@@ -21,6 +21,9 @@ public static class Macros
 	/// <summary>Synthesize a mouse-button release.</summary>
 	public static IMacroAction ReleaseMouseButton(OutputMouseButton button) => new MouseButtonAction(button, Down: false);
 
+	/// <summary>Synthesize a relative mouse move of (<paramref name="dx"/>, <paramref name="dy"/>) pixels.</summary>
+	public static IMacroAction MoveMouse(int dx, int dy) => new MoveMouseAction(dx, dy);
+
 	/// <summary>Synthesize a scroll-wheel increment of <paramref name="amount"/> in <paramref name="direction"/>.</summary>
 	public static IMacroAction Scroll(
 		ScrollDirection direction, int amount = 1, MouseScrollUnit unit = MouseScrollUnit.Notch)
@@ -213,6 +216,27 @@ public static class Macros
 			{
 				var (vertical, horizontal) = axis == ScrollAxis.Vertical ? (amount, 0) : (0, amount);
 				synthesizer.Scroll(vertical, horizontal, unit);
+				return MacroStatus.Done;
+			}
+		}
+	}
+
+	private sealed record MoveMouseAction(int Dx, int Dy) : IMacroAction, IMergeableObject<MoveMouseAction>
+	{
+		public void FillOutputs(ICollection<OutputButtonBinding> outputs)
+		{
+		}
+
+		IRuntimeMacroAction IMacroAction.CreateRuntimeAction(IRuntimeContext runtimeContext) =>
+			new RuntimeAction(GetSynthesizerOrThrow(runtimeContext), Dx, Dy);
+
+		public MoveMouseAction Merge(MergeObjectContext context) => this;
+
+		private sealed class RuntimeAction(IInputSynthesizer synthesizer, int dx, int dy) : IRuntimeMacroAction
+		{
+			public MacroStatus Step(MacroContext ctx)
+			{
+				synthesizer.MoveMouseRelative(dx, dy);
 				return MacroStatus.Done;
 			}
 		}
