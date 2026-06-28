@@ -16,6 +16,13 @@ internal static class EvdevEvent
 	// evdev REL_* relative axis codes.
 	public const ushort RelX = 0x00;
 	public const ushort RelY = 0x01;
+	public const ushort RelHWheel = 0x06;
+	public const ushort RelWheel = 0x08;
+	public const ushort RelWheelHiRes = 0x0b;
+	public const ushort RelHWheelHiRes = 0x0c;
+
+	/// <summary>High-res wheel value of one detent (kernel convention; matches Windows WHEEL_DELTA).</summary>
+	public const int WheelHiResPerNotch = 120;
 
 	public static LinuxInputEvent Key(ushort code, bool down) =>
 		new() { Type = EvType.Key, Code = code, Value = down ? 1 : 0 };

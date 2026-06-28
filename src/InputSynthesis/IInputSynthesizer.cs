@@ -26,6 +26,13 @@ public interface IInputSynthesizer
 	void MoveMouseRelative(int dx, int dy);
 
 	/// <summary>
+	/// Scroll the wheel. <paramref name="vertical"/> positive = up/away,
+	/// <paramref name="horizontal"/> positive = right. Amounts are in
+	/// <paramref name="unit"/> (whole detents by default).
+	/// </summary>
+	void Scroll(int vertical, int horizontal, MouseScrollUnit unit = MouseScrollUnit.Notch);
+
+	/// <summary>
 	/// Eagerly prepare the backend so the first event has no setup cost and any
 	/// setup failure surfaces at runtime start rather than mid-session. Idempotent.
 	/// The runtime calls this when it starts unless the build opts out; backends
