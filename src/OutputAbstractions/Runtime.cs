@@ -86,10 +86,12 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
 	}
 
+	private readonly record struct OutputMouseButtonSourceKey(int SourceDeviceIndex, int ButtonNumber);
+
 	private sealed class OutputMouseButtonGroup
 	{
 		public required OutputMouseButton Button { get; init; }
-		public required ImmutableArray<(int SourceDeviceIndex, int ButtonNumber)> Sources { get; init; }
+		public required ImmutableArray<OutputMouseButtonSourceKey> Sources { get; init; }
 		public bool WasAsserted;
 	}
 
@@ -316,7 +318,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 					Button = group.Key,
 					Sources =
 					[
-						..group.Select(route => (DeviceIndexesById[route.Source.DeviceId], route.Source.ButtonNumber)),
+						..group.Select(route => new OutputMouseButtonSourceKey(DeviceIndexesById[route.Source.DeviceId], route.Source.ButtonNumber)),
 					],
 				})
 		];
