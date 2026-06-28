@@ -220,7 +220,7 @@ public sealed class AllocationTests : IDisposable
 					}),
 
 				// SplitIntoButtons (4 even zones on a signed axis)
-				.._Stick2.BindAxis(Axis.X).SplitIntoButtons(
+				_Stick2.BindAxis(Axis.X).SplitIntoButtons(
 				[
 					_Output2.BindButton(3), _Output2.BindButton(4),
 					_Output2.BindButton(5), _Output2.BindButton(6),

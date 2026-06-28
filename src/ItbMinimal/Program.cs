@@ -33,7 +33,7 @@ BuildAndRunAsConsole(new()
 		LeftStick.Axes.ThumbStickVertical.Invert()
 			.RouteToScroll(ScrollAxis.Vertical, MouseScrollUnit.HighResolution, sensitivity: 100d),
 		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X),
-		..RightStick.Axes.Rx.SplitIntoButtons([
+		RightStick.Axes.Rx.SplitIntoButtons([
 			VJoy1.Buttons.HoldForZoom,
 			new MouseButtonTarget
 			{
