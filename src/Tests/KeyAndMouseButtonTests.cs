@@ -43,7 +43,7 @@ public sealed class KeyAndMouseButtonTests
 		var key = Key.FromKeyboard(0x87);
 		Assert.Equal(Key.KeyboardUsagePage, key.UsagePage);
 		Assert.Equal(0x87, key.Usage);
-		Assert.False(Enum.IsDefined((NamedKey)key.Code));
+		Assert.False(Enum.IsDefinedFast((NamedKey)key.Code));
 		Assert.Equal($"Key(0x{key.Code:X})", key.ToString());
 	}
 
@@ -67,7 +67,7 @@ public sealed class KeyAndMouseButtonTests
 	{
 		var button6 = new MouseButton(6);
 		Assert.Equal(6, button6.Index);
-		Assert.False(Enum.IsDefined((NamedMouseButton)button6.Index));
+		Assert.False(Enum.IsDefinedFast((NamedMouseButton)button6.Index));
 		Assert.Equal("MouseButton(6)", button6.ToString());
 	}
 }

@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace SharpSticks.InputSynthesis.Mouse;
 
 /// <summary>
@@ -14,9 +16,8 @@ public readonly record struct MouseButton(int Index)
 	public static implicit operator MouseButton(NamedMouseButton button) => new((int)button);
 
 	public override string ToString() =>
-		Enum.IsDefined((NamedMouseButton)Index)
-			? ((NamedMouseButton)Index).ToString()
-			: $"MouseButton({Index})";
+		((NamedMouseButton)Index).TryGetEnumName()
+		?? $"MouseButton({Index})";
 }
 
 /// <summary>
@@ -56,4 +57,49 @@ public enum OutputMouseButton
 	X1 = 4,
 	/// <summary>X2 / "forward" side button.</summary>
 	X2 = 5,
+}
+
+
+public static class MouseButtonExtensions
+{
+	extension(Enum)
+	{
+		public static bool IsDefinedFast(NamedMouseButton button) => button switch
+		{
+			NamedMouseButton.Left => true,
+			NamedMouseButton.Right => true,
+			NamedMouseButton.Middle => true,
+			NamedMouseButton.X1 => true,
+			NamedMouseButton.X2 => true,
+			_ => false,
+		};
+
+		public static bool IsDefinedFast(OutputMouseButton button) => button switch
+		{
+			OutputMouseButton.Left => true,
+			OutputMouseButton.Right => true,
+			OutputMouseButton.Middle => true,
+			OutputMouseButton.X1 => true,
+			OutputMouseButton.X2 => true,
+			_ => false,
+		};
+	}
+
+	extension(NamedMouseButton button)
+	{
+		public string? TryGetEnumName() => !Enum.IsDefinedFast(button)
+			? null
+			: button.ToStringFast();		
+
+#pragma warning disable CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
+		public string ToStringFast() => button switch
+#pragma warning restore CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
+		{
+			NamedMouseButton.Left => nameof(NamedMouseButton.Left),
+			NamedMouseButton.Right => nameof(NamedMouseButton.Right),
+			NamedMouseButton.Middle => nameof(NamedMouseButton.Middle),
+			NamedMouseButton.X1 => nameof(NamedMouseButton.X1),
+			NamedMouseButton.X2 => nameof(NamedMouseButton.X2),
+		};		
+	}
 }
