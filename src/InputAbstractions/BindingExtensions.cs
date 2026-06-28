@@ -258,9 +258,9 @@ public static class BindingExtensions
 		}
 	}
 
-	public static ImmutableArray<AxisToButtonRoute> SplitIntoButtons(
+	public static ImmutableArray<IRoute> SplitIntoButtons(
 		this AxisBinding axis,
-		ImmutableArray<OutputButtonBinding> outputs,
+		ImmutableArray<ButtonTarget> outputs,
 		AxisZoneOptions? options = null)
 	{
 		if (outputs.IsDefaultOrEmpty)
@@ -271,20 +271,41 @@ public static class BindingExtensions
 		var o = options ?? new();
 		var (lo, hi) = axis.Mode == AxisMode.Unsigned ? (0.0, 1.0) : (-1.0, 1.0);
 		var step = (hi - lo) / outputs.Length;
-		var builder = ImmutableArray.CreateBuilder<AxisToButtonRoute>(outputs.Length);
+		var builder = ImmutableArray.CreateBuilder<IRoute>(outputs.Length);
 		for (var i = 0; i < outputs.Length; i++)
 		{
 			var isLast = i == outputs.Length - 1;
-			builder.Add(new()
-			{
-				Source = axis,
-				OutputBinding = outputs[i],
-				Min = lo + step * i,
-				Max = isLast ? hi : lo + step * (i + 1),
-				IncludeMax = isLast,
-				Mode = o.Mode,
-				PulseDuration = o.PulseDuration,
-			});
+			
+			builder.Add(
+				outputs[i] switch
+				{
+					OutputButtonBinding b => new AxisToButtonRoute
+					{
+						Source = axis,
+						OutputBinding = b,
+						Min = lo + step * i,
+						Max = isLast ? hi : lo + step * (i + 1),
+						IncludeMax = isLast,
+						Mode = o.Mode,
+						PulseDuration = o.PulseDuration,
+					},
+					MouseButtonTarget mouseButtonTarget => new AxisToMouseButtonRoute
+					{
+						Source = axis,
+						Min = lo + step * i,
+						Max = isLast ? hi : lo + step * (i + 1),
+						IncludeMax = isLast,
+						Button = mouseButtonTarget.Button,
+						Mode = o.Mode,
+						PulseDuration = o.PulseDuration,
+					},
+					// TODO: decide zone->scroll semantics (pulse once on entering the zone vs
+					// repeat while in the zone) and implement; deferred pending that decision.
+					ScrollTarget scrollTarget => throw new NotSupportedException(
+						"Scroll targets in SplitIntoButtons are not implemented yet."),
+					_ => throw new ArgumentOutOfRangeException(nameof(outputs)),
+				}
+			);
 		}
 
 		return builder.MoveToImmutable();

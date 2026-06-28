@@ -28,7 +28,18 @@ BuildAndRunAsConsole(new()
 	Name = "ItB minimal + scaled rotations",
 	Routes =
 	[
+		LeftStick.Axes.ThumbStickHorizontal.Invert()
+			.RouteToScroll(ScrollAxis.Horizontal, MouseScrollUnit.HighResolution, sensitivity: 100d),
+		LeftStick.Axes.ThumbStickVertical.Invert()
+			.RouteToScroll(ScrollAxis.Vertical, MouseScrollUnit.HighResolution, sensitivity: 100d),
 		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X),
+		..RightStick.Axes.Rx.SplitIntoButtons([
+			VJoy1.Buttons.HoldForZoom,
+			new MouseButtonTarget
+			{
+				Button = OutputMouseButton.Middle,
+			},
+		]),
 		RightStick.Axes.Ry.RouteToMouse(MouseDirection.Y),
 		RightStick.Buttons.ThumbStick.RouteToMouse(OutputMouseButton.Left),
 		// switch to gimbals while holding cm hat east
@@ -112,6 +123,8 @@ BuildAndRunAsConsole(new()
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
 // left stick
 [RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
+[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Rx, "ThumbStickHorizontal")]
+[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Ry, "ThumbStickVertical")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]

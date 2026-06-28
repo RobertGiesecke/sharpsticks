@@ -4,7 +4,8 @@ using SharpSticks.InputSynthesis.Mouse;
 namespace SharpSticks.OutputAbstractions;
 
 //public sealed class Runtime : IOutputRuntimeContext, IDisposable
-public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext<TInputDevice, TOutputDevice>
+public sealed class Runtime<TInputDevice, TOutputDevice>
+	: IOutputRuntimeContext<TInputDevice, TOutputDevice>, IButtonSinkContext
 	where TInputDevice : JoystickDevice
 	where TOutputDevice : OutputDevice
 {
@@ -18,6 +19,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private readonly FrozenDictionary<OutputButtonBinding, OutputButtonStateIndex> _OutputButtonStateIndexByBinding;
 	private readonly ImmutableArray<TInputDevice> _Devices;
 	private readonly ImmutableArray<TOutputDevice> _OutputDevices;
+	private readonly FrozenDictionary<uint, TOutputDevice> _OutputDevicesById;
 	private readonly MacroEngine? _Macros;
 	private readonly ITimeSource _Time;
 	private readonly IInputSynthesizer? _InputSynthesizer;
@@ -30,6 +32,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private bool _MouseMoveHasLast;
 	private long _ScrollLastTicks;
 	private bool _ScrollHasLast;
+	private long? _MouseButtonZoneNextDeadlineTicks;
 
 	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
@@ -40,6 +43,11 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 
 	public OutputButtonStateIndex? TryGetOutputStateIndex(OutputButtonBinding binding) =>
 		_OutputButtonStateIndexByBinding.TryGetValue(binding, out var index) ? index : null;
+
+	IInputSynthesizer? IButtonSinkContext.Synthesizer => _InputSynthesizer;
+
+	IButtonStateSink IButtonSinkContext.CreateOutputButtonSink(OutputButtonBinding binding) =>
+		new OutputButtonSink(_OutputDevicesById[binding.OutputDeviceId], binding.ButtonNumber);
 
 	private record struct OutputButtonState
 	{
@@ -92,10 +100,25 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 
 	private readonly record struct OutputMouseButtonSourceKey(int SourceDeviceIndex, int ButtonNumber);
 
+	private sealed class OutputMouseButtonZoneSource
+	{
+		public required int SourceDeviceIndex { get; init; }
+		public required TInputDevice SourceDevice { get; init; }
+		public required AxisBinding Source { get; init; }
+		public required double Min { get; init; }
+		public required double Max { get; init; }
+		public required bool IncludeMax { get; init; }
+		public required AxisZoneTriggerMode Mode { get; init; }
+		public required long PulseDurationTicks { get; init; }
+
+		public ZoneActivation Zone;
+	}
+
 	private sealed class OutputMouseButtonGroup
 	{
 		public required OutputMouseButton Button { get; init; }
 		public required ImmutableArray<OutputMouseButtonSourceKey> Sources { get; init; }
+		public required ImmutableArray<OutputMouseButtonZoneSource> Zones { get; init; }
 		public bool WasAsserted;
 	}
 
@@ -150,9 +173,68 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public required long PulseDurationTicks { get; init; }
 		public required OutputButtonStateIndex OutputButtonStateIndex { get; init; }
 
+		public ZoneActivation Zone;
+	}
+
+	// Per-zone Hold/Pulse state, shared by vJoy-button and mouse-button zones.
+	private struct ZoneActivation
+	{
 		public bool IsAsserting;
 		public long PulseDeadlineTicks;
 		public bool PulseCooldown;
+	}
+
+	/// <summary>
+	/// Advances one zone's Hold/Pulse state for this frame and returns whether it is
+	/// asserting. <c>Hold</c> asserts while in range; <c>Pulse</c> asserts for
+	/// <paramref name="pulseDurationTicks"/> on entering range, then waits (cooldown)
+	/// until the axis leaves the zone. The earliest live pulse deadline is folded into
+	/// <paramref name="earliestDeadline"/> so the run loop can wake to end the pulse.
+	/// </summary>
+	private static bool AdvanceZoneActivation(
+		bool inRange,
+		AxisZoneTriggerMode mode,
+		long pulseDurationTicks,
+		long now,
+		ref ZoneActivation zone,
+		ref long? earliestDeadline)
+	{
+		if (mode == AxisZoneTriggerMode.Hold)
+		{
+			zone.IsAsserting = inRange;
+			return inRange;
+		}
+
+		if (zone.IsAsserting)
+		{
+			if (now >= zone.PulseDeadlineTicks)
+			{
+				zone.IsAsserting = false;
+				zone.PulseCooldown = inRange;
+			}
+			else if (earliestDeadline is null || zone.PulseDeadlineTicks < earliestDeadline)
+			{
+				earliestDeadline = zone.PulseDeadlineTicks;
+			}
+		}
+		else if (zone.PulseCooldown)
+		{
+			if (!inRange)
+			{
+				zone.PulseCooldown = false;
+			}
+		}
+		else if (inRange)
+		{
+			zone.IsAsserting = true;
+			zone.PulseDeadlineTicks = now + pulseDurationTicks;
+			if (earliestDeadline is null || zone.PulseDeadlineTicks < earliestDeadline)
+			{
+				earliestDeadline = zone.PulseDeadlineTicks;
+			}
+		}
+
+		return zone.IsAsserting;
 	}
 
 	public Runtime(
@@ -167,6 +249,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ImmutableArray<ButtonToMouseRoute> buttonToMouseRoutes,
 		ImmutableArray<AxisToScrollRoute> axisToScrollRoutes,
 		ImmutableArray<ButtonToScrollRoute> buttonToScrollRoutes,
+		ImmutableArray<AxisToMouseButtonRoute> axisToMouseButtonRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
 		ImmutableArray<TOutputDevice> outputDevices,
@@ -213,6 +296,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		var mergedButtonToMouseRoutes = buttonToMouseRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisToScrollRoutes = axisToScrollRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedButtonToScrollRoutes = buttonToScrollRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisToMouseButtonRoutes = axisToMouseButtonRoutes.MergeOrGetAll(mergeObjectContext);
 
 		foreach (var route in mergedButtonRoutes)
 		{
@@ -300,6 +384,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			})
 		];
 		_OutputDevices = outputDevices;
+		_OutputDevicesById = outputDevices.ToFrozenDictionary(device => device.DeviceId);
 		
 		_AxisToButtonRoutes =
 		[
@@ -342,16 +427,37 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 				};
 			})
 		];
+		// A mouse button can be asserted by physical buttons and/or axis zones; group
+		// both source kinds under the same button so StepMouseButtons ORs them.
 		_MouseButtonRoutes =
 		[
-			..mergedButtonToMouseRoutes
-				.GroupBy(route => route.Button)
-				.Select(group => new OutputMouseButtonGroup
+			..mergedButtonToMouseRoutes.Select(route => route.Button)
+				.Concat(mergedAxisToMouseButtonRoutes.Select(route => route.Button))
+				.Distinct()
+				.Select(button => new OutputMouseButtonGroup
 				{
-					Button = group.Key,
+					Button = button,
 					Sources =
 					[
-						..group.Select(route => new OutputMouseButtonSourceKey(DeviceIndexesById[route.Source.DeviceId], route.Source.ButtonNumber)),
+						..mergedButtonToMouseRoutes
+							.Where(route => route.Button == button)
+							.Select(route => new OutputMouseButtonSourceKey(DeviceIndexesById[route.Source.DeviceId], route.Source.ButtonNumber)),
+					],
+					Zones =
+					[
+						..mergedAxisToMouseButtonRoutes
+							.Where(route => route.Button == button)
+							.Select(route => new OutputMouseButtonZoneSource
+							{
+								SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
+								SourceDevice = DevicesById[route.Source.DeviceId],
+								Source = route.Source,
+								Min = route.Min,
+								Max = route.Max,
+								IncludeMax = route.IncludeMax,
+								Mode = route.Mode,
+								PulseDurationTicks = (long)(route.PulseDuration.TotalSeconds * timeSource.Frequency),
+							}),
 					],
 				})
 		];
@@ -477,6 +583,12 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			deadline = zoneDeadline;
 		}
 
+		if (_MouseButtonZoneNextDeadlineTicks is { } mouseZoneDeadline &&
+		    (deadline is null || mouseZoneDeadline < deadline))
+		{
+			deadline = mouseZoneDeadline;
+		}
+
 		if (deadline is null)
 		{
 			return Timeout.Infinite;
@@ -531,6 +643,9 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
 	private void StepMouseButtons(JoystickState?[] states)
 	{
+		var now = _Time.GetTimestamp();
+		long? earliestDeadline = null;
+
 		foreach (var group in _MouseButtonRoutes)
 		{
 			var asserted = false;
@@ -541,6 +656,21 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 					asserted = true;
 					break;
 				}
+			}
+
+			// Advance every zone (even once asserted) so pulse timers keep ticking, then
+			// OR each zone's activation in — physical buttons and zones share the button.
+			foreach (var zone in group.Zones)
+			{
+				var inRange = false;
+				if (states[zone.SourceDeviceIndex] is { } state)
+				{
+					var value = zone.SourceDevice.ReadNormalizedAxisValue(state, zone.Source);
+					inRange = value >= zone.Min && (zone.IncludeMax ? value <= zone.Max : value < zone.Max);
+				}
+
+				asserted |= AdvanceZoneActivation(
+					inRange, zone.Mode, zone.PulseDurationTicks, now, ref zone.Zone, ref earliestDeadline);
 			}
 
 			if (asserted == group.WasAsserted)
@@ -559,6 +689,8 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 
 			group.WasAsserted = asserted;
 		}
+
+		_MouseButtonZoneNextDeadlineTicks = earliestDeadline;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -727,53 +859,22 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 				          (route.IncludeMax ? value <= route.Max : value < route.Max);
 			}
 
-			if (route.Mode == AxisZoneTriggerMode.Hold)
-			{
-				switch (inRange)
-				{
-					case true when !route.IsAsserting:
-						OutputButtonState.IncrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-						route.IsAsserting = true;
-						break;
-					case false when route.IsAsserting:
-						OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-						route.IsAsserting = false;
-						break;
-				}
+			var wasAsserting = route.Zone.IsAsserting;
+			var asserting = AdvanceZoneActivation(
+				inRange, route.Mode, route.PulseDurationTicks, now, ref route.Zone, ref earliestDeadline);
 
+			if (asserting == wasAsserting)
+			{
 				continue;
 			}
 
-			// Pulse mode.
-			if (route.IsAsserting)
-			{
-				if (now >= route.PulseDeadlineTicks)
-				{
-					OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-					route.IsAsserting = false;
-					route.PulseCooldown = inRange;
-				}
-				else if (earliestDeadline is null || route.PulseDeadlineTicks < earliestDeadline)
-				{
-					earliestDeadline = route.PulseDeadlineTicks;
-				}
-			}
-			else if (route.PulseCooldown)
-			{
-				if (!inRange)
-				{
-					route.PulseCooldown = false;
-				}
-			}
-			else if (inRange)
+			if (asserting)
 			{
 				OutputButtonState.IncrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-				route.IsAsserting = true;
-				route.PulseDeadlineTicks = now + route.PulseDurationTicks;
-				if (earliestDeadline is null || route.PulseDeadlineTicks < earliestDeadline)
-				{
-					earliestDeadline = route.PulseDeadlineTicks;
-				}
+			}
+			else
+			{
+				OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
 			}
 		}
 

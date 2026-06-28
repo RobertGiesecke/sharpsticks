@@ -1,9 +1,9 @@
 namespace SharpSticks.Tests;
 
 /// <summary>
-/// A source button routes to any <see cref="IButtonTarget"/> — vJoy button, mouse
+/// A source button routes to any <see cref="ButtonTarget"/> — vJoy button, mouse
 /// button, or scroll increment — producing the matching discrete route type. The
-/// concrete <c>OutputButtonBinding</c> overload stays more specific than the interface one.
+/// concrete <c>OutputButtonBinding</c> overload stays more specific than the base one.
 /// </summary>
 public sealed class ButtonTargetRoutingTests : IDisposable
 {
@@ -23,15 +23,15 @@ public sealed class ButtonTargetRoutingTests : IDisposable
 		var source = _Stick.BindButton(1);
 
 		Assert.IsType<ButtonRoute>(source.RouteTo(new OutputButtonBinding(1, 1)));
-		Assert.IsType<ButtonToMouseRoute>(source.RouteTo(new MouseButtonTarget(OutputMouseButton.Left)));
+		Assert.IsType<ButtonToMouseRoute>(source.RouteTo(new MouseButtonTarget { Button = OutputMouseButton.Left }));
 		Assert.IsType<ButtonToScrollRoute>(source.RouteTo(ScrollTarget.Towards(ScrollDirection.Up)));
 	}
 
 	[Fact]
-	public void RouteTo_ViaInterfaceReference_DispatchesToTarget()
+	public void RouteTo_ViaBaseReference_DispatchesToTarget()
 	{
 		var source = _Stick.BindButton(1);
-		IButtonTarget vjoyButton = new OutputButtonBinding(1, 1);
+		ButtonTarget vjoyButton = new OutputButtonBinding(1, 1);
 
 		Assert.IsType<ButtonRoute>(source.RouteTo(vjoyButton));
 	}
