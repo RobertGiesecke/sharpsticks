@@ -6,7 +6,7 @@ public sealed record RouteToSameAxesOnOutputCombinedRoute : ICombinedRoute
 	public required uint OutputDeviceId { get; init; }
 	public RouteAxisOptions? Options { get; init; }
 
-	public IEnumerable<IBoundRoute> GetRoutes() =>
+	public IEnumerable<IRoute> GetRoutes() =>
 		SourceAxes.Distinct()
 			.Select(a => a.RouteToSameAxisOnOutput(OutputDeviceId, Options));
 }

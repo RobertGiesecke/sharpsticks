@@ -21,9 +21,6 @@ public sealed record ScrollTarget : ButtonTarget
 		return new() { Axis = axis, Amount = amount, Unit = unit };
 	}
 
-	public override IRoute CreateRoute(ButtonBinding source) =>
-		new ButtonToScrollRoute { Source = source, Axis = Axis, Amount = Amount, Unit = Unit };
-
 	public override IButtonStateSink CreateRuntimeSink(IButtonSinkContext context) =>
 		new ScrollSink(RequireSynthesizer(context), Axis, Amount, Unit);
 }

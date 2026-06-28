@@ -201,10 +201,10 @@ public sealed class AppConfigTests : IDisposable
 		};
 
 		var routes = config.BuildRoutes();
-		var button = routes.OfType<ButtonRoute>().Single();
+		var button = routes.OfType<ButtonToTargetRoute>().Single();
 		var axis = routes.OfType<AxisRoute>().Single();
 
-		Assert.Equal(7u, button.OutputBinding.OutputDeviceId);
+		Assert.Equal(7u, Assert.IsType<OutputButtonBinding>(button.Target).OutputDeviceId);
 		Assert.Equal(7u, axis.OutputBinding.OutputDeviceId);
 	}
 
@@ -235,7 +235,7 @@ public sealed class AppConfigTests : IDisposable
 		};
 
 		var routes = config.BuildRoutes();
-		Assert.Equal(9u, routes.OfType<ButtonRoute>().Single().OutputBinding.OutputDeviceId);
+		Assert.Equal(9u, Assert.IsType<OutputButtonBinding>(routes.OfType<ButtonToTargetRoute>().Single().Target).OutputDeviceId);
 		Assert.Equal(11u, routes.OfType<AxisRoute>().Single().OutputBinding.OutputDeviceId);
 	}
 

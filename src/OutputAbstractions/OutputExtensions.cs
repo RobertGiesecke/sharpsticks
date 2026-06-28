@@ -58,7 +58,7 @@ public static class OutputExtensions
 			Options = options,
 		};
 
-	public static IEnumerable<ButtonRoute> RouteToOutput<TOutputDevice>(
+	public static IEnumerable<ButtonToTargetRoute> RouteToOutput<TOutputDevice>(
 		this ImmutableArray<ButtonBinding> sourceButtons,
 		TOutputDevice outputDevice,
 		Func<ButtonBinding, bool>? predicate = null)
@@ -66,7 +66,7 @@ public static class OutputExtensions
 	{
 		var outputDeviceId = outputDevice.DeviceId;
 
-		using var result = new PooledList<ButtonRoute>(sourceButtons.Length);
+		using var result = new PooledList<ButtonToTargetRoute>(sourceButtons.Length);
 		var newSpan = result.AddSpan(sourceButtons.Length);
 
 		for (var i = 0; i < sourceButtons.Length; i++)
@@ -78,7 +78,7 @@ public static class OutputExtensions
 				continue;
 			}
 
-			newSpan[i] = binding.RouteTo(new(outputDeviceId, binding.ButtonNumber));
+			newSpan[i] = binding.RouteTo(new OutputButtonBinding(outputDeviceId, binding.ButtonNumber));
 		}
 
 		return [..newSpan];

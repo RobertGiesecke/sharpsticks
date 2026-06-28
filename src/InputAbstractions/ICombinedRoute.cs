@@ -2,5 +2,5 @@
 
 public interface ICombinedRoute : IRoute
 {
-	IEnumerable<IBoundRoute> GetRoutes();
+	IEnumerable<IRoute> GetRoutes();
 }

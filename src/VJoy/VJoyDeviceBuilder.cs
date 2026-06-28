@@ -10,12 +10,12 @@ public static class VJoyDeviceBuilder
 		/// API; returns the one created device. Caller owns disposal.
 		public static VJoyDevice Open(
 			uint deviceId,
-			IReadOnlyList<ButtonRoute> buttonRoutes,
+			IReadOnlyList<OutputButtonBinding> outputButtons,
 			IReadOnlyList<AxisRoute> axisRoutes,
 			IReadOnlyCollection<int>? macroButtonNumbers = null)
 		{
 			using var opened = VJoyDeviceFactory.Instance.EnumerateConnectedOutputDevices(
-				[new(deviceId, buttonRoutes, axisRoutes, macroButtonNumbers ?? [])]);
+				[new(deviceId, outputButtons, axisRoutes, macroButtonNumbers ?? [])]);
 			return opened[0];
 		}
 	}

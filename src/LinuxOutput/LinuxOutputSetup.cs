@@ -20,7 +20,7 @@ public static class LinuxOutputSetup
 	/// the deviceIds we'll be creating; the implementation groups by OutputBinding.OutputDeviceId
 	/// and runs one create/destroy cycle per distinct device.
 	public static void Run(
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<OutputButtonBinding> outputButtons,
 		IReadOnlyCollection<AxisRoute> axisRoutes,
 		IReadOnlyCollection<int> macroButtonNumbers)
 	{
@@ -42,7 +42,7 @@ public static class LinuxOutputSetup
 		WriteUdevRule();
 		ReloadUdev();
 		AddInvokingUserToInputGroup();
-		ValidateOutputDevices(buttonRoutes, axisRoutes, macroButtonNumbers);
+		ValidateOutputDevices(outputButtons, axisRoutes, macroButtonNumbers);
 
 		Console.WriteLine();
 		Console.WriteLine("Setup complete.");
@@ -141,11 +141,11 @@ public static class LinuxOutputSetup
 	}
 
 	private static void ValidateOutputDevices(
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<OutputButtonBinding> outputButtons,
 		IReadOnlyCollection<AxisRoute> axisRoutes,
 		IReadOnlyCollection<int> macroButtonNumbers)
 	{
-		var deviceIds = buttonRoutes.Select(static r => r.OutputBinding.OutputDeviceId)
+		var deviceIds = outputButtons.Select(static b => b.OutputDeviceId)
 			.Concat(axisRoutes.Select(static r => r.OutputBinding.OutputDeviceId))
 			.Distinct()
 			.OrderBy(static id => id)
@@ -160,7 +160,7 @@ public static class LinuxOutputSetup
 		var factory = LinuxOutputDeviceFactory.Instance;
 		foreach (var deviceId in deviceIds)
 		{
-			var deviceButtons = buttonRoutes.Where(r => r.OutputBinding.OutputDeviceId == deviceId).ToArray();
+			var deviceButtons = outputButtons.Where(b => b.OutputDeviceId == deviceId).ToArray();
 			var deviceAxes = axisRoutes.Where(r => r.OutputBinding.OutputDeviceId == deviceId).ToArray();
 			var deviceMacroButtons = macroButtonNumbers
 				.Where(_ => deviceButtons.Length > 0 || deviceAxes.Length > 0)

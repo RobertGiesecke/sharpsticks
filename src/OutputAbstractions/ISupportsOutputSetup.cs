@@ -19,7 +19,7 @@ public interface ISupportsOutputSetup
 	/// progress to <see cref="System.Console.Out"/>; throwing or calling
 	/// <see cref="System.Environment.Exit"/> on hard failure is acceptable.
 	void RunSetup(
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<OutputButtonBinding> outputButtons,
 		IReadOnlyCollection<AxisRoute> axisRoutes,
 		IReadOnlyCollection<int> macroButtonNumbers);
 }
