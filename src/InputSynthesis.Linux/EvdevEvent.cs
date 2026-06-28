@@ -24,11 +24,21 @@ internal static class EvdevEvent
 	/// <summary>High-res wheel value of one detent (kernel convention; matches Windows WHEEL_DELTA).</summary>
 	public const int WheelHiResPerNotch = 120;
 
+	// evdev ABS_* absolute axis codes, for absolute pointer positioning.
+	public const ushort AbsX = 0x00;
+	public const ushort AbsY = 0x01;
+
+	/// <summary>Upper bound of the absolute axis range; the compositor maps [0, AbsMax] to the screen.</summary>
+	public const int AbsMax = 65535;
+
 	public static LinuxInputEvent Key(ushort code, bool down) =>
 		new() { Type = EvType.Key, Code = code, Value = down ? 1 : 0 };
 
 	public static LinuxInputEvent Rel(ushort code, int value) =>
 		new() { Type = EvType.Rel, Code = code, Value = value };
+
+	public static LinuxInputEvent Abs(ushort code, int value) =>
+		new() { Type = EvType.Abs, Code = code, Value = value };
 
 	/// <summary>The SYN_REPORT that commits the events written since the last one.</summary>
 	public static LinuxInputEvent SynReport() =>

@@ -82,6 +82,17 @@ public sealed class LinuxInputSynthesizer : IInputSynthesizer, IDisposable
 		}
 	}
 
+	public void MoveMouseAbsolute(double x, double y)
+	{
+		// The uinput device declares ABS_X/ABS_Y over [0, AbsMax]; the compositor maps
+		// that range onto the screen, so both axes are always emitted together.
+		Emit(EvdevEvent.Abs(EvdevEvent.AbsX, ToAbsolute(x)));
+		Emit(EvdevEvent.Abs(EvdevEvent.AbsY, ToAbsolute(y)));
+	}
+
+	private static int ToAbsolute(double value) =>
+		(int)Math.Round(Math.Clamp(value, 0.0, 1.0) * EvdevEvent.AbsMax);
+
 	public void Scroll(int vertical, int horizontal, MouseScrollUnit unit = MouseScrollUnit.Notch)
 	{
 		if (unit == MouseScrollUnit.Notch)

@@ -26,6 +26,13 @@ public interface IInputSynthesizer
 	void MoveMouseRelative(int dx, int dy);
 
 	/// <summary>
+	/// Move the pointer to an absolute position, normalized to <c>[0, 1]</c> over the
+	/// screen — <c>(0, 0)</c> top-left, <c>(1, 1)</c> bottom-right, <c>(0.5, 0.5)</c>
+	/// center. Out-of-range values are clamped.
+	/// </summary>
+	void MoveMouseAbsolute(double x, double y);
+
+	/// <summary>
 	/// Scroll the wheel. <paramref name="vertical"/> positive = up/away,
 	/// <paramref name="horizontal"/> positive = right. Amounts are in
 	/// <paramref name="unit"/> (whole detents by default).

@@ -51,6 +51,12 @@ public sealed class WindowsInputSynthesizer : IInputSynthesizer
 
 	public void MoveMouseRelative(int dx, int dy) => _Send(Win32Input.MouseMove(dx, dy));
 
+	public void MoveMouseAbsolute(double x, double y) =>
+		_Send(Win32Input.MouseMoveAbsolute(ToAbsolute(x), ToAbsolute(y)));
+
+	private static int ToAbsolute(double value) =>
+		(int)Math.Round(Math.Clamp(value, 0.0, 1.0) * Win32Input.AbsoluteMax);
+
 	public void Scroll(int vertical, int horizontal, MouseScrollUnit unit = MouseScrollUnit.Notch)
 	{
 		// Windows wheel data is in 1/120-notch units (WHEEL_DELTA per detent); a notch
