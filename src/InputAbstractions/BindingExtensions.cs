@@ -182,11 +182,11 @@ public static class BindingExtensions
 		};
 	}
 
-	public static ButtonRoute RouteButton(this ButtonBinding binding, uint outputDeviceId, int targetButton) =>
-		RouteTo(binding, new(outputDeviceId, targetButton));
+	public static ButtonToTargetRoute RouteButton(this ButtonBinding binding, uint outputDeviceId, int targetButton) =>
+		binding.RouteTo(new OutputButtonBinding(outputDeviceId, targetButton));
 
-	public static ButtonRoute RouteTo(this ButtonBinding binding, OutputButtonBinding outputBinding) =>
-		new(binding, outputBinding);
+	public static ButtonToTargetRoute RouteTo(this ButtonBinding binding, OutputButtonBinding outputBinding) =>
+		new() { Source = binding, Target = outputBinding };
 
 	public readonly record struct AxisZoneOptions()
 	{
@@ -195,18 +195,18 @@ public static class BindingExtensions
 		public TimeSpan PulseDuration { get; init; } = TimeSpan.FromMilliseconds(50);
 	}
 
-	public static AxisToButtonRoute RouteWhenInRange(
+	public static AxisZoneRoute RouteWhenInRange(
 		this AxisBinding axis,
 		double min,
 		double max,
-		OutputButtonBinding output,
+		ButtonTarget output,
 		AxisZoneOptions? options = null)
 	{
 		var o = options ?? new();
 		return new()
 		{
 			Source = axis,
-			OutputBinding = output,
+			Target = output,
 			Min = min,
 			Max = max,
 			IncludeMax = o.IncludeMax,
@@ -219,14 +219,14 @@ public static class BindingExtensions
 		this GroupedSourceAxes axes,
 		double min,
 		double max,
-		OutputButtonBinding output,
+		ButtonTarget output,
 		AxisZoneOptions? options = null)
 	{
 		var o = options ?? new();
 		return new()
 		{
 			Sources = axes.SourceAxes,
-			OutputBinding = output,
+			Target = output,
 			Min = min,
 			Max = max,
 			IncludeMax = o.IncludeMax,
@@ -235,9 +235,9 @@ public static class BindingExtensions
 		};
 	}
 
-	public readonly record struct AxisZone(double Min, double Max, OutputButtonBinding Output);
+	public readonly record struct AxisZone(double Min, double Max, ButtonTarget Output);
 
-	public static IEnumerable<AxisToButtonRoute> RouteZones(
+	public static IEnumerable<AxisZoneRoute> RouteZones(
 		this AxisBinding axis,
 		IEnumerable<AxisZone> zones,
 		AxisZoneOptions? options = null)
@@ -248,7 +248,7 @@ public static class BindingExtensions
 			yield return new()
 			{
 				Source = axis,
-				OutputBinding = zone.Output,
+				Target = zone.Output,
 				Min = zone.Min,
 				Max = zone.Max,
 				IncludeMax = o.IncludeMax,
@@ -275,37 +275,19 @@ public static class BindingExtensions
 		for (var i = 0; i < outputs.Length; i++)
 		{
 			var isLast = i == outputs.Length - 1;
-			
-			builder.Add(
-				outputs[i] switch
-				{
-					OutputButtonBinding b => new AxisToButtonRoute
-					{
-						Source = axis,
-						OutputBinding = b,
-						Min = lo + step * i,
-						Max = isLast ? hi : lo + step * (i + 1),
-						IncludeMax = isLast,
-						Mode = o.Mode,
-						PulseDuration = o.PulseDuration,
-					},
-					MouseButtonTarget mouseButtonTarget => new AxisToMouseButtonRoute
-					{
-						Source = axis,
-						Min = lo + step * i,
-						Max = isLast ? hi : lo + step * (i + 1),
-						IncludeMax = isLast,
-						Button = mouseButtonTarget.Button,
-						Mode = o.Mode,
-						PulseDuration = o.PulseDuration,
-					},
-					// TODO: decide zone->scroll semantics (pulse once on entering the zone vs
-					// repeat while in the zone) and implement; deferred pending that decision.
-					ScrollTarget scrollTarget => throw new NotSupportedException(
-						"Scroll targets in SplitIntoButtons are not implemented yet."),
-					_ => throw new ArgumentOutOfRangeException(nameof(outputs)),
-				}
-			);
+
+			// Every target kind is just an AxisZoneRoute now; the ButtonTarget decides the
+			// sink (level for vJoy/key/mouse, pulse-on-entry for scroll).
+			builder.Add(new AxisZoneRoute
+			{
+				Source = axis,
+				Target = outputs[i],
+				Min = lo + step * i,
+				Max = isLast ? hi : lo + step * (i + 1),
+				IncludeMax = isLast,
+				Mode = o.Mode,
+				PulseDuration = o.PulseDuration,
+			});
 		}
 
 		return builder.MoveToImmutable();
@@ -322,7 +304,7 @@ public static class BindingExtensions
 			yield return new()
 			{
 				Sources = axes.SourceAxes,
-				OutputBinding = zone.Output,
+				Target = zone.Output,
 				Min = zone.Min,
 				Max = zone.Max,
 				IncludeMax = o.IncludeMax,
@@ -348,7 +330,7 @@ public static class BindingExtensions
 			OnRelease = options.OnRelease,
 		};
 
-	public static IEnumerable<ButtonRoute> RouteButtonsToOutput<TDevice>(
+	public static IEnumerable<ButtonToTargetRoute> RouteButtonsToOutput<TDevice>(
 		this TDevice device,
 		uint outputDeviceId,
 		Func<TDevice, ButtonBinding, bool>? predicate = null)

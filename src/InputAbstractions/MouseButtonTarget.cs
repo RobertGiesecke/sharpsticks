@@ -7,9 +7,6 @@ public sealed record MouseButtonTarget : ButtonTarget
 {
 	public required OutputMouseButton Button { get; init; }
 
-	public override IRoute CreateRoute(ButtonBinding source) =>
-		new ButtonToMouseRoute { Source = source, Button = Button };
-
 	public override IButtonStateSink CreateRuntimeSink(IButtonSinkContext context) =>
 		new MouseButtonSink(RequireSynthesizer(context), Button);
 }

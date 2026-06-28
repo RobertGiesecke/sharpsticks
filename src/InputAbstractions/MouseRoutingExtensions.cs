@@ -1,3 +1,4 @@
+using SharpSticks.InputSynthesis.Keyboard;
 using SharpSticks.InputSynthesis.Mouse;
 
 namespace SharpSticks.InputAbstractions;
@@ -28,12 +29,8 @@ public static class MouseRoutingExtensions
 		};
 
 	/// <summary>Route this button to a synthesized mouse button (held while the source is held).</summary>
-	public static ButtonToMouseRoute RouteToMouse(this ButtonBinding source, OutputMouseButton button) =>
-		new()
-		{
-			Source = source,
-			Button = button,
-		};
+	public static ButtonToTargetRoute RouteToMouse(this ButtonBinding source, OutputMouseButton button) =>
+		new() { Source = source, Target = new MouseButtonTarget { Button = button } };
 
 	/// <summary>
 	/// Route this axis to mouse-wheel scrolling along <paramref name="axis"/>. The
@@ -56,19 +53,14 @@ public static class MouseRoutingExtensions
 		};
 
 	/// <summary>Route this button to a scroll increment: one pulse per press in <paramref name="direction"/>.</summary>
-	public static ButtonToScrollRoute RouteToScroll(
+	public static ButtonToTargetRoute RouteToScroll(
 		this ButtonBinding source,
 		ScrollDirection direction,
 		int amount = 1,
-		MouseScrollUnit unit = MouseScrollUnit.Notch)
-	{
-		var (axis, signed) = ScrollDirectionMap.Resolve(direction, amount);
-		return new()
-		{
-			Source = source,
-			Axis = axis,
-			Amount = signed,
-			Unit = unit,
-		};
-	}
+		MouseScrollUnit unit = MouseScrollUnit.Notch) =>
+		new() { Source = source, Target = ScrollTarget.Towards(direction, amount, unit) };
+
+	/// <summary>Route this button to a keyboard key (held while the source is held).</summary>
+	public static ButtonToTargetRoute RouteToKey(this ButtonBinding source, Key key) =>
+		new() { Source = source, Target = new KeyTarget(key) };
 }

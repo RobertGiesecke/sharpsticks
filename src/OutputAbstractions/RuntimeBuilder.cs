@@ -86,38 +86,40 @@ public static class RuntimeBuilder
 				usedSourceRoutes = usedSourceRoutes.MergeOrGetAll(mergeOrGetAllOptions);
 			}
 
-			using var buttonRoutes = usedSourceRoutes.OfType<ButtonRoute>().ToPooledList();
+			using var buttonToTargetRoutes = usedSourceRoutes.OfType<ButtonToTargetRoute>().ToPooledList();
 			using var axisRoutes = usedSourceRoutes.OfType<AxisRoute>().ToPooledList();
 			using var macroRoutes = usedSourceRoutes.OfType<ButtonMacroRoute>().ToPooledList();
-			using var axisToButtonRoutes = usedSourceRoutes.OfType<AxisToButtonRoute>().ToPooledList();
+			using var axisZoneRoutes = usedSourceRoutes.OfType<AxisZoneRoute>().ToPooledList();
 			using var axisToMouseRoutes = usedSourceRoutes.OfType<AxisToMouseRoute>().ToPooledList();
-			using var buttonToMouseRoutes = usedSourceRoutes.OfType<ButtonToMouseRoute>().ToPooledList();
 			using var axisToScrollRoutes = usedSourceRoutes.OfType<AxisToScrollRoute>().ToPooledList();
-			using var buttonToScrollRoutes = usedSourceRoutes.OfType<ButtonToScrollRoute>().ToPooledList();
-			using var axisToMouseButtonRoutes = usedSourceRoutes.OfType<AxisToMouseButtonRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
 			using var auxiliaryOutputButtons = new PooledSet<OutputButtonBinding>();
 
-			foreach (var mapping in buttonRoutes)
+			foreach (var route in buttonToTargetRoutes)
 			{
-				if (mapping.Binding.ButtonNumber < 1)
+				if (route.Source.ButtonNumber < 1)
 				{
 					throw new InvalidOperationException("Source buttons are 1-based.");
 				}
 
-				if (mapping.OutputBinding.ButtonNumber < 1)
-				{
-					throw new InvalidOperationException("Target buttons are 1-based.");
-				}
+				referencedDeviceIds.Add(route.Source.DeviceId);
 
-				if (mapping.OutputBinding.OutputDeviceId < 1)
+				// Only vJoy targets reference an output device; key/mouse/scroll go to the synthesizer.
+				if (route.Target is OutputButtonBinding outputButton)
 				{
-					throw new InvalidOperationException("Output device ids are 1-based.");
-				}
+					if (outputButton.ButtonNumber < 1)
+					{
+						throw new InvalidOperationException("Target buttons are 1-based.");
+					}
 
-				referencedDeviceIds.Add(mapping.Binding.DeviceId);
-				referencedOutputDeviceIds.Add(mapping.OutputBinding.OutputDeviceId);
+					if (outputButton.OutputDeviceId < 1)
+					{
+						throw new InvalidOperationException("Output device ids are 1-based.");
+					}
+
+					referencedOutputDeviceIds.Add(outputButton.OutputDeviceId);
+				}
 			}
 
 			foreach (var mapping in axisRoutes)
@@ -162,32 +164,38 @@ public static class RuntimeBuilder
 				}
 			}
 
-			foreach (var route in axisToButtonRoutes)
+			foreach (var route in axisZoneRoutes)
 			{
-				if (route.OutputBinding.OutputDeviceId < 1)
-				{
-					throw new InvalidOperationException("Output device ids are 1-based.");
-				}
-
-				if (route.OutputBinding.ButtonNumber < 1)
-				{
-					throw new InvalidOperationException("Target buttons are 1-based.");
-				}
-
 				if (route.Max < route.Min)
 				{
 					throw new InvalidOperationException(
-						$"AxisToButtonRoute: Max ({route.Max}) must be >= Min ({route.Min}).");
+						$"AxisZoneRoute: Max ({route.Max}) must be >= Min ({route.Min}).");
 				}
 
 				if (route.Mode == AxisZoneTriggerMode.Pulse && route.PulseDuration <= TimeSpan.Zero)
 				{
 					throw new InvalidOperationException(
-						"AxisToButtonRoute.PulseDuration must be positive when Mode is Pulse.");
+						"AxisZoneRoute.PulseDuration must be positive when Mode is Pulse.");
 				}
 
 				referencedDeviceIds.Add(route.Source.DeviceId);
-				auxiliaryOutputButtons.Add(route.OutputBinding);
+
+				// A vJoy-targeted zone with no button source still needs the device to expose
+				// the button, so register it as an auxiliary output.
+				if (route.Target is OutputButtonBinding outputButton)
+				{
+					if (outputButton.OutputDeviceId < 1)
+					{
+						throw new InvalidOperationException("Output device ids are 1-based.");
+					}
+
+					if (outputButton.ButtonNumber < 1)
+					{
+						throw new InvalidOperationException("Target buttons are 1-based.");
+					}
+
+					auxiliaryOutputButtons.Add(outputButton);
+				}
 			}
 
 			foreach (var route in axisToMouseRoutes)
@@ -196,41 +204,10 @@ public static class RuntimeBuilder
 				route.Modifier?.FillDevices(referencedDeviceIds);
 			}
 
-			foreach (var route in buttonToMouseRoutes)
-			{
-				if (route.Source.ButtonNumber < 1)
-				{
-					throw new InvalidOperationException("Source buttons are 1-based.");
-				}
-
-				referencedDeviceIds.Add(route.Source.DeviceId);
-			}
-
 			foreach (var route in axisToScrollRoutes)
 			{
 				referencedDeviceIds.Add(route.Source.DeviceId);
 				route.Modifier?.FillDevices(referencedDeviceIds);
-			}
-
-			foreach (var route in buttonToScrollRoutes)
-			{
-				if (route.Source.ButtonNumber < 1)
-				{
-					throw new InvalidOperationException("Source buttons are 1-based.");
-				}
-
-				referencedDeviceIds.Add(route.Source.DeviceId);
-			}
-
-			foreach (var route in axisToMouseButtonRoutes)
-			{
-				if (route.Max < route.Min)
-				{
-					throw new InvalidOperationException(
-						$"AxisToMouseButtonRoute: Max ({route.Max}) must be >= Min ({route.Min}).");
-				}
-
-				referencedDeviceIds.Add(route.Source.DeviceId);
 			}
 
 			foreach (var output in auxiliaryOutputButtons)
@@ -280,15 +257,12 @@ public static class RuntimeBuilder
 						options.Name,
 						options.DebugLogger,
 						devices,
-						[..buttonRoutes.Span],
+						[..buttonToTargetRoutes.Span],
 						[..axisRoutes.Span],
 						[..macroRoutes.Span],
-						[..axisToButtonRoutes.Span],
+						[..axisZoneRoutes.Span],
 						[..axisToMouseRoutes.Span],
-						[..buttonToMouseRoutes.Span],
 						[..axisToScrollRoutes.Span],
-						[..buttonToScrollRoutes.Span],
-						[..axisToMouseButtonRoutes.Span],
 						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices,
@@ -329,9 +303,12 @@ public static class RuntimeBuilder
 
 					foreach (var deviceId in referencedOutputDeviceIds)
 					{
-						var buttonRoutesForDevice = buttonRoutes
-							.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToPooledList();
-						disposables.Add(buttonRoutesForDevice);
+						var outputButtonsForDevice = buttonToTargetRoutes
+							.Select(route => route.Target)
+							.OfType<OutputButtonBinding>()
+							.Where(button => button.OutputDeviceId == deviceId)
+							.ToPooledList();
+						disposables.Add(outputButtonsForDevice);
 						var axisRoutesForDevice = axisRoutes
 							.Where(route => route.OutputBinding.OutputDeviceId == deviceId).ToPooledList();
 						disposables.Add(axisRoutesForDevice);
@@ -344,7 +321,7 @@ public static class RuntimeBuilder
 						outputRequests.Add(
 							new(
 								deviceId,
-								buttonRoutesForDevice,
+								outputButtonsForDevice,
 								axisRoutesForDevice,
 								macroButtonNumbers
 							)

@@ -187,8 +187,8 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 			}
 
 			var buttonCount = VJoyNative.GetVJDButtonNumber(deviceId);
-			foreach (var targetButton in request.ButtonRoutes
-				         .Select(static route => route.OutputBinding.ButtonNumber)
+			foreach (var targetButton in request.OutputButtons
+				         .Select(static button => button.ButtonNumber)
 				         .Concat(request.MacroButtonNumbers)
 				         .Distinct())
 			{

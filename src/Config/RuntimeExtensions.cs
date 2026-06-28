@@ -18,7 +18,7 @@ public static class RuntimeExtensions
 		{
 			deviceMap ??= EmptyMap;
 
-			using var buttonRoutes = new PooledList<ButtonRoute>();
+			using var buttonRoutes = new PooledList<ButtonToTargetRoute>();
 			using var axisRoutes = new PooledList<AxisRoute>();
 
 			foreach (var mapping in config.ButtonMappings)
@@ -37,10 +37,13 @@ public static class RuntimeExtensions
 				{
 					DeviceId = Translate(mapping.SourceBinding.DeviceId, deviceMap),
 				};
-				buttonRoutes.Add(new(
-					source,
-					new(mapping.VJoyDeviceId ?? config.VJoyDeviceId,
-						mapping.TargetButton)));
+				buttonRoutes.Add(new()
+				{
+					Source = source,
+					Target = new OutputButtonBinding(
+						mapping.VJoyDeviceId ?? config.VJoyDeviceId,
+						mapping.TargetButton),
+				});
 			}
 
 			foreach (var mapping in config.AxisMappings)

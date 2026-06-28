@@ -18,13 +18,16 @@ public sealed class ButtonTargetRoutingTests : IDisposable
 	public void Dispose() => _Fakes.Dispose();
 
 	[Fact]
-	public void RouteTo_BuildsRouteMatchingTargetKind()
+	public void RouteTo_BuildsButtonToTargetRoute_CarryingTheTarget()
 	{
 		var source = _Stick.BindButton(1);
 
-		Assert.IsType<ButtonRoute>(source.RouteTo(new OutputButtonBinding(1, 1)));
-		Assert.IsType<ButtonToMouseRoute>(source.RouteTo(new MouseButtonTarget { Button = OutputMouseButton.Left }));
-		Assert.IsType<ButtonToScrollRoute>(source.RouteTo(ScrollTarget.Towards(ScrollDirection.Up)));
+		Assert.IsType<OutputButtonBinding>(
+			Assert.IsType<ButtonToTargetRoute>(source.RouteTo(new OutputButtonBinding(1, 1))).Target);
+		Assert.IsType<MouseButtonTarget>(
+			Assert.IsType<ButtonToTargetRoute>(source.RouteTo(new MouseButtonTarget { Button = OutputMouseButton.Left })).Target);
+		Assert.IsType<ScrollTarget>(
+			Assert.IsType<ButtonToTargetRoute>(source.RouteTo(ScrollTarget.Towards(ScrollDirection.Up))).Target);
 	}
 
 	[Fact]
@@ -33,7 +36,7 @@ public sealed class ButtonTargetRoutingTests : IDisposable
 		var source = _Stick.BindButton(1);
 		ButtonTarget vjoyButton = new OutputButtonBinding(1, 1);
 
-		Assert.IsType<ButtonRoute>(source.RouteTo(vjoyButton));
+		Assert.IsType<OutputButtonBinding>(Assert.IsType<ButtonToTargetRoute>(source.RouteTo(vjoyButton)).Target);
 	}
 
 	[Fact]

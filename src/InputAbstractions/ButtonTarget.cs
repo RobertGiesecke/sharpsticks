@@ -11,7 +11,7 @@ namespace SharpSticks.InputAbstractions;
 public abstract record ButtonTarget
 {
     /// <summary>Build the route that drives this target from a button source.</summary>
-    public abstract IRoute CreateRoute(ButtonBinding source);
+    public IRoute CreateRoute(ButtonBinding source) => new ButtonToTargetRoute { Source = source, Target = this };
 
     /// <summary>
     /// Build the runtime sink that applies a pressed/released state to this target.

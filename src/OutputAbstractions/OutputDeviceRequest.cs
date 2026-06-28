@@ -6,6 +6,6 @@ namespace SharpSticks.OutputAbstractions;
 /// device.
 public readonly record struct OutputDeviceRequest(
 	uint DeviceId,
-	IReadOnlyCollection<ButtonRoute> ButtonRoutes,
+	IReadOnlyCollection<OutputButtonBinding> OutputButtons,
 	IReadOnlyCollection<AxisRoute> AxisRoutes,
 	IReadOnlyCollection<int> MacroButtonNumbers);

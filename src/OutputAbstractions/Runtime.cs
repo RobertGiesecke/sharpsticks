@@ -29,7 +29,6 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 	private readonly bool _InitializeInputSynthesizer;
 	private readonly ImmutableArray<OutputMouseAxisRoute> _MouseAxisRoutes;
 	private readonly ImmutableArray<OutputScrollAxisRoute> _ScrollAxisRoutes;
-	private readonly ImmutableArray<OutputScrollButtonRoute> _ScrollButtonRoutes;
 	private long _MouseMoveLastTicks;
 	private bool _MouseMoveHasLast;
 	private long _ScrollLastTicks;
@@ -114,16 +113,6 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		// Sub-pixel remainder carried across frames so slow movement isn't lost to
 		// integer truncation.
 		public double Accumulator;
-	}
-
-	private sealed class OutputScrollButtonRoute
-	{
-		public required int SourceDeviceIndex { get; init; }
-		public required int ButtonNumber { get; init; }
-		public required ScrollAxis Axis { get; init; }
-		public required int Amount { get; init; }
-		public required MouseScrollUnit Unit { get; init; }
-		public bool WasPressed;
 	}
 
 	private sealed class OutputScrollAxisRoute
@@ -221,15 +210,12 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		string name,
 		DebugLogger? debugLogger,
 		PooledDictionary<int, TInputDevice> devices,
-		ImmutableArray<ButtonRoute> buttonRoutes,
+		ImmutableArray<ButtonToTargetRoute> buttonToTargetRoutes,
 		ImmutableArray<AxisRoute> axisRoutes,
 		ImmutableArray<ButtonMacroRoute> macroRoutes,
-		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
+		ImmutableArray<AxisZoneRoute> axisZoneRoutes,
 		ImmutableArray<AxisToMouseRoute> axisToMouseRoutes,
-		ImmutableArray<ButtonToMouseRoute> buttonToMouseRoutes,
 		ImmutableArray<AxisToScrollRoute> axisToScrollRoutes,
-		ImmutableArray<ButtonToScrollRoute> buttonToScrollRoutes,
-		ImmutableArray<AxisToMouseButtonRoute> axisToMouseButtonRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
 		ImmutableArray<TOutputDevice> outputDevices,
@@ -268,20 +254,17 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 			MergedObjects = mergedObjectsLookup,
 		};
 
-		var mergedButtonRoutes = buttonRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedButtonToTargetRoutes = buttonToTargetRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAuxiliaryOutputButtons = auxiliaryOutputButtons.MergeOrGetAll(mergeObjectContext);
 		var mergedMacroRoutes = macroRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisRoutes = axisRoutes.MergeOrGetAll(mergeObjectContext);
-		var mergedAxisToButtonRoutes = axisToButtonRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisZoneRoutes = axisZoneRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisToMouseRoutes = axisToMouseRoutes.MergeOrGetAll(mergeObjectContext);
-		var mergedButtonToMouseRoutes = buttonToMouseRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisToScrollRoutes = axisToScrollRoutes.MergeOrGetAll(mergeObjectContext);
-		var mergedButtonToScrollRoutes = buttonToScrollRoutes.MergeOrGetAll(mergeObjectContext);
-		var mergedAxisToMouseButtonRoutes = axisToMouseButtonRoutes.MergeOrGetAll(mergeObjectContext);
 
-		foreach (var route in mergedButtonRoutes)
+		foreach (var route in mergedButtonToTargetRoutes)
 		{
-			allOutputButtons.Add(route.OutputBinding);
+			allOutputButtons.Add(route.Target);
 		}
 
 		foreach (var binding in mergedAuxiliaryOutputButtons)
@@ -289,24 +272,15 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 			allOutputButtons.Add(binding);
 		}
 
-		foreach (var route in mergedButtonToMouseRoutes)
+		foreach (var route in mergedAxisZoneRoutes)
 		{
-			allOutputButtons.Add(new MouseButtonTarget { Button = route.Button });
+			allOutputButtons.Add(route.Target);
 		}
 
-		foreach (var route in mergedAxisToMouseButtonRoutes)
-		{
-			allOutputButtons.Add(new MouseButtonTarget { Button = route.Button });
-		}
-
-		// (source button, target) pairs from every button→target route kind, grouped per
-		// target for the OR-merge in ApplyButtons.
-		using var buttonSourcesByTarget = mergedButtonRoutes
-			.Select(route => (Target: (ButtonTarget)route.OutputBinding, route.Binding))
-			.Concat(mergedButtonToMouseRoutes
-				.Select(route => (Target: (ButtonTarget)new MouseButtonTarget { Button = route.Button }, Binding: route.Source)))
-			.GroupBy(pair => pair.Target)
-			.ToPooledDictionary(g => g.Key, g => g.Select(pair => pair.Binding).ToArray());
+		// Source button → target, grouped per target for the OR-merge in ApplyButtons.
+		using var buttonSourcesByTarget = mergedButtonToTargetRoutes
+			.GroupBy(route => route.Target)
+			.ToPooledDictionary(g => g.Key, g => g.Select(route => route.Source).ToArray());
 
 		{
 			using var flattenedButtonBindings = new PooledList<OutputButtonWithBindings>();
@@ -386,7 +360,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		
 		_AxisToButtonRoutes =
 		[
-			..mergedAxisToButtonRoutes.Select(route => new OutputAxisToButtonRoute
+			..mergedAxisZoneRoutes.Select(route => new OutputAxisToButtonRoute
 			{
 				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
 				SourceDevice = DevicesById[route.Source.DeviceId],
@@ -396,20 +370,8 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 				IncludeMax = route.IncludeMax,
 				Mode = route.Mode,
 				PulseDurationTicks = (long)(route.PulseDuration.TotalSeconds * timeSource.Frequency),
-				OutputButtonStateIndex = _OutputStateIndexByTarget[route.OutputBinding],
-			}),
-			..mergedAxisToMouseButtonRoutes.Select(route => new OutputAxisToButtonRoute
-			{
-				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
-				SourceDevice = DevicesById[route.Source.DeviceId],
-				Source = route.Source,
-				Min = route.Min,
-				Max = route.Max,
-				IncludeMax = route.IncludeMax,
-				Mode = route.Mode,
-				PulseDurationTicks = (long)(route.PulseDuration.TotalSeconds * timeSource.Frequency),
-				OutputButtonStateIndex = _OutputStateIndexByTarget[new MouseButtonTarget { Button = route.Button }],
-			}),
+				OutputButtonStateIndex = _OutputStateIndexByTarget[route.Target],
+			})
 		];
 		_MouseAxisRoutes =
 		[
@@ -443,17 +405,6 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 				Unit = route.Unit,
 				Sensitivity = route.Sensitivity,
 				RuntimeModifier = route.Modifier?.CreateModifierRuntimeContext(this),
-			})
-		];
-		_ScrollButtonRoutes =
-		[
-			..mergedButtonToScrollRoutes.Select(route => new OutputScrollButtonRoute
-			{
-				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
-				ButtonNumber = route.Source.ButtonNumber,
-				Axis = route.Axis,
-				Amount = route.Amount,
-				Unit = route.Unit,
 			})
 		];
 		_CurrentStates = new JoystickState?[DevicesById.Count];
@@ -598,7 +549,6 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		ApplyAxes(currentStates, shouldLogNow ? debugLogger : null);
 		StepMouseAxes(currentStates);
 		StepScrollAxes(currentStates);
-		StepScrollButtons(currentStates);
 		// Commit this frame's synthesized events (macro keys + mouse moves/buttons/scroll)
 		// in one batch. No-op when no synthesizer is configured or none were emitted.
 		_InputSynthesizer?.Flush();
@@ -649,27 +599,6 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		if (dx != 0 || dy != 0)
 		{
 			_InputSynthesizer?.MoveMouseRelative(dx, dy);
-		}
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
-	private void StepScrollButtons(JoystickState?[] states)
-	{
-		foreach (var route in _ScrollButtonRoutes)
-		{
-			var pressed = states[route.SourceDeviceIndex] is { } state && state.IsButtonPressed(route.ButtonNumber);
-
-			if (pressed && !route.WasPressed)
-			{
-				var (vertical, horizontal) = route.Axis == ScrollAxis.Vertical
-					? (route.Amount, 0)
-					: (0, route.Amount);
-				_InputSynthesizer?.Scroll(vertical, horizontal, route.Unit);
-			}
-
-			// TODO: auto-repeat while held — option to re-emit on an interval instead of
-			// only on the rising edge. Edge-only one-shot for now.
-			route.WasPressed = pressed;
 		}
 	}
 

@@ -26,12 +26,10 @@ var axisRoutes = new[]
 };
 var buttonRoutes = new[]
 {
-	new ButtonRoute(
-		new ButtonBinding(DeviceId: 99, ButtonNumber: 1),
-		new OutputButtonBinding(deviceId, ButtonNumber: 1)),
-	new ButtonRoute(
-		new ButtonBinding(DeviceId: 99, ButtonNumber: 2),
-		new OutputButtonBinding(deviceId, ButtonNumber: 2)),
+	new ButtonBinding(DeviceId: 99, ButtonNumber: 1)
+		.RouteTo(new OutputButtonBinding(deviceId, ButtonNumber: 1)),
+	new ButtonBinding(DeviceId: 99, ButtonNumber: 2)
+		.RouteTo(new OutputButtonBinding(deviceId, ButtonNumber: 2)),
 };
 
 BuildAndRunAsConsole(new ConsoleExtensions.BuildOptions
