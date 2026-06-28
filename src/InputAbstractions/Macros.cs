@@ -21,6 +21,14 @@ public static class Macros
 	/// <summary>Synthesize a mouse-button release.</summary>
 	public static IMacroAction ReleaseMouseButton(OutputMouseButton button) => new MouseButtonAction(button, Down: false);
 
+	/// <summary>Synthesize a scroll-wheel increment of <paramref name="amount"/> in <paramref name="direction"/>.</summary>
+	public static IMacroAction Scroll(
+		ScrollDirection direction, int amount = 1, MouseScrollUnit unit = MouseScrollUnit.Notch)
+	{
+		var (axis, signed) = ScrollDirectionMap.Resolve(direction, amount);
+		return new ScrollAction(axis, signed, unit);
+	}
+
 	private static IInputSynthesizer GetSynthesizerOrThrow(IRuntimeContext runtimeContext) =>
 		runtimeContext.InputSynthesizer ?? throw new InvalidOperationException(
 			"A keyboard/mouse macro action was used, but no IInputSynthesizer was provided to the runtime.");
@@ -181,6 +189,30 @@ public static class Macros
 					synthesizer.MouseButtonUp(button);
 				}
 
+				return MacroStatus.Done;
+			}
+		}
+	}
+
+	private sealed record ScrollAction(ScrollAxis Axis, int Amount, MouseScrollUnit Unit)
+		: IMacroAction, IMergeableObject<ScrollAction>
+	{
+		public void FillOutputs(ICollection<OutputButtonBinding> outputs)
+		{
+		}
+
+		IRuntimeMacroAction IMacroAction.CreateRuntimeAction(IRuntimeContext runtimeContext) =>
+			new RuntimeAction(GetSynthesizerOrThrow(runtimeContext), Axis, Amount, Unit);
+
+		public ScrollAction Merge(MergeObjectContext context) => this;
+
+		private sealed class RuntimeAction(IInputSynthesizer synthesizer, ScrollAxis axis, int amount, MouseScrollUnit unit)
+			: IRuntimeMacroAction
+		{
+			public MacroStatus Step(MacroContext ctx)
+			{
+				var (vertical, horizontal) = axis == ScrollAxis.Vertical ? (amount, 0) : (0, amount);
+				synthesizer.Scroll(vertical, horizontal, unit);
 				return MacroStatus.Done;
 			}
 		}
