@@ -24,8 +24,12 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private readonly bool _InitializeInputSynthesizer;
 	private readonly ImmutableArray<OutputMouseAxisRoute> _MouseAxisRoutes;
 	private readonly ImmutableArray<OutputMouseButtonGroup> _MouseButtonRoutes;
+	private readonly ImmutableArray<OutputScrollAxisRoute> _ScrollAxisRoutes;
+	private readonly ImmutableArray<OutputScrollButtonRoute> _ScrollButtonRoutes;
 	private long _MouseMoveLastTicks;
 	private bool _MouseMoveHasLast;
+	private long _ScrollLastTicks;
+	private bool _ScrollHasLast;
 
 	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
@@ -109,6 +113,31 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public double Accumulator;
 	}
 
+	private sealed class OutputScrollButtonRoute
+	{
+		public required int SourceDeviceIndex { get; init; }
+		public required int ButtonNumber { get; init; }
+		public required ScrollAxis Axis { get; init; }
+		public required int Amount { get; init; }
+		public required MouseScrollUnit Unit { get; init; }
+		public bool WasPressed;
+	}
+
+	private sealed class OutputScrollAxisRoute
+	{
+		public required int SourceDeviceIndex { get; init; }
+		public required TInputDevice SourceDevice { get; init; }
+		public required AxisBinding Source { get; init; }
+		public required ScrollAxis Axis { get; init; }
+		public required MouseScrollUnit Unit { get; init; }
+		public required double Sensitivity { get; init; }
+		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
+
+		// Sub-step remainder carried across frames so slow scrolling isn't lost to
+		// integer truncation.
+		public double Accumulator;
+	}
+
 	private sealed class OutputAxisToButtonRoute
 	{
 		public required int SourceDeviceIndex { get; init; }
@@ -136,6 +165,8 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
 		ImmutableArray<AxisToMouseRoute> axisToMouseRoutes,
 		ImmutableArray<ButtonToMouseRoute> buttonToMouseRoutes,
+		ImmutableArray<AxisToScrollRoute> axisToScrollRoutes,
+		ImmutableArray<ButtonToScrollRoute> buttonToScrollRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
 		ImmutableArray<TOutputDevice> outputDevices,
@@ -180,6 +211,8 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		var mergedAxisToButtonRoutes = axisToButtonRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisToMouseRoutes = axisToMouseRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedButtonToMouseRoutes = buttonToMouseRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisToScrollRoutes = axisToScrollRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedButtonToScrollRoutes = buttonToScrollRoutes.MergeOrGetAll(mergeObjectContext);
 
 		foreach (var route in mergedButtonRoutes)
 		{
@@ -321,6 +354,30 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 						..group.Select(route => new OutputMouseButtonSourceKey(DeviceIndexesById[route.Source.DeviceId], route.Source.ButtonNumber)),
 					],
 				})
+		];
+		_ScrollAxisRoutes =
+		[
+			..mergedAxisToScrollRoutes.Select(route => new OutputScrollAxisRoute
+			{
+				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
+				SourceDevice = DevicesById[route.Source.DeviceId],
+				Source = route.Source,
+				Axis = route.Axis,
+				Unit = route.Unit,
+				Sensitivity = route.Sensitivity,
+				RuntimeModifier = route.Modifier?.CreateModifierRuntimeContext(this),
+			})
+		];
+		_ScrollButtonRoutes =
+		[
+			..mergedButtonToScrollRoutes.Select(route => new OutputScrollButtonRoute
+			{
+				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
+				ButtonNumber = route.Source.ButtonNumber,
+				Axis = route.Axis,
+				Amount = route.Amount,
+				Unit = route.Unit,
+			})
 		];
 		_CurrentStates = new JoystickState?[DevicesById.Count];
 		_LastReportedReadFailure = new();
@@ -464,7 +521,9 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		ApplyAxes(currentStates, shouldLogNow ? debugLogger : null);
 		StepMouseAxes(currentStates);
 		StepMouseButtons(currentStates);
-		// Commit this frame's synthesized events (macro keys + mouse moves/buttons)
+		StepScrollAxes(currentStates);
+		StepScrollButtons(currentStates);
+		// Commit this frame's synthesized events (macro keys + mouse moves/buttons/scroll)
 		// in one batch. No-op when no synthesizer is configured or none were emitted.
 		_InputSynthesizer?.Flush();
 	}
@@ -549,6 +608,103 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			_InputSynthesizer?.MoveMouseRelative(dx, dy);
 		}
 	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
+	private void StepScrollButtons(JoystickState?[] states)
+	{
+		foreach (var route in _ScrollButtonRoutes)
+		{
+			var pressed = states[route.SourceDeviceIndex] is { } state && state.IsButtonPressed(route.ButtonNumber);
+
+			if (pressed && !route.WasPressed)
+			{
+				var (vertical, horizontal) = route.Axis == ScrollAxis.Vertical
+					? (route.Amount, 0)
+					: (0, route.Amount);
+				_InputSynthesizer?.Scroll(vertical, horizontal, route.Unit);
+			}
+
+			// TODO: auto-repeat while held — option to re-emit on an interval instead of
+			// only on the rising edge. Edge-only one-shot for now.
+			route.WasPressed = pressed;
+		}
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
+	private void StepScrollAxes(JoystickState?[] states)
+	{
+		if (_ScrollAxisRoutes.IsEmpty)
+		{
+			return;
+		}
+
+		var now = _Time.GetTimestamp();
+		var elapsedSeconds = _ScrollHasLast ? (now - _ScrollLastTicks) / (double)_Time.Frequency : 0.0;
+		_ScrollLastTicks = now;
+		_ScrollHasLast = true;
+
+		var notchVertical = 0;
+		var notchHorizontal = 0;
+		var hiResVertical = 0;
+		var hiResHorizontal = 0;
+
+		foreach (var route in _ScrollAxisRoutes)
+		{
+			if (states[route.SourceDeviceIndex] is not { } state)
+			{
+				continue;
+			}
+
+			var value = route.SourceDevice.ReadNormalizedAxisValue(state, route.Source);
+			if (route.RuntimeModifier is { } m)
+			{
+				value = m.Apply(value, states);
+			}
+
+			// Sensitivity is notches/sec at full deflection; high-res emits 1/120-notch steps.
+			var unitScale = route.Unit == MouseScrollUnit.HighResolution ? HiResUnitsPerNotch : 1.0;
+			route.Accumulator += value * route.Sensitivity * unitScale * elapsedSeconds;
+			var step = (int)route.Accumulator; // truncates toward zero; remainder carries
+			route.Accumulator -= step;
+			if (step == 0)
+			{
+				continue;
+			}
+
+			if (route.Unit == MouseScrollUnit.HighResolution)
+			{
+				if (route.Axis == ScrollAxis.Vertical)
+				{
+					hiResVertical += step;
+				}
+				else
+				{
+					hiResHorizontal += step;
+				}
+			}
+			else if (route.Axis == ScrollAxis.Vertical)
+			{
+				notchVertical += step;
+			}
+			else
+			{
+				notchHorizontal += step;
+			}
+		}
+
+		if (notchVertical != 0 || notchHorizontal != 0)
+		{
+			_InputSynthesizer?.Scroll(notchVertical, notchHorizontal, MouseScrollUnit.Notch);
+		}
+
+		if (hiResVertical != 0 || hiResHorizontal != 0)
+		{
+			_InputSynthesizer?.Scroll(hiResVertical, hiResHorizontal, MouseScrollUnit.HighResolution);
+		}
+	}
+
+	// One detent = 120 high-res units (kernel/Windows WHEEL_DELTA convention).
+	private const double HiResUnitsPerNotch = 120.0;
 
 	private void StepAxisZones(JoystickState?[] states)
 	{
