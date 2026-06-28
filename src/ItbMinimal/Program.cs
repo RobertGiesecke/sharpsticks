@@ -30,11 +30,7 @@ BuildAndRunAsConsole(new()
 	[
 		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X),
 		RightStick.Axes.Ry.RouteToMouse(MouseDirection.Y),
-		RightStick.Buttons.ThumbStick.ComplexRoute(new()
-		{
-			OnPress = [ PressMouseButton(OutputMouseButton.Left) ],
-			OnRelease = [ ReleaseMouseButton(OutputMouseButton.Left) ],
-		}),
+		RightStick.Buttons.ThumbStick.RouteToMouse(OutputMouseButton.Left),
 		// switch to gimbals while holding cm hat east
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()
 		{
