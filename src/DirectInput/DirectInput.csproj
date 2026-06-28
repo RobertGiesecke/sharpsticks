@@ -13,4 +13,5 @@
       <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />
     </ItemGroup>
 
+    <Import Project="..\CoverageExclude.Undeterministic.props" />
 </Project>

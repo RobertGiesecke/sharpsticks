@@ -19,6 +19,7 @@ public enum Axis
 public static class AxisExtensions
 {
 #pragma warning disable CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
+	[ExcludeFromCodeCoverage(Justification = "CS8509 is in WarningsAsErrors, a missing member will be a build error")]
 	[OverloadResolutionPriority(2)]
 	public static string ToStringFast(this Axis axis) => axis switch
 #pragma warning restore CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.

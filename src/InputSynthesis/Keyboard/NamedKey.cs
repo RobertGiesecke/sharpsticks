@@ -331,6 +331,7 @@ public static class NamedKeyExtensions
 		// nameof constant so it allocates nothing. Keep in sync with NamedKey; an
 		// unlisted member just falls back to the Key(0x…) form, no error.
 		// WarningsAsErrors is enabled for CS8509, so new members will create a compilation error if missing here
+		[ExcludeFromCodeCoverage(Justification = "CS8509 is in WarningsAsErrors, a missing member will be a build error")]
 		public string ToStringFast() =>
 #pragma warning disable CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
 			key switch

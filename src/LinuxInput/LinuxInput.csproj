@@ -15,4 +15,5 @@
         <ProjectReference Include="..\LinuxNative\LinuxNative.csproj"/>
     </ItemGroup>
 
+    <Import Project="..\CoverageExclude.Undeterministic.props" />
 </Project>

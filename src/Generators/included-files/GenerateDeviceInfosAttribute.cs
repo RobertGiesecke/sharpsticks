@@ -1,6 +1,8 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using SharpSticks.InputAbstractions;
 
+[ExcludeFromCodeCoverage]
 [AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = false)]
 internal sealed class GenerateDeviceInfosAttribute : Attribute
 {
@@ -22,6 +24,7 @@ internal enum GenerateDeviceInfosLevels
 	All = DeviceNames | DeviceIds | OutputDeviceIds | TypedDevices,
 }
 
+[ExcludeFromCodeCoverage]
 [ AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
 internal sealed class RenameDeviceAttribute : Attribute
 {
@@ -34,6 +37,7 @@ internal sealed class RenameDeviceAttribute : Attribute
 	}
 }
 
+[ExcludeFromCodeCoverage]
 [ AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
 internal sealed class RenameButton : Attribute
 {
@@ -48,6 +52,7 @@ internal sealed class RenameButton : Attribute
 	}
 }
 
+[ExcludeFromCodeCoverage]
 [ AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
 internal sealed class RenameAxis : Attribute
 {
