@@ -12,12 +12,14 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	public static LinuxOutputDeviceFactory Instance { get; } = new();
 
 	string ISupportsOutputSetup.SetupSubcommandName => LinuxOutputSetup.SubcommandName;
+	
+	public IInputSynthesizer InputSynthesizer => LinuxInputSynthesizer.Instance;
 
 	void ISupportsOutputSetup.RunSetup(
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<OutputButtonBinding> outputButtons,
 		IReadOnlyCollection<AxisRoute> axisRoutes,
 		IReadOnlyCollection<int> macroButtonNumbers) =>
-		LinuxOutputSetup.Run(buttonRoutes, axisRoutes, macroButtonNumbers);
+		LinuxOutputSetup.Run(outputButtons, axisRoutes, macroButtonNumbers);
 
 	/// Public convenience overload returning concrete <see cref="LinuxOutputDevice"/>
 	/// instances. Used by tests / examples that work with the typed factory directly.
@@ -61,7 +63,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 
 		try
 		{
-			DeclareCapabilities(fd, request.AxisRoutes, request.ButtonRoutes, request.MacroButtonNumbers);
+			DeclareCapabilities(fd, request.AxisRoutes, request.OutputButtons, request.MacroButtonNumbers);
 			SetupDevice(fd, request.DeviceId);
 			CreateDevice(fd);
 
@@ -73,7 +75,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 				request.DeviceId,
 				fd,
 				CollectAxisCodes(request.AxisRoutes),
-				CollectButtonCodes(request.ButtonRoutes, request.MacroButtonNumbers));
+				CollectButtonCodes(request.OutputButtons, request.MacroButtonNumbers));
 		}
 		catch
 		{
@@ -85,7 +87,7 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	private static void DeclareCapabilities(
 		int fd,
 		IReadOnlyCollection<AxisRoute> axisRoutes,
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<OutputButtonBinding> outputButtons,
 		IReadOnlyCollection<int>? macroButtonNumbers)
 	{
 		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, EvType.Key.ToNative()), "UI_SET_EVBIT(EV_KEY)");
@@ -112,8 +114,8 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 		}
 
 		var hasJoystickRangeButton = false;
-		foreach (var buttonNumber in buttonRoutes
-			         .Select(static r => r.OutputBinding.ButtonNumber)
+		foreach (var buttonNumber in outputButtons
+			         .Select(static b => b.ButtonNumber)
 			         .Concat(macroButtonNumbers ?? [])
 			         .Distinct())
 		{
@@ -183,12 +185,12 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	}
 
 	private static FrozenDictionary<int, ushort> CollectButtonCodes(
-		IReadOnlyCollection<ButtonRoute> buttonRoutes,
+		IReadOnlyCollection<OutputButtonBinding> outputButtons,
 		IReadOnlyCollection<int>? macroButtonNumbers)
 	{
 		var dict = new Dictionary<int, ushort>();
-		foreach (var buttonNumber in buttonRoutes
-			         .Select(static r => r.OutputBinding.ButtonNumber)
+		foreach (var buttonNumber in outputButtons
+			         .Select(static b => b.ButtonNumber)
 			         .Concat(macroButtonNumbers ?? [])
 			         .Distinct())
 		{

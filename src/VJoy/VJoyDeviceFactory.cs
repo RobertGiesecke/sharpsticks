@@ -13,6 +13,8 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 	/// stable sequential claim from the candidate pool.
 	internal static Guid VJoyProductGuid { get; } = ProductGuidEncoder.Encode(vendor: 0x1234, product: 0xBEAD);
 
+	public IInputSynthesizer? InputSynthesizer => WindowsInputSynthesizer.Instance;
+
 	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs()
 	{
 		try
@@ -185,8 +187,8 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 			}
 
 			var buttonCount = VJoyNative.GetVJDButtonNumber(deviceId);
-			foreach (var targetButton in request.ButtonRoutes
-				         .Select(static route => route.OutputBinding.ButtonNumber)
+			foreach (var targetButton in request.OutputButtons
+				         .Select(static button => button.ButtonNumber)
 				         .Concat(request.MacroButtonNumbers)
 				         .Distinct())
 			{

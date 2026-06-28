@@ -134,7 +134,7 @@ public sealed class AxisToButtonRouteTests : IDisposable
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
 			TimeSource = _Time,
-			Routes = [..binding.SplitIntoButtons([b1, b2, b3, b4])],
+			Routes = [binding.SplitIntoButtons([b1, b2, b3, b4])],
 		});
 
 		// Zone 1: [0, 0.25)
@@ -164,7 +164,7 @@ public sealed class AxisToButtonRouteTests : IDisposable
 	public void SplitIntoButtons_Signed_DerivesRangeFromMode()
 	{
 		// Signed axis: range is [-1, 1]. Two buttons -> [-1, 0) and [0, 1].
-		using var runtime = Build([.._Stick.BindAxis(Axis.X).SplitIntoButtons(
+		using var runtime = Build([_Stick.BindAxis(Axis.X).SplitIntoButtons(
 			[_Output.BindButton(5), _Output.BindButton(6)])]);
 
 		_Stick.SetAxisValue(Axis.X, -0.5);
@@ -255,7 +255,7 @@ public sealed class AxisToButtonRouteTests : IDisposable
 		Assert.Contains("Max", ex.Message);
 	}
 
-	private IFakesOutputRuntimeContext Build(params IBoundRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

@@ -2,8 +2,6 @@
 
 public static class Utils
 {
-	public static T? AsNullable<T>(this T value) where T : struct => value;
-
 	public static NumberFormattingDebugInterpolatedStringHandler FormatInterpolation(
 		NumberFormattingDebugInterpolatedStringHandler interpolatedStringHandler) =>
 		interpolatedStringHandler;

@@ -12,6 +12,17 @@ public sealed class FakeOutputDeviceFactory : IOutputDeviceFactory<FakeOutputDev
 {
 	private readonly PooledDictionary<uint, FakeOutputDevice> _Devices = new();
 
+	public IInputSynthesizer? InputSynthesizer { get; }
+
+	public FakeOutputDeviceFactory() : this(null)
+	{
+	}
+
+	public FakeOutputDeviceFactory(IInputSynthesizer? inputSynthesizer)
+	{
+		InputSynthesizer = inputSynthesizer;
+	}
+
 	public FakeOutputDevice this[uint deviceId] => Get(deviceId);
 
 	public FakeOutputDevice Get(uint deviceId) =>

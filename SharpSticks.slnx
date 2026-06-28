@@ -10,6 +10,7 @@
   <Project Path="src/Editor/Editor.csproj" />
   <Project Path="src/Generators/Generators.csproj" />
   <Project Path="src/InputAbstractions/InputAbstractions.csproj" />
+  <Project Path="src/InputSynthesis/InputSynthesis.csproj" />
   <Project Path="src/LinuxInput/LinuxInput.csproj" />
   <Project Path="src/LinuxNative/LinuxNative.csproj" />
   <Project Path="src/LinuxOutput/LinuxOutput.csproj" />
@@ -20,7 +21,10 @@
   <Project Path="src/PlatformDefaults/PlatformDefaults.csproj" />
   <Project Path="src/PlatformInput/PlatformInput.csproj" />
   <Project Path="src/PlatformOutput/PlatformOutput.csproj" />
+  <Project Path="src/Shared/Shared.csproj" />
   <Project Path="src/Testing/Testing.csproj" />
   <Project Path="src/Tests/Tests.csproj" />
   <Project Path="src/VJoy/VJoy.csproj" />
+  <Project Path="src/InputSynthesis.Windows/InputSynthesis.Windows.csproj" />
+  <Project Path="src/InputSynthesis.Linux/InputSynthesis.Linux.csproj" />
 </Solution>

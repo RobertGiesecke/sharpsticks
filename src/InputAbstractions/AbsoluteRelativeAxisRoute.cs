@@ -1,11 +1,11 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public sealed record AbsoluteRelativeAxisRoute : ICombinedRoute
+public sealed record AbsoluteRelativeAxisRoute : ICombinedRoute, IConfigurableRoute
 {
 	public required AxisBinding Binding { get; init; }
 	public required AbsoluteRelativeAxisOptions Options { get; init; }
 
-	public IEnumerable<IBoundRoute> GetRoutes()
+	public IEnumerable<IRoute> GetRoutes()
 	{
 		if (Options is { IncreaseAxis.OutputDeviceId: < 1 } or { DecreaseAxis.OutputDeviceId: < 1 })
 		{

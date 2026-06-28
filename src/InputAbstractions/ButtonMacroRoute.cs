@@ -6,7 +6,7 @@ namespace SharpSticks.InputAbstractions;
 /// <see cref="OnRelease"/> on the inverse edge. Press and release runs share a
 /// single FIFO so event order is preserved.
 /// </summary>
-public sealed record ButtonMacroRoute : IBoundRoute
+public sealed record ButtonMacroRoute : IBoundRoute, IConfigurableRoute
 {
 	public required ButtonBinding Binding { get; init; }
 	public ImmutableArray<IMacroAction> OnPress { get; init; } = [];
@@ -16,10 +16,6 @@ public sealed record ButtonMacroRoute : IBoundRoute
 	public MacroReentry Reentry { get; init; } = DefaultReentry;
 
 	InputBinding IBoundRoute.InputBinding => Binding;
-
-	// A macro can write to multiple output devices; the actual targets are
-	// discovered by walking actions via IMacroAction.FillOutputs.
-	uint IBoundRoute.OutputDeviceId => 0;
 
 	public IMergeableObject Merge(MergeObjectContext context)
 	{

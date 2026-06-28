@@ -26,14 +26,10 @@ var axisRoutes = new[]
 		Modifier = null,
 	},
 };
-var buttonRoutes = new[]
+var outputButtons = new[]
 {
-	new ButtonRoute(
-		new(DeviceId: 99, ButtonNumber: 1),
-		new(deviceId, ButtonNumber: 1)),
-	new ButtonRoute(
-		new(DeviceId: 99, ButtonNumber: 2),
-		new(deviceId, ButtonNumber: 2)),
+	new OutputButtonBinding(deviceId, ButtonNumber: 1),
+	new OutputButtonBinding(deviceId, ButtonNumber: 2),
 };
 
 OutputDevice device;
@@ -41,7 +37,7 @@ try
 {
 	using var opened = LinuxOutputDeviceFactory.Instance.EnumerateConnectedOutputDevices(
 	[
-		new(deviceId, buttonRoutes, axisRoutes, []),
+		new(deviceId, outputButtons, axisRoutes, []),
 	]);
 	device = opened[0];
 }

@@ -12,8 +12,22 @@ public static class ConsoleExtensions<TInputDevice, TOutputDevice>
 		public required string Name { get; init; }
 		public DebugLogger? DebugLogger { get; init; }
 		public IOutputDeviceFactory<TOutputDevice>? OutputDeviceFactory { get; init; }
+
+		/// <summary>
+		/// OS keyboard/mouse sink for key/mouse macro actions. Leave null to use the
+		/// output backend's default (<see cref="IOutputDeviceFactory.InputSynthesizer"/>);
+		/// set it to override, or to opt out with a no-op.
+		/// </summary>
+		public IInputSynthesizer? InputSynthesizer { get; init; }
+
+		/// <summary>
+		/// Initialize the synthesizer's backend at startup (the Linux uinput device,
+		/// etc.). Default true. Set false on a profile that doesn't synthesize input
+		/// to keep the synthetic device from being created.
+		/// </summary>
+		public bool InitializeInputSynthesizer { get; init; } = true;
 		public ImmutableArray<TInputDevice>? ConnectedDevices { get; init; }
-		public ImmutableArray<IRoute> Routes { get; init; } = [];
+		public ImmutableArray<IConfigurableRoute> Routes { get; init; } = [];
 	}
 
 	public static PooledList<TInputDevice> EnumerateConnectedDevices() =>

@@ -57,12 +57,15 @@ public static class FactoryExtensions
 				return true;
 			}
 
-			var buttonRoutes = options.Routes.OfType<ButtonRoute>().ToArray();
+			var outputButtons = options.Routes.OfType<ButtonToTargetRoute>().Select(route => route.Target)
+				.Concat(options.Routes.OfType<AxisZoneRoute>().Select(route => route.Target))
+				.OfType<OutputButtonBinding>()
+				.ToArray();
 			var axisRoutes = options.Routes.OfType<AxisRoute>().ToArray();
 			// Macro-only output buttons are discovered by walking IMacroAction.FillOutputs;
 			// not extracted here. Setup only needs to validate that buttons declared in
 			// direct routes can be created.
-			setupCapable.RunSetup(buttonRoutes, axisRoutes, []);
+			setupCapable.RunSetup(outputButtons, axisRoutes, []);
 			return true;
 		}
 
@@ -89,6 +92,8 @@ public static class FactoryExtensions
 			Name = o.Name,
 			DebugLogger = o.DebugLogger,
 			OutputDeviceFactory = o.OutputDeviceFactory,
+			InputSynthesizer = o.InputSynthesizer,
+			InitializeInputSynthesizer = o.InitializeInputSynthesizer,
 			ConnectedDevices = o.ConnectedDevices ?? [..joystickDevices!],
 			Routes = o.Routes,
 		};

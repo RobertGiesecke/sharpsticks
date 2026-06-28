@@ -13,6 +13,8 @@
     <ItemGroup>
       <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj" />
       <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj" />
+      <ProjectReference Include="..\InputSynthesis.Windows\InputSynthesis.Windows.csproj" />
     </ItemGroup>
 
+    <Import Project="..\CoverageExclude.Undeterministic.props" />
 </Project>

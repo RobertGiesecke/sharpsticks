@@ -1,10 +1,10 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public sealed record MultiAxesToButtonRoute : ICombinedRoute
+public sealed record MultiAxesToButtonRoute : ICombinedRoute, IConfigurableRoute
 {
 	public required ImmutableArray<AxisBinding> Sources { get; init; }
 
-	public required OutputButtonBinding OutputBinding { get; init; }
+	public required ButtonTarget Target { get; init; }
 	public required double Min { get; init; }
 	public required double Max { get; init; }
 	/// <summary>
@@ -19,12 +19,12 @@ public sealed record MultiAxesToButtonRoute : ICombinedRoute
 	/// <summary>Only used when <see cref="Mode"/> is <see cref="AxisZoneTriggerMode.Pulse"/>.</summary>
 	public TimeSpan PulseDuration { get; init; } = TimeSpan.FromMilliseconds(50);
 
-	public IEnumerable<IBoundRoute> GetRoutes()
+	public IEnumerable<IRoute> GetRoutes()
 	{
-		return Sources.Select(s => new AxisToButtonRoute
+		return Sources.Select(s => new AxisZoneRoute
 		{
 			Source = s,
-			OutputBinding = OutputBinding,
+			Target = Target,
 			Min = Min,
 			Max = Max,
 			IncludeMax = IncludeMax,

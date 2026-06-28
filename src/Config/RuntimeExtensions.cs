@@ -14,11 +14,11 @@ public static class RuntimeExtensions
 		/// <c>DeviceId</c> in bindings (and inside nested modifiers) is
 		/// rewritten through this map. Unmapped ids pass through unchanged.
 		/// </param>
-		public ImmutableArray<IRoute> BuildRoutes(IReadOnlyDictionary<int, int>? deviceMap = null)
+		public ImmutableArray<IConfigurableRoute> BuildRoutes(IReadOnlyDictionary<int, int>? deviceMap = null)
 		{
 			deviceMap ??= EmptyMap;
 
-			using var buttonRoutes = new PooledList<ButtonRoute>();
+			using var buttonRoutes = new PooledList<ButtonToTargetRoute>();
 			using var axisRoutes = new PooledList<AxisRoute>();
 
 			foreach (var mapping in config.ButtonMappings)
@@ -37,10 +37,13 @@ public static class RuntimeExtensions
 				{
 					DeviceId = Translate(mapping.SourceBinding.DeviceId, deviceMap),
 				};
-				buttonRoutes.Add(new(
-					source,
-					new(mapping.VJoyDeviceId ?? config.VJoyDeviceId,
-						mapping.TargetButton)));
+				buttonRoutes.Add(new()
+				{
+					Source = source,
+					Target = new OutputButtonBinding(
+						mapping.VJoyDeviceId ?? config.VJoyDeviceId,
+						mapping.TargetButton),
+				});
 			}
 
 			foreach (var mapping in config.AxisMappings)

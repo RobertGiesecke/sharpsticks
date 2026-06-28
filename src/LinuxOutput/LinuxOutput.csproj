@@ -13,6 +13,9 @@
         <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj"/>
         <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj"/>
         <ProjectReference Include="..\LinuxNative\LinuxNative.csproj"/>
+        <ProjectReference Include="..\InputSynthesis.Linux\InputSynthesis.Linux.csproj"/>
     </ItemGroup>
+
+    <Import Project="..\CoverageExclude.Undeterministic.props" />
 
 </Project>

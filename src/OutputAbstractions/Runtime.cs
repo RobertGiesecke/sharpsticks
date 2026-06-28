@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
+using SharpSticks.InputSynthesis.Mouse;
 
 namespace SharpSticks.OutputAbstractions;
 
 //public sealed class Runtime : IOutputRuntimeContext, IDisposable
-public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext<TInputDevice, TOutputDevice>
+public sealed class Runtime<TInputDevice, TOutputDevice>
+	: IOutputRuntimeContext<TInputDevice, TOutputDevice>, IButtonSinkContext
 	where TInputDevice : JoystickDevice
 	where TOutputDevice : OutputDevice
 {
@@ -11,29 +13,52 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private readonly DebugLogger? _DebugLogger;
 	private readonly ImmutableArray<OutputAxisRoute> _AxisRoutes;
 	private readonly OutputButtonState[] _OutputButtonStates;
+	// Final-apply sink per output-button state index (vJoy button / key / mouse / scroll),
+	// built once from each target so the apply loop never does a lookup.
+	private readonly ImmutableArray<IButtonStateSink> _Sinks;
 	private readonly ImmutableArray<OutputButtonWithBindings> _ButtonRoutes;
 	private readonly ImmutableArray<OutputAxisToButtonRoute> _AxisToButtonRoutes;
 	private long? _AxisZoneNextDeadlineTicks;
-	private readonly FrozenDictionary<OutputButtonBinding, OutputButtonStateIndex> _OutputButtonStateIndexByBinding;
+	private readonly FrozenDictionary<ButtonTarget, OutputButtonStateIndex> _OutputStateIndexByTarget;
 	private readonly ImmutableArray<TInputDevice> _Devices;
 	private readonly ImmutableArray<TOutputDevice> _OutputDevices;
+	private readonly FrozenDictionary<uint, TOutputDevice> _OutputDevicesById;
 	private readonly MacroEngine? _Macros;
 	private readonly ITimeSource _Time;
+	private readonly IInputSynthesizer? _InputSynthesizer;
+	private readonly bool _InitializeInputSynthesizer;
+	private readonly ImmutableArray<OutputMouseAxisRoute> _MouseAxisRoutes;
+	private readonly ImmutableArray<OutputScrollAxisRoute> _ScrollAxisRoutes;
+	private long _MouseMoveLastTicks;
+	private bool _MouseMoveHasLast;
+	private long _ScrollLastTicks;
+	private bool _ScrollHasLast;
 
 	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
 	public ImmutableArray<TInputDevice> Devices => _Devices;
 	public ITimeSource TimeSource => _Time;
+	public IInputSynthesizer? InputSynthesizer => _InputSynthesizer;
 
 	public OutputButtonStateIndex? TryGetOutputStateIndex(OutputButtonBinding binding) =>
-		_OutputButtonStateIndexByBinding.TryGetValue(binding, out var index) ? index : null;
+		_OutputStateIndexByTarget.TryGetValue(binding, out var index) ? index : null;
+
+	IInputSynthesizer? IButtonSinkContext.Synthesizer => _InputSynthesizer;
+
+	IButtonStateSink IButtonSinkContext.CreateOutputButtonSink(OutputButtonBinding binding) =>
+		new OutputButtonSink(_OutputDevicesById[binding.OutputDeviceId], binding.ButtonNumber);
 
 	private record struct OutputButtonState
 	{
 		public int Pressers;
 		public int Suppressors;
 		public bool WasRouteAssertingLastFrame;
+
+		// Last state pushed to the sink, so the apply loop only fires on a change — key/
+		// mouse sinks emit down/up events and the scroll sink pulses, so re-applying the
+		// same state every frame would spam events (vJoy SetButtonState was idempotent).
+		public bool LastApplied;
 
 		public static void IncrementPressers(ref OutputButtonState outputButtonState) => outputButtonState.Pressers++;
 
@@ -55,9 +80,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 	private sealed class OutputButtonWithBindings
 	{
 		public required OutputButtonStateIndex OutputButtonStateIndex { get; init; }
-		public required TOutputDevice OutputDevice { get; init; }
-		public required int TargetButton { get; init; }
-		public required OutputButtonBinding TargetBinding { get; init; }
+		public required ButtonTarget Target { get; init; }
 
 		public required bool IsFirstBinding { get; init; }
 		public required bool IsLastBinding { get; init; }
@@ -78,6 +101,35 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
 	}
 
+	private sealed class OutputMouseAxisRoute
+	{
+		public required int SourceDeviceIndex { get; init; }
+		public required TInputDevice SourceDevice { get; init; }
+		public required AxisBinding Source { get; init; }
+		public required MouseDirection Direction { get; init; }
+		public required double Sensitivity { get; init; }
+		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
+
+		// Sub-pixel remainder carried across frames so slow movement isn't lost to
+		// integer truncation.
+		public double Accumulator;
+	}
+
+	private sealed class OutputScrollAxisRoute
+	{
+		public required int SourceDeviceIndex { get; init; }
+		public required TInputDevice SourceDevice { get; init; }
+		public required AxisBinding Source { get; init; }
+		public required ScrollAxis Axis { get; init; }
+		public required MouseScrollUnit Unit { get; init; }
+		public required double Sensitivity { get; init; }
+		public required IRuntimeAxisModifier? RuntimeModifier { get; init; }
+
+		// Sub-step remainder carried across frames so slow scrolling isn't lost to
+		// integer truncation.
+		public double Accumulator;
+	}
+
 	private sealed class OutputAxisToButtonRoute
 	{
 		public required int SourceDeviceIndex { get; init; }
@@ -90,26 +142,91 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		public required long PulseDurationTicks { get; init; }
 		public required OutputButtonStateIndex OutputButtonStateIndex { get; init; }
 
+		public ZoneActivation Zone;
+	}
+
+	// Per-zone Hold/Pulse state, shared by vJoy-button and mouse-button zones.
+	private struct ZoneActivation
+	{
 		public bool IsAsserting;
 		public long PulseDeadlineTicks;
 		public bool PulseCooldown;
+	}
+
+	/// <summary>
+	/// Advances one zone's Hold/Pulse state for this frame and returns whether it is
+	/// asserting. <c>Hold</c> asserts while in range; <c>Pulse</c> asserts for
+	/// <paramref name="pulseDurationTicks"/> on entering range, then waits (cooldown)
+	/// until the axis leaves the zone. The earliest live pulse deadline is folded into
+	/// <paramref name="earliestDeadline"/> so the run loop can wake to end the pulse.
+	/// </summary>
+	private static bool AdvanceZoneActivation(
+		bool inRange,
+		AxisZoneTriggerMode mode,
+		long pulseDurationTicks,
+		long now,
+		ref ZoneActivation zone,
+		ref long? earliestDeadline)
+	{
+		if (mode == AxisZoneTriggerMode.Hold)
+		{
+			zone.IsAsserting = inRange;
+			return inRange;
+		}
+
+		if (zone.IsAsserting)
+		{
+			if (now >= zone.PulseDeadlineTicks)
+			{
+				zone.IsAsserting = false;
+				zone.PulseCooldown = inRange;
+			}
+			else if (earliestDeadline is null || zone.PulseDeadlineTicks < earliestDeadline)
+			{
+				earliestDeadline = zone.PulseDeadlineTicks;
+			}
+		}
+		else if (zone.PulseCooldown)
+		{
+			if (!inRange)
+			{
+				zone.PulseCooldown = false;
+			}
+		}
+		else if (inRange)
+		{
+			zone.IsAsserting = true;
+			zone.PulseDeadlineTicks = now + pulseDurationTicks;
+			if (earliestDeadline is null || zone.PulseDeadlineTicks < earliestDeadline)
+			{
+				earliestDeadline = zone.PulseDeadlineTicks;
+			}
+		}
+
+		return zone.IsAsserting;
 	}
 
 	public Runtime(
 		string name,
 		DebugLogger? debugLogger,
 		PooledDictionary<int, TInputDevice> devices,
-		ImmutableArray<ButtonRoute> buttonRoutes,
+		ImmutableArray<ButtonToTargetRoute> buttonToTargetRoutes,
 		ImmutableArray<AxisRoute> axisRoutes,
 		ImmutableArray<ButtonMacroRoute> macroRoutes,
-		ImmutableArray<AxisToButtonRoute> axisToButtonRoutes,
+		ImmutableArray<AxisZoneRoute> axisZoneRoutes,
+		ImmutableArray<AxisToMouseRoute> axisToMouseRoutes,
+		ImmutableArray<AxisToScrollRoute> axisToScrollRoutes,
 		ImmutableArray<OutputButtonBinding> auxiliaryOutputButtons,
 		ITimeSource timeSource,
-		ImmutableArray<TOutputDevice> outputDevices)
+		ImmutableArray<TOutputDevice> outputDevices,
+		IInputSynthesizer? inputSynthesizer = null,
+		bool initializeInputSynthesizer = true)
 	{
 		Name = name;
 		_DebugLogger = debugLogger;
 		_Time = timeSource;
+		_InputSynthesizer = inputSynthesizer;
+		_InitializeInputSynthesizer = initializeInputSynthesizer;
 		_Devices = [..devices.Values];
 		DevicesById = devices.ToFrozenDictionary();
 		{
@@ -126,9 +243,10 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			.Select((device, index) => new { device.DeviceId, Index = index })
 			.ToPooledDictionary(t => t.DeviceId, t => t.Index);
 
-		// Macro / axis-zone output buttons get an OutputButtonWithBindings entry
-		// too so ApplyButtons can OR their held sets in for them.
-		using var allOutputButtons = new PooledSet<OutputButtonBinding>();
+		// Every distinct button-like target (vJoy button, mouse button, …) gets an
+		// OutputButtonState slot; macro / axis-zone targets get an OutputButtonWithBindings
+		// entry too so ApplyButtons can OR their held sets in for them.
+		using var allOutputButtons = new PooledSet<ButtonTarget>();
 
 		using var mergedObjectsLookup = new PooledDictionary<IMergeableObject, IMergeableObject>();
 		var mergeObjectContext = new MergeObjectContext
@@ -136,48 +254,52 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			MergedObjects = mergedObjectsLookup,
 		};
 
-		var mergedButtonRoutes = buttonRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedButtonToTargetRoutes = buttonToTargetRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAuxiliaryOutputButtons = auxiliaryOutputButtons.MergeOrGetAll(mergeObjectContext);
 		var mergedMacroRoutes = macroRoutes.MergeOrGetAll(mergeObjectContext);
 		var mergedAxisRoutes = axisRoutes.MergeOrGetAll(mergeObjectContext);
-		var mergedAxisToButtonRoutes = axisToButtonRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisZoneRoutes = axisZoneRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisToMouseRoutes = axisToMouseRoutes.MergeOrGetAll(mergeObjectContext);
+		var mergedAxisToScrollRoutes = axisToScrollRoutes.MergeOrGetAll(mergeObjectContext);
 
-		foreach (var route in mergedButtonRoutes)
+		foreach (var route in mergedButtonToTargetRoutes)
 		{
-			allOutputButtons.Add(route.OutputBinding);
+			allOutputButtons.Add(route.Target);
 		}
-
 
 		foreach (var binding in mergedAuxiliaryOutputButtons)
 		{
 			allOutputButtons.Add(binding);
 		}
 
-		using var bindingsByOutput = mergedButtonRoutes
-			.GroupBy(t => t.OutputBinding)
-			.ToPooledDictionary(g => g.Key, g => g.ToArray());
+		foreach (var route in mergedAxisZoneRoutes)
+		{
+			allOutputButtons.Add(route.Target);
+		}
+
+		// Source button → target, grouped per target for the OR-merge in ApplyButtons.
+		using var buttonSourcesByTarget = mergedButtonToTargetRoutes
+			.GroupBy(route => route.Target)
+			.ToPooledDictionary(g => g.Key, g => g.Select(route => route.Source).ToArray());
 
 		{
 			using var flattenedButtonBindings = new PooledList<OutputButtonWithBindings>();
 			using var outputButtonsStates = new PooledList<OutputButtonState>(allOutputButtons.Count);
-			using var outputButtonStateIndexByBinding = new PooledDictionary<OutputButtonBinding, OutputButtonStateIndex>(allOutputButtons.Count);
+			using var outputStateIndexByTarget = new PooledDictionary<ButtonTarget, OutputButtonStateIndex>(allOutputButtons.Count);
 
-			foreach (var binding in allOutputButtons)
+			foreach (var target in allOutputButtons)
 			{
 				outputButtonsStates.Add(new());
 				var outputButtonStateIndex = new OutputButtonStateIndex(outputButtonsStates.Count - 1);
-				outputButtonStateIndexByBinding.Add(binding, outputButtonStateIndex);
-				var sources = bindingsByOutput.GetValueOrDefault(binding, []);
+				outputStateIndexByTarget.Add(target, outputButtonStateIndex);
+				var sources = buttonSourcesByTarget.GetValueOrDefault(target, []);
 				if (sources is not { Length: > 0 })
 				{
 					flattenedButtonBindings.Add(new()
 					{
 						OutputButtonStateIndex = outputButtonStateIndex,
-						// ReSharper disable once AccessToDisposedClosure
-						OutputDevice = outputDevices[outputDeviceIndexes[binding.OutputDeviceId]],
-						TargetButton = binding.ButtonNumber,
-						TargetBinding = binding,
-						ButtonBinding = default,
+						Target = target,
+						ButtonBinding = null,
 						SourceDeviceIndex = -1,
 						IsFirstBinding = true,
 						IsLastBinding = true,
@@ -187,16 +309,13 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 				var lastIndex = sources.Length - 1;
 				for (var i = 0; i < sources.Length; i++)
 				{
-					var t = sources[i].Binding;
+					var source = sources[i];
 					flattenedButtonBindings.Add(new()
 					{
 						OutputButtonStateIndex = outputButtonStateIndex,
-						// ReSharper disable once AccessToDisposedClosure
-						OutputDevice = outputDevices[outputDeviceIndexes[binding.OutputDeviceId]],
-						TargetButton = binding.ButtonNumber,
-						TargetBinding = binding,
-						ButtonBinding = t,
-						SourceDeviceIndex = DeviceIndexesById[t.DeviceId],
+						Target = target,
+						ButtonBinding = source,
+						SourceDeviceIndex = DeviceIndexesById[source.DeviceId],
 						IsFirstBinding = i == 0,
 						IsLastBinding = i == lastIndex,
 					});
@@ -204,7 +323,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			}
 
 			_OutputButtonStates = [..outputButtonsStates.Span];
-			_OutputButtonStateIndexByBinding = outputButtonStateIndexByBinding.ToFrozenDictionary();
+			_OutputStateIndexByTarget = outputStateIndexByTarget.ToFrozenDictionary();
 			_ButtonRoutes =
 			[
 				..flattenedButtonBindings.Span,
@@ -228,25 +347,64 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 			})
 		];
 		_OutputDevices = outputDevices;
+		_OutputDevicesById = outputDevices.ToFrozenDictionary(device => device.DeviceId);
+
+		// Build the apply sink for each output-button state index, once, from its target.
+		var sinks = new IButtonStateSink[_OutputButtonStates.Length];
+		foreach (var (target, index) in _OutputStateIndexByTarget)
+		{
+			sinks[index.Value] = target.CreateRuntimeSink(this);
+		}
+
+		_Sinks = [..sinks];
 		
 		_AxisToButtonRoutes =
 		[
-			..mergedAxisToButtonRoutes.Select(route =>
+			..mergedAxisZoneRoutes.Select(route => new OutputAxisToButtonRoute
 			{
-				var durationSeconds = route.PulseDuration.TotalSeconds;
-				var durationTicks = (long)(durationSeconds * timeSource.Frequency);
-				return new OutputAxisToButtonRoute
+				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
+				SourceDevice = DevicesById[route.Source.DeviceId],
+				Source = route.Source,
+				Min = route.Min,
+				Max = route.Max,
+				IncludeMax = route.IncludeMax,
+				Mode = route.Mode,
+				PulseDurationTicks = (long)(route.PulseDuration.TotalSeconds * timeSource.Frequency),
+				OutputButtonStateIndex = _OutputStateIndexByTarget[route.Target],
+			})
+		];
+		_MouseAxisRoutes =
+		[
+			..mergedAxisToMouseRoutes.Select(route =>
+			{
+				if (route.Movement.Kind != MovementKind.Relative)
+				{
+					throw new NotSupportedException(
+						"Only relative mouse movement is implemented; absolute is not yet supported.");
+				}
+
+				return new OutputMouseAxisRoute
 				{
 					SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
 					SourceDevice = DevicesById[route.Source.DeviceId],
 					Source = route.Source,
-					Min = route.Min,
-					Max = route.Max,
-					IncludeMax = route.IncludeMax,
-					Mode = route.Mode,
-					PulseDurationTicks = durationTicks,
-					OutputButtonStateIndex = _OutputButtonStateIndexByBinding[route.OutputBinding],
+					Direction = route.Direction,
+					Sensitivity = route.Sensitivity,
+					RuntimeModifier = route.Modifier?.CreateModifierRuntimeContext(this),
 				};
+			})
+		];
+		_ScrollAxisRoutes =
+		[
+			..mergedAxisToScrollRoutes.Select(route => new OutputScrollAxisRoute
+			{
+				SourceDeviceIndex = DeviceIndexesById[route.Source.DeviceId],
+				SourceDevice = DevicesById[route.Source.DeviceId],
+				Source = route.Source,
+				Axis = route.Axis,
+				Unit = route.Unit,
+				Sensitivity = route.Sensitivity,
+				RuntimeModifier = route.Modifier?.CreateModifierRuntimeContext(this),
 			})
 		];
 		_CurrentStates = new JoystickState?[DevicesById.Count];
@@ -298,6 +456,13 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		debugLogger ??= _DebugLogger;
 		try
 		{
+			// Prepare the synthesizer backend (e.g. create the uinput device) as the
+			// runtime starts, unless the build opted out; first use covers it lazily.
+			if (_InitializeInputSynthesizer)
+			{
+				_InputSynthesizer?.EnsureInitialized();
+			}
+
 			LogStartup(debugLogger);
 
 			var waitHandles = DevicesById.Values
@@ -382,7 +547,136 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		StepAxisZones(currentStates);
 		ApplyButtons(currentStates, shouldLogNow ? debugLogger : null);
 		ApplyAxes(currentStates, shouldLogNow ? debugLogger : null);
+		StepMouseAxes(currentStates);
+		StepScrollAxes(currentStates);
+		// Commit this frame's synthesized events (macro keys + mouse moves/buttons/scroll)
+		// in one batch. No-op when no synthesizer is configured or none were emitted.
+		_InputSynthesizer?.Flush();
 	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
+	private void StepMouseAxes(JoystickState?[] states)
+	{
+		if (_MouseAxisRoutes.IsEmpty)
+		{
+			return;
+		}
+
+		var now = _Time.GetTimestamp();
+		var elapsedSeconds = _MouseMoveHasLast ? (now - _MouseMoveLastTicks) / (double)_Time.Frequency : 0.0;
+		_MouseMoveLastTicks = now;
+		_MouseMoveHasLast = true;
+
+		var dx = 0;
+		var dy = 0;
+		foreach (var route in _MouseAxisRoutes)
+		{
+			if (states[route.SourceDeviceIndex] is not { } state)
+			{
+				continue;
+			}
+
+			var value = route.SourceDevice.ReadNormalizedAxisValue(state, route.Source);
+			if (route.RuntimeModifier is { } m)
+			{
+				value = m.Apply(value, states);
+			}
+
+			route.Accumulator += value * route.Sensitivity * elapsedSeconds;
+			var step = (int)route.Accumulator; // truncates toward zero; remainder carries
+			route.Accumulator -= step;
+
+			if (route.Direction == MouseDirection.X)
+			{
+				dx += step;
+			}
+			else
+			{
+				dy += step;
+			}
+		}
+
+		if (dx != 0 || dy != 0)
+		{
+			_InputSynthesizer?.MoveMouseRelative(dx, dy);
+		}
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
+	private void StepScrollAxes(JoystickState?[] states)
+	{
+		if (_ScrollAxisRoutes.IsEmpty)
+		{
+			return;
+		}
+
+		var now = _Time.GetTimestamp();
+		var elapsedSeconds = _ScrollHasLast ? (now - _ScrollLastTicks) / (double)_Time.Frequency : 0.0;
+		_ScrollLastTicks = now;
+		_ScrollHasLast = true;
+
+		var notchVertical = 0;
+		var notchHorizontal = 0;
+		var hiResVertical = 0;
+		var hiResHorizontal = 0;
+
+		foreach (var route in _ScrollAxisRoutes)
+		{
+			if (states[route.SourceDeviceIndex] is not { } state)
+			{
+				continue;
+			}
+
+			var value = route.SourceDevice.ReadNormalizedAxisValue(state, route.Source);
+			if (route.RuntimeModifier is { } m)
+			{
+				value = m.Apply(value, states);
+			}
+
+			// Sensitivity is notches/sec at full deflection; high-res emits 1/120-notch steps.
+			var unitScale = route.Unit == MouseScrollUnit.HighResolution ? HiResUnitsPerNotch : 1.0;
+			route.Accumulator += value * route.Sensitivity * unitScale * elapsedSeconds;
+			var step = (int)route.Accumulator; // truncates toward zero; remainder carries
+			route.Accumulator -= step;
+			if (step == 0)
+			{
+				continue;
+			}
+
+			if (route.Unit == MouseScrollUnit.HighResolution)
+			{
+				if (route.Axis == ScrollAxis.Vertical)
+				{
+					hiResVertical += step;
+				}
+				else
+				{
+					hiResHorizontal += step;
+				}
+			}
+			else if (route.Axis == ScrollAxis.Vertical)
+			{
+				notchVertical += step;
+			}
+			else
+			{
+				notchHorizontal += step;
+			}
+		}
+
+		if (notchVertical != 0 || notchHorizontal != 0)
+		{
+			_InputSynthesizer?.Scroll(notchVertical, notchHorizontal, MouseScrollUnit.Notch);
+		}
+
+		if (hiResVertical != 0 || hiResHorizontal != 0)
+		{
+			_InputSynthesizer?.Scroll(hiResVertical, hiResHorizontal, MouseScrollUnit.HighResolution);
+		}
+	}
+
+	// One detent = 120 high-res units (kernel/Windows WHEEL_DELTA convention).
+	private const double HiResUnitsPerNotch = 120.0;
 
 	private void StepAxisZones(JoystickState?[] states)
 	{
@@ -405,53 +699,22 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 				          (route.IncludeMax ? value <= route.Max : value < route.Max);
 			}
 
-			if (route.Mode == AxisZoneTriggerMode.Hold)
-			{
-				switch (inRange)
-				{
-					case true when !route.IsAsserting:
-						OutputButtonState.IncrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-						route.IsAsserting = true;
-						break;
-					case false when route.IsAsserting:
-						OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-						route.IsAsserting = false;
-						break;
-				}
+			var wasAsserting = route.Zone.IsAsserting;
+			var asserting = AdvanceZoneActivation(
+				inRange, route.Mode, route.PulseDurationTicks, now, ref route.Zone, ref earliestDeadline);
 
+			if (asserting == wasAsserting)
+			{
 				continue;
 			}
 
-			// Pulse mode.
-			if (route.IsAsserting)
-			{
-				if (now >= route.PulseDeadlineTicks)
-				{
-					OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-					route.IsAsserting = false;
-					route.PulseCooldown = inRange;
-				}
-				else if (earliestDeadline is null || route.PulseDeadlineTicks < earliestDeadline)
-				{
-					earliestDeadline = route.PulseDeadlineTicks;
-				}
-			}
-			else if (route.PulseCooldown)
-			{
-				if (!inRange)
-				{
-					route.PulseCooldown = false;
-				}
-			}
-			else if (inRange)
+			if (asserting)
 			{
 				OutputButtonState.IncrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
-				route.IsAsserting = true;
-				route.PulseDeadlineTicks = now + route.PulseDurationTicks;
-				if (earliestDeadline is null || route.PulseDeadlineTicks < earliestDeadline)
-				{
-					earliestDeadline = route.PulseDeadlineTicks;
-				}
+			}
+			else
+			{
+				OutputButtonState.DecrementPressers(ref _OutputButtonStates[route.OutputButtonStateIndex.Value]);
 			}
 		}
 
@@ -529,6 +792,12 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 		}
 
 		var isPressed = x is { Pressers: > 0, Suppressors: 0 };
+		if (isPressed == x.LastApplied)
+		{
+			return;
+		}
+
+		x.LastApplied = isPressed;
 
 		debugLines?.WriteLine(
 			$"{(assertingBinding is { } bound
@@ -536,9 +805,9 @@ public sealed class Runtime<TInputDevice, TOutputDevice> : IOutputRuntimeContext
 				: isPressed
 					? Utils.FormatInterpolation($"macro -> ")
 					: NumberFormattingDebugInterpolatedStringHandler.Empty())}" +
-			$"output{route.OutputDevice.DeviceId}:{route.TargetButton} = {(isPressed ? "down" : "up")}");
+			$"output {route.Target.ToString()} = {(isPressed ? "down" : "up")}");
 
-		route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
+		_Sinks[route.OutputButtonStateIndex.Value].SetButtonState(isPressed);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]

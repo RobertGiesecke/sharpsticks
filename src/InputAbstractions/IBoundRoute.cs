@@ -1,7 +1,6 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public interface IBoundRoute : IRoute, IMergeableObject
+public interface IBoundRoute : IConfigurableRoute, IMergeableObject
 {
 	InputBinding InputBinding { get; }
-	uint OutputDeviceId { get; }
 }

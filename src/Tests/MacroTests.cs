@@ -165,7 +165,7 @@ public sealed class MacroTests : IDisposable
 		// stick.B2 fires a macro that presses output.B3.
 		var target = _Output.BindButton(3);
 		using var runtime = Build(
-			new ButtonRoute(_Stick.BindButton(1), target),
+			_Stick.BindButton(1).RouteTo(target),
 			new ButtonMacroRoute
 			{
 				Binding = _Stick.BindButton(2),
@@ -313,7 +313,7 @@ public sealed class MacroTests : IDisposable
 		// asserts the button again.
 		var target = _Output.BindButton(3);
 		using var runtime = Build(
-			new ButtonRoute(_Stick.BindButton(1), target),
+			_Stick.BindButton(1).RouteTo(target),
 			new ButtonMacroRoute
 			{
 				Binding = _Stick.BindButton(2),
@@ -351,7 +351,7 @@ public sealed class MacroTests : IDisposable
 		// route press takes effect.
 		var target = _Output.BindButton(3);
 		using var runtime = Build(
-			new ButtonRoute(_Stick.BindButton(1), target),
+			_Stick.BindButton(1).RouteTo(target),
 			new ButtonMacroRoute
 			{
 				Binding = _Stick.BindButton(2),
@@ -394,7 +394,7 @@ public sealed class MacroTests : IDisposable
 		var b3 = _Output.BindButton(3);
 		var b4 = _Output.BindButton(4);
 		using var runtime = Build(
-			new ButtonRoute(_Stick.BindButton(1), b1),
+			_Stick.BindButton(1).RouteTo(b1),
 			new ButtonMacroRoute
 			{
 				Binding = _Stick.BindButton(2),
@@ -482,8 +482,8 @@ public sealed class MacroTests : IDisposable
 		// the next press can assert.
 		var b1 = _Output.BindButton(1);
 		using var runtime = Build(
-			new ButtonRoute(_Stick.BindButton(1), b1),
-			new ButtonRoute(_Stick.BindButton(2), b1),
+			_Stick.BindButton(1).RouteTo(b1),
+			_Stick.BindButton(2).RouteTo(b1),
 			new ButtonMacroRoute
 			{
 				Binding = _Stick.BindButton(3),
@@ -527,8 +527,8 @@ public sealed class MacroTests : IDisposable
 		// the output to drop.
 		var target = _Output.BindButton(3);
 		using var runtime = Build(
-			new ButtonRoute(_Stick.BindButton(1), target),
-			new ButtonRoute(_Stick.BindButton(2), target));
+			_Stick.BindButton(1).RouteTo(target),
+			_Stick.BindButton(2).RouteTo(target));
 
 		runtime.ProcessFrame();
 		Assert.False(_Output.GetButtonState(3));
@@ -556,7 +556,7 @@ public sealed class MacroTests : IDisposable
 
 	// ── Helpers ─────────────────────────────────────────────────────────
 
-	private IFakesOutputRuntimeContext Build(params IBoundRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",
