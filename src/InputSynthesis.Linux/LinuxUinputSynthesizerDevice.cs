@@ -65,6 +65,10 @@ internal sealed partial class LinuxUinputSynthesizerDevice : ILinuxInputEventSen
 			Check(LinuxLibc.IoctlInt(fd, UiSetEvBit, (int)EvType.Rel), "UI_SET_EVBIT(EV_REL)");
 			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelX), "UI_SET_RELBIT(REL_X)");
 			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelY), "UI_SET_RELBIT(REL_Y)");
+			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelWheel), "UI_SET_RELBIT(REL_WHEEL)");
+			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelHWheel), "UI_SET_RELBIT(REL_HWHEEL)");
+			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelWheelHiRes), "UI_SET_RELBIT(REL_WHEEL_HI_RES)");
+			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelHWheelHiRes), "UI_SET_RELBIT(REL_HWHEEL_HI_RES)");
 
 			var setup = new UinputSetup
 			{

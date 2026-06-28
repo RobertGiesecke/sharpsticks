@@ -28,6 +28,12 @@ public sealed class LinuxInputSynthesizer : IInputSynthesizer, IDisposable
 	private readonly bool _OwnsInputEventSender;
 	private bool _PendingSinceFlush;
 
+	// High-res scroll accumulators: hi-res events report in 1/120-notch units, but
+	// legacy clients only read REL_WHEEL/REL_HWHEEL, so we also emit a whole notch
+	// each time the accumulated hi-res amount crosses a detent.
+	private int _WheelHiResAccumulator;
+	private int _HWheelHiResAccumulator;
+
 	public LinuxInputSynthesizer() : this(new LinuxUinputSynthesizerDevice(), ownsInputEventSender: true)
 	{
 	}
@@ -73,6 +79,50 @@ public sealed class LinuxInputSynthesizer : IInputSynthesizer, IDisposable
 		if (dy != 0)
 		{
 			Emit(EvdevEvent.Rel(EvdevEvent.RelY, dy));
+		}
+	}
+
+	public void Scroll(int vertical, int horizontal, MouseScrollUnit unit = MouseScrollUnit.Notch)
+	{
+		if (unit == MouseScrollUnit.Notch)
+		{
+			if (vertical != 0)
+			{
+				Emit(EvdevEvent.Rel(EvdevEvent.RelWheel, vertical));
+			}
+
+			if (horizontal != 0)
+			{
+				Emit(EvdevEvent.Rel(EvdevEvent.RelHWheel, horizontal));
+			}
+
+			return;
+		}
+
+		ScrollHiRes(vertical, EvdevEvent.RelWheelHiRes, EvdevEvent.RelWheel, ref _WheelHiResAccumulator);
+		ScrollHiRes(horizontal, EvdevEvent.RelHWheelHiRes, EvdevEvent.RelHWheel, ref _HWheelHiResAccumulator);
+	}
+
+	private void ScrollHiRes(int amount, ushort hiResCode, ushort notchCode, ref int accumulator)
+	{
+		if (amount == 0)
+		{
+			return;
+		}
+
+		Emit(EvdevEvent.Rel(hiResCode, amount));
+
+		accumulator += amount;
+		while (accumulator >= EvdevEvent.WheelHiResPerNotch)
+		{
+			Emit(EvdevEvent.Rel(notchCode, 1));
+			accumulator -= EvdevEvent.WheelHiResPerNotch;
+		}
+
+		while (accumulator <= -EvdevEvent.WheelHiResPerNotch)
+		{
+			Emit(EvdevEvent.Rel(notchCode, -1));
+			accumulator += EvdevEvent.WheelHiResPerNotch;
 		}
 	}
 

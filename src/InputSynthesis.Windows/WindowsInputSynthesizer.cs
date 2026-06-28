@@ -51,6 +51,24 @@ public sealed class WindowsInputSynthesizer : IInputSynthesizer
 
 	public void MoveMouseRelative(int dx, int dy) => _Send(Win32Input.MouseMove(dx, dy));
 
+	public void Scroll(int vertical, int horizontal, MouseScrollUnit unit = MouseScrollUnit.Notch)
+	{
+		// Windows wheel data is in 1/120-notch units (WHEEL_DELTA per detent); a notch
+		// is that ×120, a high-res unit is the raw value.
+		if (vertical != 0)
+		{
+			_Send(Win32Input.MouseWheel(WheelData(vertical, unit), horizontal: false));
+		}
+
+		if (horizontal != 0)
+		{
+			_Send(Win32Input.MouseWheel(WheelData(horizontal, unit), horizontal: true));
+		}
+	}
+
+	private static int WheelData(int amount, MouseScrollUnit unit) =>
+		unit == MouseScrollUnit.Notch ? amount * Win32Input.WheelDelta : amount;
+
 	internal static Win32Input.Input BuildMouse(OutputMouseButton button, bool down) => button switch
 	{
 		OutputMouseButton.Left =>
