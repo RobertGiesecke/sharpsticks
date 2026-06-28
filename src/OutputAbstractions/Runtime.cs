@@ -13,6 +13,9 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 	private readonly DebugLogger? _DebugLogger;
 	private readonly ImmutableArray<OutputAxisRoute> _AxisRoutes;
 	private readonly OutputButtonState[] _OutputButtonStates;
+	// Final-apply sink per output-button state index (vJoy button / key / mouse / scroll),
+	// built once from each target so the apply loop never does a lookup.
+	private readonly IButtonStateSink[] _Sinks;
 	private readonly ImmutableArray<OutputButtonWithBindings> _ButtonRoutes;
 	private readonly ImmutableArray<OutputAxisToButtonRoute> _AxisToButtonRoutes;
 	private long? _AxisZoneNextDeadlineTicks;
@@ -385,6 +388,14 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		];
 		_OutputDevices = outputDevices;
 		_OutputDevicesById = outputDevices.ToFrozenDictionary(device => device.DeviceId);
+
+		// Build the apply sink for each output-button state index. Today every index is a
+		// vJoy OutputButtonBinding; key/mouse/scroll targets join this map in later steps.
+		_Sinks = new IButtonStateSink[_OutputButtonStates.Length];
+		foreach (var (binding, index) in _OutputButtonStateIndexByBinding)
+		{
+			_Sinks[index.Value] = binding.CreateRuntimeSink(this);
+		}
 		
 		_AxisToButtonRoutes =
 		[
@@ -961,7 +972,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 					: NumberFormattingDebugInterpolatedStringHandler.Empty())}" +
 			$"output{route.OutputDevice.DeviceId}:{route.TargetButton} = {(isPressed ? "down" : "up")}");
 
-		route.OutputDevice.SetButtonState(route.TargetButton, isPressed);
+		_Sinks[route.OutputButtonStateIndex.Value].SetButtonState(isPressed);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization)]
