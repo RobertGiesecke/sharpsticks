@@ -38,6 +38,44 @@ public sealed class MouseMoveMacroTests : IDisposable
 		Assert.Equal(-5, ev.Dy);
 	}
 
+	[Fact]
+	public void OnPress_MoveMouseTo_SynthesizesAbsoluteMove()
+	{
+		using var runtime = Build(new ButtonMacroRoute
+		{
+			Binding = _Stick.BindButton(1),
+			OnPress = [Macros.MoveMouseTo(0.25, 0.75)],
+		});
+
+		runtime.ProcessFrame();
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+
+		var ev = Assert.Single(_Synth.Events);
+		Assert.Equal(EventKind.MouseMoveAbsolute, ev.Kind);
+		Assert.Equal(0.25, ev.X);
+		Assert.Equal(0.75, ev.Y);
+	}
+
+	[Fact]
+	public void OnPress_CenterMouse_SynthesizesAbsoluteMoveToCenter()
+	{
+		using var runtime = Build(new ButtonMacroRoute
+		{
+			Binding = _Stick.BindButton(1),
+			OnPress = [Macros.CenterMouse()],
+		});
+
+		runtime.ProcessFrame();
+		_Stick.PressButton(1);
+		runtime.ProcessFrame();
+
+		var ev = Assert.Single(_Synth.Events);
+		Assert.Equal(EventKind.MouseMoveAbsolute, ev.Kind);
+		Assert.Equal(0.5, ev.X);
+		Assert.Equal(0.5, ev.Y);
+	}
+
 	private IFakesOutputRuntimeContext Build(params IBoundRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{

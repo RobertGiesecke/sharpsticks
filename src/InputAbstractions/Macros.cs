@@ -24,6 +24,15 @@ public static class Macros
 	/// <summary>Synthesize a relative mouse move of (<paramref name="dx"/>, <paramref name="dy"/>) pixels.</summary>
 	public static IMacroAction MoveMouse(int dx, int dy) => new MoveMouseAction(dx, dy);
 
+	/// <summary>
+	/// Synthesize an absolute mouse move to (<paramref name="x"/>, <paramref name="y"/>),
+	/// normalized to <c>[0, 1]</c> over the screen ((0,0) top-left, (1,1) bottom-right).
+	/// </summary>
+	public static IMacroAction MoveMouseTo(double x, double y) => new MoveMouseToAction(x, y);
+
+	/// <summary>Synthesize an absolute mouse move to the center of the screen.</summary>
+	public static IMacroAction CenterMouse() => new MoveMouseToAction(0.5, 0.5);
+
 	/// <summary>Synthesize a scroll-wheel increment of <paramref name="amount"/> in <paramref name="direction"/>.</summary>
 	public static IMacroAction Scroll(
 		ScrollDirection direction, int amount = 1, MouseScrollUnit unit = MouseScrollUnit.Notch)
@@ -237,6 +246,27 @@ public static class Macros
 			public MacroStatus Step(MacroContext ctx)
 			{
 				synthesizer.MoveMouseRelative(dx, dy);
+				return MacroStatus.Done;
+			}
+		}
+	}
+
+	private sealed record MoveMouseToAction(double X, double Y) : IMacroAction, IMergeableObject<MoveMouseToAction>
+	{
+		public void FillOutputs(ICollection<OutputButtonBinding> outputs)
+		{
+		}
+
+		IRuntimeMacroAction IMacroAction.CreateRuntimeAction(IRuntimeContext runtimeContext) =>
+			new RuntimeAction(GetSynthesizerOrThrow(runtimeContext), X, Y);
+
+		public MoveMouseToAction Merge(MergeObjectContext context) => this;
+
+		private sealed class RuntimeAction(IInputSynthesizer synthesizer, double x, double y) : IRuntimeMacroAction
+		{
+			public MacroStatus Step(MacroContext ctx)
+			{
+				synthesizer.MoveMouseAbsolute(x, y);
 				return MacroStatus.Done;
 			}
 		}
