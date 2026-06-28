@@ -28,7 +28,7 @@ public static class RuntimeBuilder
 		/// </summary>
 		public bool InitializeInputSynthesizer { get; init; } = true;
 		public required ImmutableArray<TInputDevice> ConnectedDevices { get; init; }
-		public ImmutableArray<IRoute> Routes { get; init; } = [];
+		public ImmutableArray<IConfigurableRoute> Routes { get; init; } = [];
 	}
 
 	extension<TInputDevice, TOutputDevice>(Runtime<TInputDevice, TOutputDevice>)
@@ -51,7 +51,7 @@ public static class RuntimeBuilder
 
 			var mergeOrGetAllOptions = new MergeableObjectExtensions.MergeOrGetAllOptions() { ReturnUniqueItems = true };
 
-			var usedSourceRoutes = options.Routes.MergeOrGetAll(mergeOrGetAllOptions);
+			var usedSourceRoutes = options.Routes.CastArray<IRoute>().MergeOrGetAll(mergeOrGetAllOptions);
 
 			{
 				using var routes = new PooledList<IRoute>(usedSourceRoutes.Length);

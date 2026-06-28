@@ -6,7 +6,7 @@ namespace SharpSticks.InputAbstractions;
 /// the per-target route types collapse into this, with the <see cref="ButtonTarget"/>
 /// deciding the runtime sink.
 /// </summary>
-public sealed record ButtonToTargetRoute : IRoute, IMergeableObject<ButtonToTargetRoute>
+public sealed record ButtonToTargetRoute : IConfigurableRoute, IMergeableObject<ButtonToTargetRoute>
 {
     public required ButtonBinding Source { get; init; }
     public required ButtonTarget Target { get; init; }

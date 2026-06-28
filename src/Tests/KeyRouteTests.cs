@@ -70,7 +70,7 @@ public sealed class KeyRouteTests : IDisposable
 		Assert.Equal(EventKind.KeyDown, _Synth.Events[2].Kind); // B pressed
 	}
 
-	private IFakesOutputRuntimeContext Build(params IRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

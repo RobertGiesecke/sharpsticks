@@ -6,7 +6,7 @@ namespace SharpSticks.InputAbstractions;
 /// route: the per-target zone route types collapse into this. A scroll target pulses on
 /// entering the zone; level targets (vJoy/key/mouse) are held while in range.
 /// </summary>
-public sealed record AxisZoneRoute : IRoute, IMergeableObject<AxisZoneRoute>
+public sealed record AxisZoneRoute : IConfigurableRoute, IMergeableObject<AxisZoneRoute>
 {
     public required AxisBinding Source { get; init; }
     public required ButtonTarget Target { get; init; }

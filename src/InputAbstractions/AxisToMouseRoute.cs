@@ -9,7 +9,7 @@ namespace SharpSticks.InputAbstractions;
 /// normalized axis controls pointer speed: <see cref="Sensitivity"/> is the pixels
 /// per second at full deflection.
 /// </summary>
-public sealed record AxisToMouseRoute : IRoute, IMergeableObject<AxisToMouseRoute>
+public sealed record AxisToMouseRoute : IConfigurableRoute, IMergeableObject<AxisToMouseRoute>
 {
 	public required AxisBinding Source { get; init; }
 	public required MouseDirection Direction { get; init; }

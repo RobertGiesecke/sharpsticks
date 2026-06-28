@@ -87,7 +87,7 @@ public sealed class MouseAxisRouteTests : IDisposable
 			_Stick.BindAxis(Axis.X).RouteToMouse(MouseDirection.X, new MouseMovement { Kind = MovementKind.Absolute })));
 	}
 
-	private IFakesOutputRuntimeContext Build(params IRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

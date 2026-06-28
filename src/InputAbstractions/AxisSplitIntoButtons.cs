@@ -1,6 +1,6 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public sealed record AxisSplitIntoButtons : ICombinedRoute
+public sealed record AxisSplitIntoButtons : ICombinedRoute, IConfigurableRoute
 {
 	public required AxisBinding Axis { get; init; }
 	public required ImmutableArray<ButtonTarget> Outputs { get; init; }

@@ -1,6 +1,6 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public sealed record ButtonsRoutedToOutput<TDevice> : ICombinedRoute
+public sealed record ButtonsRoutedToOutput<TDevice> : ICombinedRoute, IConfigurableRoute
 	where TDevice : JoystickDevice
 {
 	public required TDevice Device { get; init; }

@@ -556,7 +556,7 @@ public sealed class MacroTests : IDisposable
 
 	// ── Helpers ─────────────────────────────────────────────────────────
 
-	private IFakesOutputRuntimeContext Build(params IRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

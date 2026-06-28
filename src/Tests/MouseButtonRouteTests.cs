@@ -71,7 +71,7 @@ public sealed class MouseButtonRouteTests : IDisposable
 		Assert.Equal(EventKind.MouseButtonUp, _Synth.Events[1].Kind);
 	}
 
-	private IFakesOutputRuntimeContext Build(params IRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

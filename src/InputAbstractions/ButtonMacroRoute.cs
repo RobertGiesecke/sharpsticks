@@ -6,7 +6,7 @@ namespace SharpSticks.InputAbstractions;
 /// <see cref="OnRelease"/> on the inverse edge. Press and release runs share a
 /// single FIFO so event order is preserved.
 /// </summary>
-public sealed record ButtonMacroRoute : IBoundRoute
+public sealed record ButtonMacroRoute : IBoundRoute, IConfigurableRoute
 {
 	public required ButtonBinding Binding { get; init; }
 	public ImmutableArray<IMacroAction> OnPress { get; init; } = [];

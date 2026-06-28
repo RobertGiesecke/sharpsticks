@@ -1,6 +1,6 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public sealed record AxesWithZones : ICombinedRoute
+public sealed record AxesWithZones : ICombinedRoute, IConfigurableRoute
 {
 	public required GroupedSourceAxes GroupedSourceAxes { get; init; }
 	public required ImmutableArray<AxisZone> Zones { get; init; }
