@@ -31,6 +31,7 @@ public interface IInputSynthesizer
 	/// The runtime calls this when it starts unless the build opts out; backends
 	/// that need no setup (Windows SendInput, fakes) leave it a no-op.
 	/// </summary>
+	[ExcludeFromCodeCoverage]
 	void EnsureInitialized() { }
 
 	/// <summary>Commit any buffered events. No-op for backends that emit eagerly.</summary>

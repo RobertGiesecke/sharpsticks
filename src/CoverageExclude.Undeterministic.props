@@ -1,0 +1,7 @@
+﻿<Project>
+    <ItemGroup>
+        <Compile Include="$(MSBuildThisFileDirectory)CoverageExclude.Undeterministic.cs">
+            <Link>config/CoverageExclude.Undeterministic.cs</Link>
+        </Compile>
+    </ItemGroup>
+</Project>

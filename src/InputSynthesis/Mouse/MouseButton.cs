@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace SharpSticks.InputSynthesis.Mouse;
 
 /// <summary>

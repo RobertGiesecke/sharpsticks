@@ -16,4 +16,6 @@
         <ProjectReference Include="..\InputSynthesis.Linux\InputSynthesis.Linux.csproj"/>
     </ItemGroup>
 
+    <Import Project="..\CoverageExclude.Undeterministic.props" />
+
 </Project>

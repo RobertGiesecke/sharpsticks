@@ -16,4 +16,5 @@
       <ProjectReference Include="..\InputSynthesis.Windows\InputSynthesis.Windows.csproj" />
     </ItemGroup>
 
+    <Import Project="..\CoverageExclude.Undeterministic.props" />
 </Project>

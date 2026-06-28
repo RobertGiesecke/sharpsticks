@@ -12,6 +12,7 @@ namespace SharpSticks.InputSynthesis.Linux;
 /// <c>SYN_REPORT</c>. The device is torn down on <see cref="Dispose"/> (and, as a
 /// backstop, when the process exits and the fd closes).
 /// </summary>
+[ExcludeFromCodeCoverage]
 internal sealed partial class LinuxUinputSynthesizerDevice : ILinuxInputEventSender, IDisposable
 {
 	private const string DevicePath = "/dev/uinput";
