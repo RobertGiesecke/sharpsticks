@@ -50,7 +50,7 @@ public sealed class KeyRouteTests : IDisposable
 		// Signed axis split into two key zones: [-1, 0) A, [0, 1] B.
 		using var runtime = Build(
 		[
-			.._Stick.BindAxis(Axis.X).SplitIntoButtons(
+			_Stick.BindAxis(Axis.X).SplitIntoButtons(
 			[
 				new KeyTarget(NamedKey.A),
 				new KeyTarget(NamedKey.B),

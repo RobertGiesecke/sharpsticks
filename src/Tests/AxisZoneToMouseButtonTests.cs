@@ -27,7 +27,7 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 		// Signed axis split into two mouse-button zones: [-1, 0) Left, [0, 1] Right.
 		using var runtime = Build(
 		[
-			.._Stick.BindAxis(Axis.X).SplitIntoButtons(
+			_Stick.BindAxis(Axis.X).SplitIntoButtons(
 			[
 				new MouseButtonTarget { Button = OutputMouseButton.Left },
 				new MouseButtonTarget { Button = OutputMouseButton.Right },
@@ -60,7 +60,7 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 		using var runtime = Build(
 		[
 			_Stick.BindButton(1).RouteToMouse(OutputMouseButton.Right),
-			.._Stick.BindAxis(Axis.X).SplitIntoButtons(
+			_Stick.BindAxis(Axis.X).SplitIntoButtons(
 			[
 				new MouseButtonTarget { Button = OutputMouseButton.Left },
 				new MouseButtonTarget { Button = OutputMouseButton.Right },
@@ -88,7 +88,7 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 	{
 		using var runtime = Build(
 		[
-			.._Stick.BindAxis(Axis.X).SplitIntoButtons(
+			_Stick.BindAxis(Axis.X).SplitIntoButtons(
 			[
 				new MouseButtonTarget { Button = OutputMouseButton.Left },
 				new MouseButtonTarget { Button = OutputMouseButton.Right },
