@@ -4,6 +4,9 @@ namespace SharpSticks.InputAbstractions;
 
 public static class BindingExtensions
 {
+	public static AxisBinding Invert(
+		this AxisBinding binding) => binding with { Invert = !binding.Invert };
+
 	[OverloadResolutionPriority(2)]
 	public static AxisRoute RouteToSameAxisOnOutput(
 		this AxisBinding binding,
