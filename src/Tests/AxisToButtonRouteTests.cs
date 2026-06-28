@@ -255,7 +255,7 @@ public sealed class AxisToButtonRouteTests : IDisposable
 		Assert.Contains("Max", ex.Message);
 	}
 
-	private IFakesOutputRuntimeContext Build(params IBoundRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

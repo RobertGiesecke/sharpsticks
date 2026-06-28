@@ -3,5 +3,4 @@
 public interface IBoundRoute : IRoute, IMergeableObject
 {
 	InputBinding InputBinding { get; }
-	uint OutputDeviceId { get; }
 }

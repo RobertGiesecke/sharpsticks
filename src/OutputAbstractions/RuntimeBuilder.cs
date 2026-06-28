@@ -94,6 +94,7 @@ public static class RuntimeBuilder
 			using var buttonToMouseRoutes = usedSourceRoutes.OfType<ButtonToMouseRoute>().ToPooledList();
 			using var axisToScrollRoutes = usedSourceRoutes.OfType<AxisToScrollRoute>().ToPooledList();
 			using var buttonToScrollRoutes = usedSourceRoutes.OfType<ButtonToScrollRoute>().ToPooledList();
+			using var axisToMouseButtonRoutes = usedSourceRoutes.OfType<AxisToMouseButtonRoute>().ToPooledList();
 			using var claimedAxes = new PooledSet<(uint OutputDeviceId, Axis Axis)>();
 			using var referencedOutputDeviceIds = new PooledSet<uint>();
 			using var auxiliaryOutputButtons = new PooledSet<OutputButtonBinding>();
@@ -221,6 +222,17 @@ public static class RuntimeBuilder
 				referencedDeviceIds.Add(route.Source.DeviceId);
 			}
 
+			foreach (var route in axisToMouseButtonRoutes)
+			{
+				if (route.Max < route.Min)
+				{
+					throw new InvalidOperationException(
+						$"AxisToMouseButtonRoute: Max ({route.Max}) must be >= Min ({route.Min}).");
+				}
+
+				referencedDeviceIds.Add(route.Source.DeviceId);
+			}
+
 			foreach (var output in auxiliaryOutputButtons)
 			{
 				if (output.OutputDeviceId < 1)
@@ -276,6 +288,7 @@ public static class RuntimeBuilder
 						[..buttonToMouseRoutes.Span],
 						[..axisToScrollRoutes.Span],
 						[..buttonToScrollRoutes.Span],
+						[..axisToMouseButtonRoutes.Span],
 						[..auxiliaryOutputButtons],
 						timeSource,
 						outputDevices,

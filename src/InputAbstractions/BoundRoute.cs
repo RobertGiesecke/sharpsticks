@@ -15,7 +15,6 @@ public abstract record BoundRoute : IBoundRoute
 	protected abstract uint OutputDeviceId { get; }
 
 	InputBinding IBoundRoute.InputBinding => InputBinding;
-	uint IBoundRoute.OutputDeviceId => OutputDeviceId;
 	IMergeableObject IMergeableObject.Merge(MergeObjectContext context) => MergeUntyped(context);
 	protected abstract IMergeableObject MergeUntyped(MergeObjectContext context);
 }

@@ -3,16 +3,12 @@
 namespace SharpSticks.InputAbstractions;
 
 /// <summary>
-/// A scroll-wheel increment as an <see cref="IButtonTarget"/>: one pulse of
+/// A scroll-wheel increment as a <see cref="ButtonTarget"/>: one pulse of
 /// <see cref="Amount"/> units along <see cref="Axis"/> per press. The sign of
 /// <see cref="Amount"/> is the direction (positive = up / right).
 /// </summary>
-public readonly record struct ScrollTarget : IButtonTarget
+public sealed record ScrollTarget : ButtonTarget
 {
-	public ScrollTarget()
-	{
-	}
-
 	public required ScrollAxis Axis { get; init; }
 	public int Amount { get; init; } = 1;
 	public MouseScrollUnit Unit { get; init; } = MouseScrollUnit.Notch;
@@ -25,6 +21,9 @@ public readonly record struct ScrollTarget : IButtonTarget
 		return new() { Axis = axis, Amount = amount, Unit = unit };
 	}
 
-	public IRoute CreateRoute(ButtonBinding source) =>
+	public override IRoute CreateRoute(ButtonBinding source) =>
 		new ButtonToScrollRoute { Source = source, Axis = Axis, Amount = Amount, Unit = Unit };
+
+	public override IButtonStateSink CreateRuntimeSink(IButtonSinkContext context) =>
+		new ScrollSink(RequireSynthesizer(context), Axis, Amount, Unit);
 }
