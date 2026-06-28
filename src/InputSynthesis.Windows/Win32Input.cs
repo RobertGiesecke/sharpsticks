@@ -27,9 +27,13 @@ internal static partial class Win32Input
 	public const uint MouseEventXUp = 0x0100;
 	public const uint MouseEventWheel = 0x0800;
 	public const uint MouseEventHWheel = 0x01000;
+	public const uint MouseEventAbsolute = 0x8000;
 
 	/// <summary>WHEEL_DELTA: the wheel-data magnitude of one detent.</summary>
 	public const int WheelDelta = 120;
+
+	/// <summary>Absolute mouse coordinates span 0..65535 across the (primary) screen.</summary>
+	public const int AbsoluteMax = 65535;
 
 	public const uint XButton1 = 0x0001;
 	public const uint XButton2 = 0x0002;
@@ -131,4 +135,12 @@ internal static partial class Win32Input
 	/// <summary>A wheel event carrying an already-scaled (signed) wheel delta.</summary>
 	public static Input MouseWheel(int delta, bool horizontal) =>
 		Mouse(horizontal ? MouseEventHWheel : MouseEventWheel, unchecked((uint)delta));
+
+	/// <summary>An absolute-move event; coordinates are 0..<see cref="AbsoluteMax"/>.</summary>
+	public static Input MouseMoveAbsolute(int x, int y) =>
+		new()
+		{
+			Type = InputMouse,
+			Union = new() { Mouse = new() { Dx = x, Dy = y, Flags = MouseEventMove | MouseEventAbsolute } },
+		};
 }

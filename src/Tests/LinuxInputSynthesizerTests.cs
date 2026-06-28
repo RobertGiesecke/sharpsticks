@@ -92,6 +92,20 @@ public sealed class LinuxInputSynthesizerTests
 	}
 
 	[Fact]
+	public void MoveMouseAbsolute_EmitsAbsXAndAbsY_ScaledToRange()
+	{
+		NewSynth().MoveMouseAbsolute(0.0, 1.0);
+
+		Assert.Equal(2, _Sent.Count);
+		Assert.Equal(EvType.Abs, _Sent[0].Type);
+		Assert.Equal((ushort)0x00, _Sent[0].Code); // ABS_X
+		Assert.Equal(0, _Sent[0].Value);
+		Assert.Equal(EvType.Abs, _Sent[1].Type);
+		Assert.Equal((ushort)0x01, _Sent[1].Code); // ABS_Y
+		Assert.Equal(65535, _Sent[1].Value);
+	}
+
+	[Fact]
 	public void Flush_AfterEvents_EmitsSynReport()
 	{
 		var synth = NewSynth();

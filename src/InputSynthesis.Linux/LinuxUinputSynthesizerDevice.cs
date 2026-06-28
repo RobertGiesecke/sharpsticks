@@ -29,6 +29,8 @@ internal sealed partial class LinuxUinputSynthesizerDevice : ILinuxInputEventSen
 	private static uint UiSetEvBit => LinuxIoctl.Iow(IocType, 100, sizeof(int));
 	private static uint UiSetKeyBit => LinuxIoctl.Iow(IocType, 101, sizeof(int));
 	private static uint UiSetRelBit => LinuxIoctl.Iow(IocType, 102, sizeof(int));
+	private static uint UiSetAbsBit => LinuxIoctl.Iow(IocType, 103, sizeof(int));
+	private static uint UiAbsSetup => LinuxIoctl.Iow(IocType, 4, UinputAbsSetup.Size);
 
 	private int _Fd = -1;
 	private bool _Initialized;
@@ -69,6 +71,12 @@ internal sealed partial class LinuxUinputSynthesizerDevice : ILinuxInputEventSen
 			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelHWheel), "UI_SET_RELBIT(REL_HWHEEL)");
 			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelWheelHiRes), "UI_SET_RELBIT(REL_WHEEL_HI_RES)");
 			Check(LinuxLibc.IoctlInt(fd, UiSetRelBit, EvdevEvent.RelHWheelHiRes), "UI_SET_RELBIT(REL_HWHEEL_HI_RES)");
+
+			// Absolute pointer: lets the synthesizer place the cursor at a screen position.
+			// The [0, AbsMax] range is mapped onto the screen by the compositor.
+			Check(LinuxLibc.IoctlInt(fd, UiSetEvBit, (int)EvType.Abs), "UI_SET_EVBIT(EV_ABS)");
+			SetupAbsAxis(fd, EvdevEvent.AbsX);
+			SetupAbsAxis(fd, EvdevEvent.AbsY);
 
 			var setup = new UinputSetup
 			{
@@ -142,8 +150,45 @@ internal sealed partial class LinuxUinputSynthesizerDevice : ILinuxInputEventSen
 		}
 	}
 
+	private static void SetupAbsAxis(int fd, ushort code)
+	{
+		Check(LinuxLibc.IoctlInt(fd, UiSetAbsBit, code), $"UI_SET_ABSBIT({code})");
+
+		var setup = new UinputAbsSetup
+		{
+			Code = code,
+			AbsInfo = new InputAbsInfo { Minimum = 0, Maximum = EvdevEvent.AbsMax },
+		};
+		Check(IoctlUinputAbsSetup(fd, UiAbsSetup, ref setup), $"UI_ABS_SETUP({code})");
+	}
+
 	[LibraryImport("libc", EntryPoint = "ioctl", SetLastError = true)]
 	private static partial int IoctlUinputSetup(int fd, nuint request, ref UinputSetup value);
+
+	[LibraryImport("libc", EntryPoint = "ioctl", SetLastError = true)]
+	private static partial int IoctlUinputAbsSetup(int fd, nuint request, ref UinputAbsSetup value);
+
+	/// <c>struct input_absinfo</c>: value, minimum, maximum, fuzz, flat, resolution (6 × s32).
+	[StructLayout(LayoutKind.Sequential)]
+	private struct InputAbsInfo
+	{
+		public int Value;
+		public int Minimum;
+		public int Maximum;
+		public int Fuzz;
+		public int Flat;
+		public int Resolution;
+	}
+
+	/// <c>struct uinput_abs_setup</c>: code (u16, padded to 4) + input_absinfo (24) = 28 bytes.
+	[StructLayout(LayoutKind.Sequential)]
+	private struct UinputAbsSetup
+	{
+		public ushort Code;
+		public InputAbsInfo AbsInfo;
+
+		public const uint Size = 28;
+	}
 
 	/// <c>struct uinput_setup</c>: input_id (8) + name[80] + ff_effects_max (4) = 92 bytes.
 	[StructLayout(LayoutKind.Sequential)]

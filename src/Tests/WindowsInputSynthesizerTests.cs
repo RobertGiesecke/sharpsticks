@@ -89,6 +89,28 @@ public sealed class WindowsInputSynthesizerTests
 	}
 
 	[Fact]
+	public void MoveMouseAbsolute_Center_EmitsAbsoluteMidpoint()
+	{
+		NewSynth().MoveMouseAbsolute(0.5, 0.5);
+
+		var i = Single();
+		Assert.Equal(Win32Input.InputMouse, i.Type);
+		Assert.Equal(Win32Input.MouseEventMove | Win32Input.MouseEventAbsolute, i.Union.Mouse.Flags);
+		Assert.Equal(32768, i.Union.Mouse.Dx); // round(0.5 × 65535)
+		Assert.Equal(32768, i.Union.Mouse.Dy);
+	}
+
+	[Fact]
+	public void MoveMouseAbsolute_ClampsOutOfRange()
+	{
+		NewSynth().MoveMouseAbsolute(-1.0, 2.0);
+
+		var i = Single();
+		Assert.Equal(0, i.Union.Mouse.Dx);
+		Assert.Equal(Win32Input.AbsoluteMax, i.Union.Mouse.Dy);
+	}
+
+	[Fact]
 	public void KeyDown_UnmappedKeyboardUsage_Throws_AndSendsNothing()
 	{
 		// 0x87 (International1) is intentionally absent from the scancode table.
