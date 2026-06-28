@@ -15,6 +15,7 @@
         <PackageTags>vJoy joystick</PackageTags>
         <Description>An experimental library to build low-latency vJoy configurations purely from C# code</Description>
         <Authors>Robert Giesecke</Authors>
+        <WarningsAsErrors>CS8509</WarningsAsErrors>
     </PropertyGroup>
     <ItemGroup>
         <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\"/>

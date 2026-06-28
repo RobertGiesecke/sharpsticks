@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SharpSticks.InputAbstractions;
+using SharpSticks.VJoy;
 
 namespace SharpSticks.Generators;
 
@@ -506,14 +507,14 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		}
 
 		using var builtinAxisNames = new PooledSet<string>(
-			presentAxes.Select(static a => a.ToString()), StringComparer.Ordinal);
+			presentAxes.Select(static a => a.ToStringFast()), StringComparer.Ordinal);
 		using var axisNameCounts = new PooledDictionary<string, int>(StringComparer.Ordinal);
 		foreach (var axis in presentAxes)
 		{
 			var hasRename = axisMap.TryGetValue(axis, out var renamed);
-			var finalName = hasRename ? renamed : axis.ToString();
+			var finalName = hasRename ? renamed : axis.ToStringFast();
 
-			if (hasRename && finalName != axis.ToString() && builtinAxisNames.Contains(finalName))
+			if (hasRename && finalName != axis.ToStringFast() && builtinAxisNames.Contains(finalName))
 			{
 				Report(RenameClashesWithBuiltInName, $"Axis {axis}", deviceDisplayName, finalName, "axis");
 			}
@@ -913,7 +914,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		foreach (var axisName in device.Axes)
 		{
 			var propName = AxisPropertyName(axisName, axisPropertyNames);
-			if (propName != axisName.ToString())
+			if (propName != axisName.ToStringFast())
 			{
 				builder.Append(innerMemberIndent).Append("/// <summary>").Append(axisName).AppendLine("</summary>");
 			}
@@ -1037,7 +1038,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		foreach (var axis in axes)
 		{
 			var propName = AxisPropertyName(axis, axisPropertyNames);
-			if (propName != axis.ToString())
+			if (propName != axis.ToStringFast())
 			{
 				builder.Append(innerMemberIndent).Append("/// <summary>").Append(axis).AppendLine("</summary>");
 			}
@@ -1178,7 +1179,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 	}
 
 	private static string AxisPropertyName(Axis axisName, PooledDictionary<Axis, string> axisPropertyNames) =>
-		axisPropertyNames.GetValueOrDefault(axisName, axisName.ToString());
+		axisPropertyNames.GetValueOrDefault(axisName, axisName.ToStringFast());
 
 	private static PooledDictionary<int, string> BuildButtonPropertyNames(
 		string deviceProductName,
