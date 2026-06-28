@@ -9,7 +9,7 @@ namespace SharpSticks.InputAbstractions;
 /// <see cref="Sensitivity"/> is notches per second at full deflection (regardless of
 /// <see cref="Unit"/> — <see cref="MouseScrollUnit.HighResolution"/> just emits finer steps).
 /// </summary>
-public sealed record AxisToScrollRoute : IRoute, IMergeableObject<AxisToScrollRoute>
+public sealed record AxisToScrollRoute : IConfigurableRoute, IMergeableObject<AxisToScrollRoute>
 {
     public required AxisBinding Source { get; init; }
     public required ScrollAxis Axis { get; init; }

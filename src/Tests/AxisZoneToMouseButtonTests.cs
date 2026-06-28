@@ -110,7 +110,7 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 		Assert.DoesNotContain(_Synth.Events, e => e.MouseButton == OutputMouseButton.Right);
 	}
 
-	private IFakesOutputRuntimeContext Build(params IRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

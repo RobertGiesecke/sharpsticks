@@ -1,6 +1,6 @@
 namespace SharpSticks.InputAbstractions;
 
-public sealed record AxisRoute : BoundRoute<AxisRoute>
+public sealed record AxisRoute : BoundRoute<AxisRoute>, IConfigurableRoute
 {
 	public required AxisBinding Source { get; init; }
 	public required OutputAxisBinding OutputBinding { get; init; }

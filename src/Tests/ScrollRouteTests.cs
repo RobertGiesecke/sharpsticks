@@ -157,7 +157,7 @@ public sealed class ScrollRouteTests : IDisposable
 		Assert.Equal(0, scroll.Dy);
 	}
 
-	private IFakesOutputRuntimeContext Build(params IRoute[] routes) =>
+	private IFakesOutputRuntimeContext Build(params IConfigurableRoute[] routes) =>
 		FakesRuntime.Build(new()
 		{
 			Name = "test",

@@ -27,7 +27,7 @@ public static class ConsoleExtensions<TInputDevice, TOutputDevice>
 		/// </summary>
 		public bool InitializeInputSynthesizer { get; init; } = true;
 		public ImmutableArray<TInputDevice>? ConnectedDevices { get; init; }
-		public ImmutableArray<IRoute> Routes { get; init; } = [];
+		public ImmutableArray<IConfigurableRoute> Routes { get; init; } = [];
 	}
 
 	public static PooledList<TInputDevice> EnumerateConnectedDevices() =>

@@ -1,6 +1,6 @@
 ﻿namespace SharpSticks.OutputAbstractions;
 
-public sealed record RouteToSameAxesOnOutputCombinedRoute : ICombinedRoute
+public sealed record RouteToSameAxesOnOutputCombinedRoute : ICombinedRoute, IConfigurableRoute
 {
 	public required ImmutableArray<AxisBinding> SourceAxes { get; init; }
 	public required uint OutputDeviceId { get; init; }

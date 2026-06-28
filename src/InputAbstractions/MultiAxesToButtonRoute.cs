@@ -1,6 +1,6 @@
 ﻿namespace SharpSticks.InputAbstractions;
 
-public sealed record MultiAxesToButtonRoute : ICombinedRoute
+public sealed record MultiAxesToButtonRoute : ICombinedRoute, IConfigurableRoute
 {
 	public required ImmutableArray<AxisBinding> Sources { get; init; }
 
