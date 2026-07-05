@@ -27,6 +27,17 @@ public static class RuntimeBuilder
 		/// Default true; no-op when there is no synthesizer.
 		/// </summary>
 		public bool InitializeInputSynthesizer { get; init; } = true;
+
+		/// <summary>
+		/// Minimum frame cadence while a continuous (time-integrating) route is active —
+		/// relative mouse/scroll movement or an absolute-relative axis. The run loop wakes
+		/// at least this often even without device events, so those integrators advance
+		/// smoothly rather than only when a device reports. Device events still dispatch
+		/// immediately; this is a floor, not a throttle. Defaults to 4 ms (~250 Hz);
+		/// ignored when no continuous route is present.
+		/// </summary>
+		public TimeSpan? UpdateInterval { get; init; }
+
 		public required ImmutableArray<TInputDevice> ConnectedDevices { get; init; }
 		public ImmutableArray<IConfigurableRoute> Routes { get; init; } = [];
 	}
@@ -267,7 +278,8 @@ public static class RuntimeBuilder
 						timeSource,
 						outputDevices,
 						inputSynthesizer,
-						options.InitializeInputSynthesizer);
+						options.InitializeInputSynthesizer,
+						options.UpdateInterval);
 				}
 				catch
 				{
