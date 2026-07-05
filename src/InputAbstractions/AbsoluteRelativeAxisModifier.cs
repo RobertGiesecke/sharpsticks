@@ -347,7 +347,8 @@ internal sealed record AbsoluteRelativeAxisModifier :
 	private sealed record BidirectionalRuntimeModifier :
 		RuntimeModifier<BidirectionalRuntimeModifier.PulseState>,
 		IRuntimeAxisModifier,
-		IRuntimeAxisDebugView
+		IRuntimeAxisDebugView,
+		IContinuousRuntimeModifier
 	{
 		internal struct PulseState
 		{
@@ -432,7 +433,8 @@ internal sealed record AbsoluteRelativeAxisModifier :
 	private sealed record DualAxesRuntimeModifier :
 		RuntimeModifier<DualAxesRuntimeModifier.PulseState>,
 		IRuntimeAxisModifier,
-		IRuntimeAxisDebugView
+		IRuntimeAxisDebugView,
+		IContinuousRuntimeModifier
 	{
 		internal struct PulseState
 		{

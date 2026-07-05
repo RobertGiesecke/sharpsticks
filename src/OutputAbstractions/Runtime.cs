@@ -34,6 +34,11 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 	private long _ScrollLastTicks;
 	private bool _ScrollHasLast;
 
+	// Frame-cadence floor (ms) while a continuous integrator (mouse/scroll movement or a
+	// time-integrating axis modifier) is live; null when none, so the loop idles on events.
+	private readonly int? _ContinuousTickMs;
+	private const int DefaultUpdateIntervalMs = 4;
+
 	public ImmutableArray<TOutputDevice> OutputDevices => _OutputDevices;
 	public FrozenDictionary<int, TInputDevice> DevicesById { get; }
 	public FrozenDictionary<int, int> DeviceIndexesById { get; }
@@ -220,7 +225,8 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		ITimeSource timeSource,
 		ImmutableArray<TOutputDevice> outputDevices,
 		IInputSynthesizer? inputSynthesizer = null,
-		bool initializeInputSynthesizer = true)
+		bool initializeInputSynthesizer = true,
+		TimeSpan? updateInterval = null)
 	{
 		Name = name;
 		_DebugLogger = debugLogger;
@@ -407,6 +413,15 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 				RuntimeModifier = route.Modifier?.CreateModifierRuntimeContext(this),
 			})
 		];
+		// Relative mouse/scroll movement and time-integrating axis modifiers keep changing
+		// between device events, so they need a steady tick to converge smoothly.
+		var needsContinuousTick = !_MouseAxisRoutes.IsEmpty
+			|| !_ScrollAxisRoutes.IsEmpty
+			|| _AxisRoutes.Any(route => route.RuntimeModifier is IContinuousRuntimeModifier);
+		_ContinuousTickMs = needsContinuousTick
+			? Math.Max(1, (int)Math.Round(updateInterval?.TotalMilliseconds ?? DefaultUpdateIntervalMs))
+			: null;
+
 		_CurrentStates = new JoystickState?[DevicesById.Count];
 		_LastReportedReadFailure = new();
 		_Macros = mergedMacroRoutes.IsEmpty
@@ -491,7 +506,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		}
 	}
 
-	private int ComputeWaitTimeoutMs()
+	public int ComputeWaitTimeoutMs()
 	{
 		long? deadline = null;
 		if (_Macros?.NextDeadlineTicks is { } macroDeadline)
@@ -505,19 +520,32 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 			deadline = zoneDeadline;
 		}
 
+		int ms;
 		if (deadline is null)
 		{
-			return Timeout.Infinite;
+			ms = Timeout.Infinite;
 		}
-
-		var remaining = deadline.Value - _Time.GetTimestamp();
-		if (remaining <= 0)
+		else
 		{
-			return 0;
+			var remaining = deadline.Value - _Time.GetTimestamp();
+			if (remaining <= 0)
+			{
+				return 0;
+			}
+
+			var msLong = remaining * 1000 / _Time.Frequency;
+			ms = msLong > int.MaxValue ? int.MaxValue : (int)msLong;
 		}
 
-		var ms = remaining * 1000 / _Time.Frequency;
-		return ms > int.MaxValue ? int.MaxValue : (int)ms;
+		// A continuous integrator floors the wait so ProcessFrame runs at least this often
+		// even with no device events; a real event still wins the WaitAny race and dispatches
+		// immediately, so this only adds frames during input gaps.
+		if (_ContinuousTickMs is { } tick && (ms == Timeout.Infinite || tick < ms))
+		{
+			ms = tick;
+		}
+
+		return ms;
 	}
 
 	public void ProcessFrame(DebugLogger? debugLogger = null)
