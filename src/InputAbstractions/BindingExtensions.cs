@@ -22,6 +22,14 @@ public static class BindingExtensions
 			SourceAxes = [binding, ..otherAxes],
 		};
 
+	public static GroupedSourceAxes WithAxisMode(
+		this GroupedSourceAxes sourceAxes,
+		// ReSharper disable once WithExpressionModifiesAllMembers
+		AxisMode mode) => sourceAxes with
+	{
+		SourceAxes = [..sourceAxes.SourceAxes.Select(t => t with { Mode = mode })],
+	};
+
 	public static GroupedSourceAxesWithModifiers WithModifier(
 		this GroupedSourceAxes sourceAxes,
 		IAxisModifier modifier) => new()
