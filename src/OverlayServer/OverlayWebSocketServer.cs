@@ -94,11 +94,10 @@ internal sealed class OverlayWebSocketServer : IDisposable
 		client.NoDelay = true;
 		var stream = client.GetStream();
 
-		Span<byte> request = stackalloc byte[2048];
-		var length = ReadHttpHeaders(stream, request);
-		if (length > 0)
+		var request = ReadHttpHeaders(stream);
+		if (request is { Length: > 0 })
 		{
-			var req = request[..length];
+			var req = request.AsSpan();
 			if (TryFindWebSocketKey(req, out var key))
 			{
 				CompleteHandshake(stream, key);
@@ -235,27 +234,40 @@ internal sealed class OverlayWebSocketServer : IDisposable
 		return source.Length;
 	}
 
-	/// <summary>Reads until the CRLFCRLF end-of-headers, into <paramref name="buffer"/>. Returns bytes read, or 0.</summary>
-	private static int ReadHttpHeaders(NetworkStream stream, Span<byte> buffer)
+	// Reads until the CRLFCRLF end-of-headers and returns exactly those bytes, or null.
+	// Grows to accommodate long request lines: the overlay's "direct link" encodes the whole
+	// config into the query string, so a GET can be tens of KB — a fixed small buffer would
+	// silently drop it and the browser would show a page-load error.
+	private static byte[]? ReadHttpHeaders(NetworkStream stream)
 	{
-		var total = 0;
 		var httpDelimiter = "\r\n\r\n"u8;
-		while (total < buffer.Length)
+		var buffer = new byte[8192];
+		var total = 0;
+		while (true)
 		{
-			var read = stream.Read(buffer[total..]);
+			if (total == buffer.Length)
+			{
+				if (buffer.Length >= 512 * 1024)
+				{
+					return null; // guard against an unbounded request
+				}
+
+				Array.Resize(ref buffer, buffer.Length * 2);
+			}
+
+			var read = stream.Read(buffer, total, buffer.Length - total);
 			if (read <= 0)
 			{
-				return 0;
+				return null;
 			}
 
 			total += read;
-			if (total >= 4 && buffer.Slice(total - 4, 4).SequenceEqual(httpDelimiter))
+			if (total >= 4 && buffer.AsSpan(total - 4, 4).SequenceEqual(httpDelimiter))
 			{
-				return total;
+				Array.Resize(ref buffer, total);
+				return buffer;
 			}
 		}
-
-		return 0;
 	}
 
 	private static bool TryFindWebSocketKey(ReadOnlySpan<byte> request, out ReadOnlySpan<byte> key)
