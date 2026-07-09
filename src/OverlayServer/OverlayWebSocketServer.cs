@@ -1,0 +1,398 @@
+using System.Buffers.Text;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace SharpSticks.OverlayServer;
+
+/// <summary>
+/// Minimal, dependency-free WebSocket server over <see cref="TcpListener"/> — AOT-clean and
+/// small enough to control fully. It only ever sends server-to-client binary frames (the
+/// overlay never sends application data), so inbound frames are ignored; a client that has
+/// gone away is detected when a send throws and is dropped. Sends are synchronous on the
+/// caller's thread (the read loop) so there is no per-frame Task/await allocation.
+/// </summary>
+internal sealed class OverlayWebSocketServer : IDisposable
+{
+	private static readonly byte[] MagicBytes = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"u8.ToArray();
+
+	private readonly TcpListener _Listener;
+	private readonly byte[] _Descriptor;
+	private readonly string? _WebRoot;
+	private readonly Lock _Sync = new();
+	private readonly List<TcpClient> _Clients = [];
+	private readonly byte[] _Header = new byte[4];
+	private Thread? _AcceptThread;
+	private volatile bool _Running;
+
+	/// <param name="webRoot">
+	/// When set, plain HTTP GETs on the same port are served as static files from this
+	/// directory (so one process serves both the overlay page and the live WebSocket feed).
+	/// When null, only WebSocket upgrades are handled.
+	/// </param>
+	public OverlayWebSocketServer(int port, byte[] descriptor, string? webRoot = null)
+	{
+		_Descriptor = descriptor;
+		_WebRoot = webRoot is null ? null : Path.GetFullPath(webRoot);
+		_Listener = new(IPAddress.Loopback, port);
+	}
+
+	public int ClientCount
+	{
+		get
+		{
+			lock (_Sync)
+			{
+				return _Clients.Count;
+			}
+		}
+	}
+
+	public void Start()
+	{
+		_Running = true;
+		_Listener.Start();
+		_AcceptThread = new(AcceptLoop) { IsBackground = true, Name = "overlay-ws-accept" };
+		_AcceptThread.Start();
+	}
+
+	private void AcceptLoop()
+	{
+		while (_Running)
+		{
+			TcpClient client;
+			try
+			{
+				client = _Listener.AcceptTcpClient();
+			}
+			catch (SocketException)
+			{
+				break; // listener stopped
+			}
+			catch (ObjectDisposedException)
+			{
+				break;
+			}
+
+			try
+			{
+				HandleConnection(client);
+			}
+			catch
+			{
+				client.Dispose();
+			}
+		}
+	}
+
+	// Reads one request and dispatches it: a WebSocket upgrade becomes a live client,
+	// anything else is served as a static file (when a web root is configured). The
+	// connection is kept open only for an accepted WebSocket; HTTP replies are one-shot.
+	private void HandleConnection(TcpClient client)
+	{
+		client.NoDelay = true;
+		var stream = client.GetStream();
+
+		Span<byte> request = stackalloc byte[2048];
+		var length = ReadHttpHeaders(stream, request);
+		if (length > 0)
+		{
+			var req = request[..length];
+			if (TryFindWebSocketKey(req, out var key))
+			{
+				CompleteHandshake(stream, key);
+				// Send the descriptor first so the client can interpret state frames. Done
+				// under the lock so the shared header buffer isn't shared with Broadcast.
+				lock (_Sync)
+				{
+					SendFrame(stream, _Descriptor);
+					_Clients.Add(client);
+				}
+
+				return; // client is now owned by _Clients
+			}
+
+			if (_WebRoot is not null)
+			{
+				ServeStaticFile(stream, req);
+			}
+			else
+			{
+				WriteHttpStatus(stream, "404 Not Found"u8);
+			}
+		}
+
+		client.Dispose();
+	}
+
+	private static void CompleteHandshake(NetworkStream stream, ReadOnlySpan<byte> key)
+	{
+		// accept = base64(SHA1(key + magic)), assembled in stack buffers (no string/array).
+		Span<byte> keyPlusMagic = stackalloc byte[64];
+		key.CopyTo(keyPlusMagic);
+		MagicBytes.CopyTo(keyPlusMagic[key.Length..]);
+		Span<byte> hash = stackalloc byte[20];
+		SHA1.HashData(keyPlusMagic[..(key.Length + MagicBytes.Length)], hash);
+
+		Span<byte> response = stackalloc byte[160];
+		var pos = 0;
+		var responseHeader =
+			"HTTP/1.1 101 Switching Protocols\r\n"u8 +
+			"Upgrade: websocket\r\n"u8 +
+			"Connection: Upgrade\r\n"u8 +
+			"Sec-WebSocket-Accept: "u8;
+		pos += Append(response[pos..], responseHeader);
+		Base64.EncodeToUtf8(hash, response[pos..], out _, out var acceptWritten);
+		pos += acceptWritten;
+		pos += Append(response[pos..], "\r\n\r\n"u8);
+
+		stream.Write(response[..pos]);
+	}
+
+	// ---- Static file serving (page-load path; ordinary allocations are fine here) -------
+	private void ServeStaticFile(NetworkStream stream, ReadOnlySpan<byte> request)
+	{
+		if (!TryGetRequestTarget(request, out var target))
+		{
+			WriteHttpStatus(stream, "400 Bad Request"u8);
+			return;
+		}
+
+		var relative = target == "/" ? "joyviz.html" : Uri.UnescapeDataString(target.TrimStart('/'));
+		var full = Path.GetFullPath(Path.Combine(_WebRoot!, relative));
+		// Reject path traversal outside the web root.
+		if (!full.StartsWith(_WebRoot!, StringComparison.OrdinalIgnoreCase) || !File.Exists(full))
+		{
+			WriteHttpStatus(stream, "404 Not Found"u8);
+			return;
+		}
+
+		var body = File.ReadAllBytes(full);
+		var header = "HTTP/1.1 200 OK\r\nContent-Type: " + ContentType(full) +
+			"\r\nContent-Length: " + body.Length +
+			"\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
+		stream.Write(Encoding.ASCII.GetBytes(header));
+		stream.Write(body);
+	}
+
+	private static bool TryGetRequestTarget(ReadOnlySpan<byte> request, out string target)
+	{
+		target = "";
+		var lineEnd = request.IndexOf((byte)'\n');
+		var line = lineEnd < 0 ? request : request[..lineEnd];
+		var firstSpace = line.IndexOf((byte)' ');
+		if (firstSpace < 0)
+		{
+			return false;
+		}
+
+		var afterMethod = line[(firstSpace + 1)..];
+		var secondSpace = afterMethod.IndexOf((byte)' ');
+		var raw = secondSpace < 0 ? afterMethod : afterMethod[..secondSpace];
+		var query = raw.IndexOf((byte)'?');
+		if (query >= 0)
+		{
+			raw = raw[..query];
+		}
+
+		if (raw.Length == 0 || raw[0] != (byte)'/')
+		{
+			return false;
+		}
+
+		target = Encoding.ASCII.GetString(raw);
+		return true;
+	}
+
+	private static string ContentType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+	{
+		".html" or ".htm" => "text/html; charset=utf-8",
+		".js" => "text/javascript",
+		".css" => "text/css",
+		".json" => "application/json",
+		".svg" => "image/svg+xml",
+		".ico" => "image/x-icon",
+		".png" => "image/png",
+		".woff2" => "font/woff2",
+		_ => "application/octet-stream",
+	};
+
+	private static void WriteHttpStatus(NetworkStream stream, ReadOnlySpan<byte> status)
+	{
+		Span<byte> response = stackalloc byte[64];
+		var pos = 0;
+		pos += Append(response[pos..], "HTTP/1.1 "u8);
+		status.CopyTo(response[pos..]);
+		pos += status.Length;
+		pos += Append(response[pos..], "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"u8);
+		stream.Write(response[..pos]);
+	}
+
+	private static int Append(Span<byte> destination, ReadOnlySpan<byte> source)
+	{
+		source.CopyTo(destination);
+		return source.Length;
+	}
+
+	/// <summary>Reads until the CRLFCRLF end-of-headers, into <paramref name="buffer"/>. Returns bytes read, or 0.</summary>
+	private static int ReadHttpHeaders(NetworkStream stream, Span<byte> buffer)
+	{
+		var total = 0;
+		var httpDelimiter = "\r\n\r\n"u8;
+		while (total < buffer.Length)
+		{
+			var read = stream.Read(buffer[total..]);
+			if (read <= 0)
+			{
+				return 0;
+			}
+
+			total += read;
+			if (total >= 4 && buffer.Slice(total - 4, 4).SequenceEqual(httpDelimiter))
+			{
+				return total;
+			}
+		}
+
+		return 0;
+	}
+
+	private static bool TryFindWebSocketKey(ReadOnlySpan<byte> request, out ReadOnlySpan<byte> key)
+	{
+		var header = "sec-websocket-key:"u8;
+		var offset = 0;
+		while (offset < request.Length)
+		{
+			var newline = request[offset..].IndexOf((byte)'\n');
+			var line = newline < 0 ? request[offset..] : request.Slice(offset, newline);
+			if (line.Length > 0 && line[^1] == (byte)'\r')
+			{
+				line = line[..^1];
+			}
+
+			if (StartsWithIgnoreAsciiCase(line, header))
+			{
+				key = TrimAsciiSpace(line[header.Length..]);
+				return key.Length > 0;
+			}
+
+			if (newline < 0)
+			{
+				break;
+			}
+
+			offset += newline + 1;
+		}
+
+		key = default;
+		return false;
+	}
+
+	private static bool StartsWithIgnoreAsciiCase(ReadOnlySpan<byte> value, ReadOnlySpan<byte> lowerPrefix)
+	{
+		if (value.Length < lowerPrefix.Length)
+		{
+			return false;
+		}
+
+		for (var i = 0; i < lowerPrefix.Length; i++)
+		{
+			var c = value[i];
+			if (c >= 'A' && c <= 'Z')
+			{
+				c += 32; // to lower
+			}
+
+			if (c != lowerPrefix[i])
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	private static ReadOnlySpan<byte> TrimAsciiSpace(ReadOnlySpan<byte> value)
+	{
+		var start = 0;
+		var end = value.Length;
+		while (start < end && (value[start] == (byte)' ' || value[start] == (byte)'\t'))
+		{
+			start++;
+		}
+
+		while (end > start && (value[end - 1] == (byte)' ' || value[end - 1] == (byte)'\t'))
+		{
+			end--;
+		}
+
+		return value[start..end];
+	}
+
+	/// <summary>Broadcasts one binary frame to every connected client; drops any that fail.</summary>
+	public void Broadcast(ReadOnlySpan<byte> payload)
+	{
+		lock (_Sync)
+		{
+			for (var i = _Clients.Count - 1; i >= 0; i--)
+			{
+				var client = _Clients[i];
+				try
+				{
+					SendFrame(client.GetStream(), payload);
+				}
+				catch
+				{
+					_Clients.RemoveAt(i);
+					client.Dispose();
+				}
+			}
+		}
+	}
+
+	private void SendFrame(NetworkStream stream, ReadOnlySpan<byte> payload)
+	{
+		// FIN + binary opcode (0x2); unmasked (server -> client).
+		int headerLen;
+		_Header[0] = 0x82;
+		if (payload.Length <= 125)
+		{
+			_Header[1] = (byte)payload.Length;
+			headerLen = 2;
+		}
+		else
+		{
+			_Header[1] = 126;
+			_Header[2] = (byte)(payload.Length >> 8);
+			_Header[3] = (byte)(payload.Length & 0xFF);
+			headerLen = 4;
+		}
+
+		stream.Write(_Header, 0, headerLen);
+		stream.Write(payload);
+	}
+
+	public void Dispose()
+	{
+		_Running = false;
+		try
+		{
+			_Listener.Stop();
+		}
+		catch
+		{
+			// ignore
+		}
+
+		lock (_Sync)
+		{
+			foreach (var client in _Clients)
+			{
+				client.Dispose();
+			}
+
+			_Clients.Clear();
+		}
+	}
+}
