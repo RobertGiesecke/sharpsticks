@@ -77,6 +77,29 @@ public sealed class AxisToButtonRouteTests : IDisposable
 	}
 
 	[Fact]
+	public void Hold_Inverted_AssertsOutsideTheBand()
+	{
+		using var runtime = Build(_Stick.BindAxis(Axis.X).RouteWhenInRange(
+			0.3, 0.6, _Output.BindButton(1),
+			new() { Inverted = true }));
+
+		// Inside the band → not pressed (inverted).
+		_Stick.SetAxisValue(Axis.X, 0.4);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Outside the band → pressed.
+		_Stick.SetAxisValue(Axis.X, 0.1);
+		runtime.ProcessFrame();
+		Assert.True(_Output.GetButtonState(1));
+
+		// Back inside → released.
+		_Stick.SetAxisValue(Axis.X, 0.5);
+		runtime.ProcessFrame();
+		Assert.False(_Output.GetButtonState(1));
+	}
+
+	[Fact]
 	public void Pulse_PressesOnEntry_ReleasesAfterDuration_ReArmsAfterLeaving()
 	{
 		var pulse = TimeSpan.FromMilliseconds(50);

@@ -213,6 +213,7 @@ public static class BindingExtensions
 			IncludeMax = o.IncludeMax,
 			Mode = o.Mode,
 			PulseDuration = o.PulseDuration,
+			Inverted = o.Inverted,
 		};
 	}
 
@@ -233,6 +234,7 @@ public static class BindingExtensions
 			IncludeMax = o.IncludeMax,
 			Mode = o.Mode,
 			PulseDuration = o.PulseDuration,
+			Inverted = o.Inverted,
 		};
 	}
 
@@ -253,6 +255,7 @@ public static class BindingExtensions
 				IncludeMax = o.IncludeMax,
 				Mode = o.Mode,
 				PulseDuration = o.PulseDuration,
+				Inverted = o.Inverted,
 			};
 		}
 	}

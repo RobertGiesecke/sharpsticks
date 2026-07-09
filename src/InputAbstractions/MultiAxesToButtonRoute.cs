@@ -19,6 +19,9 @@ public sealed record MultiAxesToButtonRoute : ICombinedRoute, IConfigurableRoute
 	/// <summary>Only used when <see cref="Mode"/> is <see cref="AxisZoneTriggerMode.Pulse"/>.</summary>
 	public TimeSpan PulseDuration { get; init; } = TimeSpan.FromMilliseconds(50);
 
+	/// <summary>Assert while an axis is <em>outside</em> the zone instead of inside.</summary>
+	public bool Inverted { get; init; }
+
 	public IEnumerable<IRoute> GetRoutes()
 	{
 		return Sources.Select(s => new AxisZoneRoute
@@ -29,7 +32,8 @@ public sealed record MultiAxesToButtonRoute : ICombinedRoute, IConfigurableRoute
 			Max = Max,
 			IncludeMax = IncludeMax,
 			Mode = Mode,
-			PulseDuration = PulseDuration
+			PulseDuration = PulseDuration,
+			Inverted = Inverted,
 		});
 	}
 }

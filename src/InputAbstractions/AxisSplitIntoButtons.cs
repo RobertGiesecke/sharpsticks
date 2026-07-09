@@ -32,6 +32,7 @@ public sealed record AxisSplitIntoButtons : ICombinedRoute, IConfigurableRoute
 				IncludeMax = isLast,
 				Mode = o.Mode,
 				PulseDuration = o.PulseDuration,
+				Inverted = o.Inverted,
 			});
 		}
 
@@ -46,4 +47,7 @@ public readonly record struct AxisZoneOptions()
 	public bool IncludeMax { get; init; } = true;
 	public AxisZoneTriggerMode Mode { get; init; } = AxisZoneTriggerMode.Hold;
 	public TimeSpan PulseDuration { get; init; } = TimeSpan.FromMilliseconds(50);
+
+	/// <summary>Assert while the axis is <em>outside</em> the zone instead of inside.</summary>
+	public bool Inverted { get; init; }
 }

@@ -19,7 +19,7 @@ public abstract record ButtonTarget<T> : ButtonTarget, IMergeableObject<T>
 public abstract record ButtonTarget
 {
 	/// <summary>Build the route that drives this target from a button source.</summary>
-	public IRoute CreateRoute(ButtonBinding source) => new ButtonToTargetRoute { Source = source, Target = this };
+	public IConfigurableRoute CreateRoute(ButtonBinding source) => new ButtonToTargetRoute { Source = source, Target = this };
 
 	/// <summary>
 	/// Build the runtime sink that applies a pressed/released state to this target.
@@ -40,5 +40,5 @@ public static class ButtonTargetRoutingExtensions
 	/// <c>RouteToKey</c>/<c>RouteToMouse</c>/<c>RouteToScroll</c> overloads are more
 	/// convenient when the target type is known.
 	/// </summary>
-	public static IRoute RouteTo(this ButtonBinding source, ButtonTarget target) => target.CreateRoute(source);
+	public static IConfigurableRoute RouteTo(this ButtonBinding source, ButtonTarget target) => target.CreateRoute(source);
 }

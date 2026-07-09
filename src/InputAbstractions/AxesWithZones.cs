@@ -20,6 +20,7 @@ public sealed record AxesWithZones : ICombinedRoute, IConfigurableRoute
 				IncludeMax = o.IncludeMax,
 				Mode = o.Mode,
 				PulseDuration = o.PulseDuration,
+				Inverted = o.Inverted,
 			};
 		}
 	}
