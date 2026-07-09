@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SharpSticks.InputSynthesis.Mouse;
 using static System.TimeSpan;
 
@@ -7,18 +8,19 @@ using static System.TimeSpan;
 [assembly: RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
 [assembly: RenameDevice(DeviceNames.VpcRudderPedals, "Pedals")]
 
-var groupedZoomAxes = Pedals.Axes.RightToeBrake.GroupWith(LeftStick.Axes.BrakeLever);
+var groupedZoomAxes = Pedals.Axes.RightToeBrake
+	.GroupWith(LeftStick.Axes.BrakeLever)
+	.WithAxisMode(AxisMode.Unsigned);
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 2.4d },
 	PrecisionCurve = new AxisCurve { Max = 0.05d },
-	// Whichever is engaged furthest wins — ModifierAxes takes the max.
+	// Whichever is engaged the furthest wins — ModifierAxes takes the max.
 	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
 	ModifierAxes =
 	[
-		..groupedZoomAxes.SourceAxes.Select(a => a with { Mode = AxisMode.Unsigned })
-			.WithModifier(new AxisCurve { Max = 1.0d, Exponent = 2.4d }),
+		..groupedZoomAxes.SourceAxes,
 	],
 	Stateful = true,
 };
@@ -28,20 +30,9 @@ BuildAndRunAsConsole(new()
 	Name = "ItB minimal + scaled rotations",
 	Routes =
 	[
-		LeftStick.Axes.ThumbStickHorizontal.Invert()
-			.RouteToScroll(ScrollAxis.Horizontal, MouseScrollUnit.HighResolution, sensitivity: 100d),
-		LeftStick.Axes.ThumbStickVertical.Invert()
-			.RouteToScroll(ScrollAxis.Vertical, MouseScrollUnit.HighResolution, sensitivity: 100d),
-		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X),
-		RightStick.Axes.Rx.SplitIntoButtons([
-			VJoy1.Buttons.HoldForZoom,
-			new MouseButtonTarget
-			{
-				Button = OutputMouseButton.Middle,
-			},
-		]),
-		RightStick.Axes.Ry.RouteToMouse(MouseDirection.Y),
-		RightStick.Buttons.ThumbStick.RouteToMouse(OutputMouseButton.Left),
+		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X, sensitivity: 2000),
+		RightStick.Axes.Ry.RouteToMouse(MouseDirection.Y, sensitivity: 2000),
+		RightStick.Buttons.ThumbStick.RouteTo(MouseOutput.Buttons.Left),
 		// switch to gimbals while holding cm hat east
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()
 		{
@@ -66,22 +57,25 @@ BuildAndRunAsConsole(new()
 		}),
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
-		groupedZoomAxes.RouteWhenInRange(-0.00d, 1d, VJoy1.Buttons.PrecisionMode,
+		..LeftStick.Axes.BrakeLever.RouteWhenInRange(-0.95d, 1d, VJoy1.Buttons.HoldForZoom,
 			options: new()
 			{
 				IncludeMax = true,
 				Mode = AxisZoneTriggerMode.Hold,
-			}),
-		LeftStick.Axes.BrakeLever.RouteWhenInRange(-0.95d, 1d, VJoy1.Buttons.HoldForZoom,
-			options: new()
+			}) switch
 			{
-				IncludeMax = true,
-				Mode = AxisZoneTriggerMode.Hold,
-			}),
+				var x => ImmutableArray.Create(x, x with 
+				{
+					Target = VJoy1.Buttons.HoldWhenNotZoomed,
+					Inverted = true,
+				}),
+			},
 		RightStick.Axes.X.RouteTo(VJoy1.Axes.Roll, modifier: modifierBlendCurve),
 		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: modifierBlendCurve),
 		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: modifierBlendCurve),
-		//LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever, scale: 2, offset: -1),
+
+		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever/*, scale: 2, offset: -1*/),
+		Pedals.Axes.RightToeBrake.RouteTo(VJoy1.Axes.RightToeBrake, scale: 2, offset: -1),
 		// simulate absolute zoom with 2 virtual relative axes
 		LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
 		{
@@ -91,7 +85,7 @@ BuildAndRunAsConsole(new()
 			// range is [0, 1], which throws away the first half of the pull.
 			SourceInputMinimum = -1.0,
 			SourceInputMaximum = 1.0,
-			Gain = 8.0,
+			Gain = 6.0,
 			// Must clear the game's deadzone: pulses below it advance the
 			// model but not the game, so the zoom never reaches the stops.
 			// Tune to just above where the game starts reacting.
@@ -112,35 +106,43 @@ BuildAndRunAsConsole(new()
 	],
 });
 
+
 //pedals
 [RenameAxis(DeviceNames.Pedals, Axis.Z, "Seesaw")]
-[RenameAxis(DeviceNames.Pedals, Axis.Slider1, "LeftToeBrake")]
-[RenameAxis(DeviceNames.Pedals, Axis.Slider2, "RightToeBrake")]
+[RenameAxis(DeviceNames.Pedals, Axis.Slider1, SharedNames.LeftToeBrake)]
+[RenameAxis(DeviceNames.Pedals, Axis.Slider2, SharedNames.RightToeBrake)]
 // right stick
 [RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 6, "ThumbStick")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
+[RenameButton(DeviceNames.RightVpcStickWarBRD, 6, "ThumbStick")]
 // left stick
-[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, "BrakeLever")]
-[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Rx, "ThumbStickHorizontal")]
-[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Ry, "ThumbStickVertical")]
+[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, SharedNames.BrakeLever)]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
 [RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, "BrakeLever")]
+[RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, SharedNames.BrakeLever)]
 // vjoy device
 [RenameButton(DeviceNames.VJoy1, 1, "Fire")]
 [RenameButton(DeviceNames.VJoy1, 79, "CenterHeadTracking")]
 [RenameAxis(DeviceNames.VJoy1, Axis.X, "Roll")]
 [RenameAxis(DeviceNames.VJoy1, Axis.Y, "Pitch")]
 [RenameAxis(DeviceNames.VJoy1, Axis.Z, "Yaw")]
-[RenameAxis(DeviceNames.VJoy1, Axis.Rz, "BrakeLever")]
-[RenameAxis(DeviceNames.VJoy1, Axis.Ry, "ZoomInOut")]
+[RenameAxis(DeviceNames.VJoy1, Axis.Rz, SharedNames.BrakeLever)]
+[RenameAxis(DeviceNames.VJoy1, Axis.Rx, SharedNames.RightToeBrake)]
+[RenameAxis(DeviceNames.VJoy1, Axis.Ry, SharedNames.ZoomInOut)]
 [RenameAxis(DeviceNames.VJoy1, Axis.Slider1, "ZoomIn")]
 [RenameAxis(DeviceNames.VJoy1, Axis.Slider2, "ZoomOut")]
 [RenameButton(DeviceNames.VJoy1, 71, "SwitchToWeaponGroup1")]
 [RenameButton(DeviceNames.VJoy1, 72, "SwitchToWeaponGroup2")]
 [RenameButton(DeviceNames.VJoy1, 20, "HoldForZoom")]
-[RenameButton(DeviceNames.VJoy1, 21, "PrecisionMode")]
+[RenameButton(DeviceNames.VJoy1, 21, "HoldWhenNotZoomed")]
 partial class Devices;
+
+static class SharedNames
+{
+	public const string BrakeLever = "BrakeLever";
+	public const string RightToeBrake = "RightToeBrake";
+	public const string LeftToeBrake = "LeftToeBrake";
+	public const string ZoomInOut = "ZoomInOut";
+}

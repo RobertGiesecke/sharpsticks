@@ -143,6 +143,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		public required double Min { get; init; }
 		public required double Max { get; init; }
 		public required bool IncludeMax { get; init; }
+		public required bool Inverted { get; init; }
 		public required AxisZoneTriggerMode Mode { get; init; }
 		public required long PulseDurationTicks { get; init; }
 		public required OutputButtonStateIndex OutputButtonStateIndex { get; init; }
@@ -374,6 +375,7 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 				Min = route.Min,
 				Max = route.Max,
 				IncludeMax = route.IncludeMax,
+				Inverted = route.Inverted,
 				Mode = route.Mode,
 				PulseDurationTicks = (long)(route.PulseDuration.TotalSeconds * timeSource.Frequency),
 				OutputButtonStateIndex = _OutputStateIndexByTarget[route.Target],
@@ -480,11 +482,14 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 
 			LogStartup(debugLogger);
 
-			var waitHandles = DevicesById.Values
-				.Select(d => d.DataAvailable)
-				.Append(cancellationToken.WaitHandle)
-				.ToArray();
+			var waitHandles = new WaitHandle[Devices.Length + 1];
+			for (var index = 0; index < Devices.Length; index++)
+			{
+				waitHandles[index] = Devices[index].DataAvailable;
+			}
+
 			var cancelIndex = waitHandles.Length - 1;
+			waitHandles[cancelIndex] = cancellationToken.WaitHandle;
 
 			while (true)
 			{
@@ -723,8 +728,10 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 			if (states[route.SourceDeviceIndex] is { } state)
 			{
 				var value = route.SourceDevice.ReadNormalizedAxisValue(state, route.Source);
-				inRange = value >= route.Min &&
-				          (route.IncludeMax ? value <= route.Max : value < route.Max);
+				var inBand = value >= route.Min &&
+				             (route.IncludeMax ? value <= route.Max : value < route.Max);
+				// Inverted asserts outside the band; a missing device stays unasserted either way.
+				inRange = route.Inverted ? !inBand : inBand;
 			}
 
 			var wasAsserting = route.Zone.IsAsserting;

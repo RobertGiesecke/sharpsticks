@@ -16,6 +16,13 @@ public sealed record AxisZoneRoute : IConfigurableRoute, IMergeableObject<AxisZo
     /// <summary>If <c>true</c> the zone is <c>[Min, Max]</c>; otherwise <c>[Min, Max)</c>.</summary>
     public bool IncludeMax { get; init; } = true;
 
+    /// <summary>
+    /// When <c>true</c>, the zone asserts while the axis is <em>outside</em> [Min, Max]
+    /// rather than inside — the complement. (Distinct from <see cref="AxisBinding.Invert"/>,
+    /// which flips the axis value itself.) A missing device never asserts either way.
+    /// </summary>
+    public bool Inverted { get; init; }
+
     public AxisZoneTriggerMode Mode { get; init; } = AxisZoneTriggerMode.Hold;
 
     /// <summary>Only used when <see cref="Mode"/> is <see cref="AxisZoneTriggerMode.Pulse"/>.</summary>
