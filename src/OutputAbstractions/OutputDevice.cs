@@ -28,10 +28,11 @@ public abstract class OutputDevice : IDisposable, IOutputDevice
 	/// <c>DeviceId</c> of the input-side device this output also surfaces as, when one
 	/// exists on this platform (vJoy device → DirectInput entry on Windows; uinput
 	/// device → evdev event node on Linux). <c>null</c> when the output has no input
-	/// counterpart or the backend couldn't determine the mapping. Assigned by the
-	/// factory at <see cref="IOutputDeviceFactory.EnumerateConnectedOutputDevices"/> time.
+	/// counterpart or the backend couldn't determine the mapping. Set once at construction
+	/// by the concrete output device, from the mapping its factory resolves at
+	/// <see cref="IOutputDeviceFactory.EnumerateConnectedOutputDevices"/> time.
 	/// </summary>
-	public int? InputDeviceId { get; internal set; }
+	public int? InputDeviceId { get; protected init; }
 
 	public void Freeze()
 	{
