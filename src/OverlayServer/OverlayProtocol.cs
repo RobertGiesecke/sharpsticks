@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Collections.Immutable;
 using System.Text;
 using SharpSticks.InputAbstractions;
 
@@ -22,7 +23,7 @@ namespace SharpSticks.OverlayServer;
 internal static class OverlayProtocol
 {
 	public static OverlayProtocol<TInputDevice> Create<TInputDevice>(
-		TInputDevice[] devices,
+		ImmutableArray<TInputDevice> devices,
 		byte version)
 		where TInputDevice : JoystickDevice => new(devices, version);
 }
@@ -32,7 +33,7 @@ internal sealed class OverlayProtocol<TInputDevice>
 	public const byte FrameDescriptor = 0x01;
 	public const byte FrameState = 0x02;
 
-	private readonly TInputDevice[] _Devices;
+	private readonly ImmutableArray<TInputDevice> _Devices;
 	private readonly AxisBinding[][] _AxisBindings;
 	private readonly int[] _ButtonCounts;
 	private readonly byte _Version;
@@ -40,7 +41,7 @@ internal sealed class OverlayProtocol<TInputDevice>
 
 	public byte[] Descriptor { get; }
 
-	public OverlayProtocol(TInputDevice[] devices, byte version)
+	public OverlayProtocol(ImmutableArray<TInputDevice> devices, byte version)
 	{
 		_Devices = devices;
 		_Version = version;
