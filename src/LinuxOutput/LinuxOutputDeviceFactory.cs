@@ -1,5 +1,6 @@
 using System.Text;
 using Collections.Pooled;
+using SharpSticks.LinuxInput;
 
 namespace SharpSticks.LinuxOutput;
 
@@ -10,6 +11,13 @@ namespace SharpSticks.LinuxOutput;
 public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputDevice>, ISupportsOutputSetup
 {
 	public static LinuxOutputDeviceFactory Instance { get; } = new();
+
+	// Identity stamped on every virtual device (see SetupDevice). The same (vendor, product)
+	// lets us find the freshly-created evdev node again after UI_DEV_CREATE and read back the
+	// DeviceId the input enumerator assigns it, so InputDeviceId correlates output ↔ input.
+	private const ushort VirtualVendor = 0xfeed;
+
+	private static ushort VirtualProduct(uint deviceId) => (ushort)(0xc000 | (deviceId & 0xff));
 
 	string ISupportsOutputSetup.SetupSubcommandName => LinuxOutputSetup.SubcommandName;
 	
@@ -67,15 +75,18 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 			SetupDevice(fd, request.DeviceId);
 			CreateDevice(fd);
 
-			// InputDeviceId stays null on purpose. The matching evdev device only appears
-			// AFTER UI_DEV_CREATE here, but the availableInputs snapshot was taken before
-			// that — so it can't contain our new counterpart. A consumer that wants to
-			// find the new evdev node should re-enumerate inputs after Open returns.
+			// The matching evdev node only exists AFTER UI_DEV_CREATE, so it couldn't be in
+			// the availableInputs snapshot (taken before). Re-enumerate now and find our node
+			// by the (vendor, product) identity we just stamped, reading back the DeviceId the
+			// input enumerator assigns it — null if it isn't visible yet.
+			var inputDeviceId = DiscoverInputDeviceId(request.DeviceId);
+
 			return new(
 				request.DeviceId,
 				fd,
 				CollectAxisCodes(request.AxisRoutes),
-				CollectButtonCodes(request.OutputButtons, request.MacroButtonNumbers));
+				CollectButtonCodes(request.OutputButtons, request.MacroButtonNumbers),
+				inputDeviceId);
 		}
 		catch
 		{
@@ -145,8 +156,8 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 			Id = new()
 			{
 				BusType = LinuxUinput.BusVirtual,
-				Vendor = 0xfeed,
-				Product = (ushort)(0xc000 | (deviceId & 0xff)),
+				Vendor = VirtualVendor,
+				Product = VirtualProduct(deviceId),
 				Version = 0x0100,
 			},
 			FfEffectsMax = 0,
@@ -171,6 +182,25 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	private static void CreateDevice(int fd)
 	{
 		MustSucceed(LinuxLibc.IoctlNoArg(fd, LinuxUinput.UiDevCreate), "UI_DEV_CREATE");
+	}
+
+	/// Finds the just-created uinput device among the enumerated evdev inputs by its stamped
+	/// (vendor, product) identity and returns the DeviceId the input enumerator assigned it,
+	/// or null if it can't be found. That id is a positional index over the current input set,
+	/// so it correlates only against an input enumeration of the same device set (which is how
+	/// consumers re-discover these outputs); it is not a stable per-device identifier.
+	private static int? DiscoverInputDeviceId(uint deviceId)
+	{
+		var expected = ProductGuidEncoder.Encode(VirtualVendor, VirtualProduct(deviceId));
+		foreach (var input in LinuxInputJoystickDeviceFactory.Instance.EnumerateAvailableInputs())
+		{
+			if (input.ProductGuid == expected)
+			{
+				return input.DeviceId;
+			}
+		}
+
+		return null;
 	}
 
 	private static FrozenDictionary<Axis, ushort> CollectAxisCodes(IReadOnlyCollection<AxisRoute> axisRoutes)
