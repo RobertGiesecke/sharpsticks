@@ -21,9 +21,11 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 		uint deviceId,
 		int fd,
 		FrozenDictionary<Axis, ushort> axisCodes,
-		FrozenDictionary<int, ushort> buttonCodes)
+		FrozenDictionary<int, ushort> buttonCodes,
+		int? inputDeviceId)
 		: base(deviceId)
 	{
+		InputDeviceId = inputDeviceId;
 		_Fd = fd;
 		_AxisCodes = axisCodes;
 		_ButtonCodes = buttonCodes;
