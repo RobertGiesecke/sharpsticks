@@ -201,10 +201,16 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 			}
 
 			var device = new VJoyDevice(deviceId, axisLimits.ToFrozenDictionary());
+			// Match against the DirectInput entry's *full* capabilities, not the routed
+			// subset. DirectInput reports every enabled axis/button/POV, so using only the
+			// routed axis count (axisLimits.Count) here means the fingerprint never matched
+			// and InputDeviceId was left unassigned.
+			var povCount = Math.Max(0, VJoyNative.GetVJDContPovNumber(deviceId)) +
+			               Math.Max(0, VJoyNative.GetVJDDiscPovNumber(deviceId));
 			var caps = new JoystickCapabilities(
-				NumAxes: (uint)axisLimits.Count,
+				NumAxes: (uint)EnumerateAxes(deviceId).Length,
 				NumButtons: (uint)Math.Max(0, buttonCount),
-				NumPovs: 0
+				NumPovs: (uint)povCount
 			);
 			return (device, caps);
 		}
