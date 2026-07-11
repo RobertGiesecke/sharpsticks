@@ -11,9 +11,10 @@ public sealed class VJoyDevice : OutputDevice, IOutputDeviceWithFactory<VJoyDevi
 	public static VJoyDeviceFactory Factory => VJoyDeviceFactory.Instance;
 	static IOutputDeviceFactory<VJoyDevice> IOutputDeviceWithFactory<VJoyDevice>.Factory => Factory;
 
-	public VJoyDevice(uint deviceId, FrozenDictionary<Axis, AxisLimits> axisLimits)
+	public VJoyDevice(uint deviceId, FrozenDictionary<Axis, AxisLimits> axisLimits, int? inputDeviceId)
 		: base(deviceId)
 	{
+		InputDeviceId = inputDeviceId;
 		_AxisLimits = axisLimits;
 		_LastAxisValues = new(axisLimits.Count);
 		_LastButtonValues = new(128);

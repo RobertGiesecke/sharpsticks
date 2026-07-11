@@ -106,8 +106,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 
 		foreach (var request in requests.OrderBy(static r => r.DeviceId))
 		{
-			var (device, caps) = OpenOne(request);
-			device.InputDeviceId = ClaimMatchingInput(caps, candidatePool);
+			var device = OpenOne(request, candidatePool);
 			destination.Add((TDevice)(OutputDevice)device);
 		}
 	}
@@ -134,7 +133,10 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 		return pool;
 	}
 
-	private static (VJoyDevice Device, JoystickCapabilities Capabilities) OpenOne(OutputDeviceRequest request)
+	private static VJoyDevice OpenOne<TInputDevice>(
+		OutputDeviceRequest request,
+		PooledList<TInputDevice> candidatePool)
+		where TInputDevice : JoystickDevice
 	{
 		var deviceId = request.DeviceId;
 		if (deviceId < 1)
@@ -200,11 +202,10 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 				}
 			}
 
-			var device = new VJoyDevice(deviceId, axisLimits.ToFrozenDictionary());
 			// Match against the DirectInput entry's *full* capabilities, not the routed
 			// subset. DirectInput reports every enabled axis/button/POV, so using only the
 			// routed axis count (axisLimits.Count) here means the fingerprint never matched
-			// and InputDeviceId was left unassigned.
+			// and no input device was paired.
 			var povCount = Math.Max(0, VJoyNative.GetVJDContPovNumber(deviceId)) +
 			               Math.Max(0, VJoyNative.GetVJDDiscPovNumber(deviceId));
 			var caps = new JoystickCapabilities(
@@ -212,7 +213,8 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 				NumButtons: (uint)Math.Max(0, buttonCount),
 				NumPovs: (uint)povCount
 			);
-			return (device, caps);
+			var inputDeviceId = ClaimMatchingInput(caps, candidatePool);
+			return new VJoyDevice(deviceId, axisLimits.ToFrozenDictionary(), inputDeviceId);
 		}
 		catch
 		{
