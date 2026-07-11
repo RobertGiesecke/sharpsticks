@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Text;
 using System.Net;
 using System.Net.Sockets;
@@ -20,16 +21,34 @@ internal sealed class OverlayWebSocketServer : IDisposable
 	private readonly TcpListener _Listener;
 	private readonly byte[] _Descriptor;
 	private readonly string? _WebRoot;
-	private readonly Lock _Sync = new();
+	// A SemaphoreSlim rather than a Lock so the async broadcast can hold it across an await
+	// (a Lock/Monitor can't be held over await). Taken synchronously (Wait) on the accept
+	// thread and the sync broadcast, asynchronously (WaitAsync) by BroadcastAsync.
+	private readonly SemaphoreSlim _Sync = new(1, 1);
 	private readonly List<TcpClient> _Clients = [];
 	private readonly byte[] _Header = new byte[4];
 	private Thread? _AcceptThread;
 	private volatile bool _Running;
 
+	// A stuck client must not block the accept thread's handshake read or a broadcast's
+	// writes (the write happens while _Sync is held). Socket-level timeouts turn "blocked
+	// forever" into an IOException, which the callers already treat as "drop this client".
+	// These govern synchronous socket ops; an async send path would need a CancellationToken.
+	private const int HandshakeReadTimeoutMs = 5000;
+	private const int ClientSendTimeoutMs = 1000;
+
+	/// <summary>
+	/// Represents a minimal WebSocket server implementation that uses <see cref="TcpListener"/> to serve binary frames to connected clients.
+	/// It supports serving static files when a root directory is provided, otherwise only WebSocket upgrades are handled.
+	/// </summary>
+	/// <param name="port">
+	/// The port on which the WebSocket server will listen for incoming connections.
+	/// </param>
+	/// <param name="descriptor">
+	/// A binary descriptor that is sent to clients during the WebSocket communication.
+	/// </param>
 	/// <param name="webRoot">
-	/// When set, plain HTTP GETs on the same port are served as static files from this
-	/// directory (so one process serves both the overlay page and the live WebSocket feed).
-	/// When null, only WebSocket upgrades are handled.
+	/// The root directory for serving static files over plain HTTP GET requests. When null, static file serving is disabled, and only WebSocket upgrades are handled.
 	/// </param>
 	public OverlayWebSocketServer(int port, byte[] descriptor, string? webRoot = null)
 	{
@@ -42,9 +61,14 @@ internal sealed class OverlayWebSocketServer : IDisposable
 	{
 		get
 		{
-			lock (_Sync)
+			_Sync.Wait();
+			try
 			{
 				return _Clients.Count;
+			}
+			finally
+			{
+				_Sync.Release();
 			}
 		}
 	}
@@ -92,6 +116,8 @@ internal sealed class OverlayWebSocketServer : IDisposable
 	private void HandleConnection(TcpClient client)
 	{
 		client.NoDelay = true;
+		client.ReceiveTimeout = HandshakeReadTimeoutMs;
+		client.SendTimeout = ClientSendTimeoutMs;
 		var stream = client.GetStream();
 
 		var request = ReadHttpHeaders(stream);
@@ -103,10 +129,15 @@ internal sealed class OverlayWebSocketServer : IDisposable
 				CompleteHandshake(stream, key);
 				// Send the descriptor first so the client can interpret state frames. Done
 				// under the lock so the shared header buffer isn't shared with Broadcast.
-				lock (_Sync)
+				_Sync.Wait();
+				try
 				{
 					SendFrame(stream, _Descriptor);
 					_Clients.Add(client);
+				}
+				finally
+				{
+					_Sync.Release();
 				}
 
 				return; // client is now owned by _Clients
@@ -169,8 +200,8 @@ internal sealed class OverlayWebSocketServer : IDisposable
 
 		var body = File.ReadAllBytes(full);
 		var header = "HTTP/1.1 200 OK\r\nContent-Type: " + ContentType(full) +
-			"\r\nContent-Length: " + body.Length +
-			"\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
+		             "\r\nContent-Length: " + body.Length +
+		             "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
 		stream.Write(Encoding.ASCII.GetBytes(header));
 		stream.Write(body);
 	}
@@ -345,7 +376,8 @@ internal sealed class OverlayWebSocketServer : IDisposable
 	/// <summary>Broadcasts one binary frame to every connected client; drops any that fail.</summary>
 	public void Broadcast(ReadOnlySpan<byte> payload)
 	{
-		lock (_Sync)
+		_Sync.Wait();
+		try
 		{
 			for (var i = _Clients.Count - 1; i >= 0; i--)
 			{
@@ -361,28 +393,73 @@ internal sealed class OverlayWebSocketServer : IDisposable
 				}
 			}
 		}
+		finally
+		{
+			_Sync.Release();
+		}
+	}
+
+	/// <summary>Broadcasts one binary frame to every connected client; drops any that fail.</summary>
+	public async Task BroadcastAsync(ReadOnlyMemory<byte> payload)
+	{
+		await _Sync.WaitAsync();
+		try
+		{
+			for (var i = _Clients.Count - 1; i >= 0; i--)
+			{
+				var client = _Clients[i];
+				try
+				{
+					await SendFrameAsync(client.GetStream(), payload);
+				}
+				catch
+				{
+					_Clients.RemoveAt(i);
+					client.Dispose();
+				}
+			}
+		}
+		finally
+		{
+			_Sync.Release();
+		}
 	}
 
 	private void SendFrame(NetworkStream stream, ReadOnlySpan<byte> payload)
 	{
-		// FIN + binary opcode (0x2); unmasked (server -> client).
-		int headerLen;
-		_Header[0] = 0x82;
-		if (payload.Length <= 125)
-		{
-			_Header[1] = (byte)payload.Length;
-			headerLen = 2;
-		}
-		else
-		{
-			_Header[1] = 126;
-			_Header[2] = (byte)(payload.Length >> 8);
-			_Header[3] = (byte)(payload.Length & 0xFF);
-			headerLen = 4;
-		}
+		Span<byte> headerSpan = _Header;
+
+		var headerLen = BuildHeaderForPayload(payload, headerSpan);
 
 		stream.Write(_Header, 0, headerLen);
 		stream.Write(payload);
+	}
+
+	private async Task SendFrameAsync(NetworkStream stream, ReadOnlyMemory<byte> payload)
+	{
+		using var headerOwner = MemoryPool<byte>.Shared.Rent(_Header.Length);
+		var headerSpan = headerOwner.Memory.Span;
+
+		var headerLen = BuildHeaderForPayload(payload.Span, headerSpan);
+
+		await stream.WriteAsync(headerOwner.Memory[..headerLen]);
+		await stream.WriteAsync(payload);
+	}
+
+	private static int BuildHeaderForPayload(ReadOnlySpan<byte> payload, Span<byte> headerSpan)
+	{
+		// FIN + binary opcode (0x2); unmasked (server -> client).
+		headerSpan[0] = 0x82;
+		if (payload.Length <= 125)
+		{
+			headerSpan[1] = (byte)payload.Length;
+			return 2;
+		}
+
+		headerSpan[1] = 126;
+		headerSpan[2] = (byte)(payload.Length >> 8);
+		headerSpan[3] = (byte)(payload.Length & 0xFF);
+		return 4;
 	}
 
 	public void Dispose()
@@ -397,7 +474,8 @@ internal sealed class OverlayWebSocketServer : IDisposable
 			// ignore
 		}
 
-		lock (_Sync)
+		_Sync.Wait();
+		try
 		{
 			foreach (var client in _Clients)
 			{
@@ -406,5 +484,11 @@ internal sealed class OverlayWebSocketServer : IDisposable
 
 			_Clients.Clear();
 		}
+		finally
+		{
+			_Sync.Release();
+		}
+
+		_Sync.Dispose();
 	}
 }
