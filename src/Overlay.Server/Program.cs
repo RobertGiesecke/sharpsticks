@@ -52,21 +52,9 @@ public static class Program
 
 		serveOptions = serveOptions with
 		{
-			Started = runtimeOptions =>
+			Events = new()
 			{
-				Console.WriteLine(
-					$"Serving {runtimeOptions.Devices.Length} device(s) on ws://localhost:{runtimeOptions.Port}. Ctrl+C to stop.");
-				if (runtimeOptions.WebRoot is not null)
-				{
-					Console.WriteLine(
-						$"Overlay: http://localhost:{runtimeOptions.Port}/joyviz.html   (files from {runtimeOptions.WebRoot})");
-				}
-
-				foreach (var device in runtimeOptions.Devices)
-				{
-					Console.WriteLine(
-						$"  \"{device.Name}\" (axes={device.PhysicalAxes.Length}, buttons={device.Capabilities.NumButtons})");
-				}
+				Started = OverlayUtils.ShowServerStatus,
 			},
 		};
 

@@ -4,8 +4,15 @@ public readonly record struct ServeOptions<TInputDevice>
 	where TInputDevice : JoystickDevice
 {
 	public string? WebRoot { get; init; }
+	public string? WebRootPath { get; init; }
 	public ushort? Port { get; init; }
 	public Func<TInputDevice, bool>? DevicePredicate { get; init; }
 	
+	public OverlayServeEvents<TInputDevice>? Events { get; init; }
+}
+
+public readonly record struct OverlayServeEvents<TInputDevice> 
+	where TInputDevice : JoystickDevice
+{
 	public Action<OverlayServeRuntimeOptions<TInputDevice>>? Started { get; init; }
 }

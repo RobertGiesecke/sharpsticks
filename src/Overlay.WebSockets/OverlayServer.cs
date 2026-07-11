@@ -39,6 +39,7 @@ public sealed class OverlayServer : IOverlayServer
 		return (null, new()
 		{
 			WebRoot = webRoot,
+			WebRootPath = options.WebRootPath,
 			Port = port,
 			Devices = devices,
 		});
@@ -70,12 +71,21 @@ public sealed class OverlayServer : IOverlayServer
 			return new() { FailReason = OverlayServeFailReason.RuntimeOptionsInferenceFailed };
 		}
 
+		return Serve(runtimeOptions, options.Events, cancellationToken);
+	}
+
+	public static OverlayServeResult Serve<TInputDevice>(
+		OverlayServeRuntimeOptions<TInputDevice> runtimeOptions,
+		OverlayServeEvents<TInputDevice>? events,
+		CancellationToken cancellationToken) 
+		where TInputDevice : JoystickDevice
+	{
 		var protocol = OverlayProtocol.Create(runtimeOptions.Devices, version: 1);
 		using var server = new OverlayWebSocketServer(runtimeOptions.Port, protocol.Descriptor, runtimeOptions.WebRoot);
 
 		server.Start();
 
-		options.Started?.Invoke(runtimeOptions);
+		events?.Started?.Invoke(runtimeOptions);
 
 		try
 		{
