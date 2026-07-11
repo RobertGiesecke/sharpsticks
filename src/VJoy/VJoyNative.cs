@@ -110,6 +110,12 @@ public static partial class VJoyNative
 	public static partial int GetVJDButtonNumber(uint deviceId);
 
 	[LibraryImport("vJoyInterface.dll")]
+	public static partial int GetVJDContPovNumber(uint deviceId);
+
+	[LibraryImport("vJoyInterface.dll")]
+	public static partial int GetVJDDiscPovNumber(uint deviceId);
+
+	[LibraryImport("vJoyInterface.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	public static partial bool SetAxis(int value, uint deviceId, uint axisUsage);
 
