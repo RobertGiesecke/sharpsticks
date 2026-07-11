@@ -1,4 +1,4 @@
-// SharpSticks.OverlayServer — reads the selected DirectInput devices (physical sticks and,
+// SharpSticks.Overlay.Server — reads the selected DirectInput devices (physical sticks and,
 // since vJoy also enumerates as a DirectInput game controller, the vJoy output) and
 // broadcasts their full state to the joyviz overlay over a local binary WebSocket.
 //
@@ -8,7 +8,7 @@
 // Runs as its own process alongside the routing engine; DirectInput is opened non-exclusive
 // so both can read the same devices at once.
 
-namespace SharpSticks.OverlayServer;
+namespace SharpSticks.Overlay.Server;
 
 public static class Program
 {

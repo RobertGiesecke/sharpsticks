@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!--
+        The CLI is the only piece that picks a concrete platform: PlatformInput supplies
+        PlatformDefaultInputDevice.Factory. All reusable server logic lives in the
+        platform-agnostic Overlay.WebSockets library.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\Overlay.WebSockets\Overlay.WebSockets.csproj"/>
+        <ProjectReference Include="..\PlatformInput\PlatformInput.csproj"/>
+    </ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Immutable;
 
-namespace SharpSticks.OverlayServer;
+namespace SharpSticks.Overlay.WebSockets;
 
 public readonly record struct OverlayServeRuntimeOptions<TInputDevice>
 	where TInputDevice : JoystickDevice

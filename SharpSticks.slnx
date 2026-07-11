@@ -16,7 +16,8 @@
   <Project Path="src/LinuxOutput/LinuxOutput.csproj" />
   <Project Path="src/ItbMinimal/ItbMinimal.csproj" />
   <Project Path="src/OutputAbstractions/OutputAbstractions.csproj" />
-  <Project Path="src/OverlayServer/OverlayServer.csproj" />
+  <Project Path="src/Overlay.WebSockets/Overlay.WebSockets.csproj" />
+  <Project Path="src/Overlay.Server/Overlay.Server.csproj" />
   <Project Path="src/PlatformDefaults/PlatformDefaults.csproj" />
   <Project Path="src/PlatformInput/PlatformInput.csproj" />
   <Project Path="src/PlatformOutput/PlatformOutput.csproj" />

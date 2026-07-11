@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using Collections.Pooled;
 
-namespace SharpSticks.OverlayServer;
+namespace SharpSticks.Overlay.WebSockets;
 
 public sealed class OverlayServer : IOverlayServer
 {

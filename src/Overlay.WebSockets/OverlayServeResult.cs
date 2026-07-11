@@ -1,4 +1,4 @@
-﻿namespace SharpSticks.OverlayServer;
+﻿namespace SharpSticks.Overlay.WebSockets;
 
 public readonly record struct OverlayServeResult
 {

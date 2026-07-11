@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace SharpSticks.OverlayServer;
+namespace SharpSticks.Overlay.WebSockets;
 
 /// <summary>
 /// Minimal, dependency-free WebSocket server over <see cref="TcpListener"/> — AOT-clean and

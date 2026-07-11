@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!--
+        Platform-agnostic: depends only on the device abstractions, never on a concrete
+        input backend or PlatformDefaults. Callers pass their own IJoystickDeviceFactory,
+        so this can be hosted from the CLI, the Console, or anywhere without pinning a
+        platform-specific device factory.
+    -->
+    <ItemGroup>
+        <PackageReference Include="Collections.Pooled.V2" Version="2.4.1"/>
+        <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj"/>
+    </ItemGroup>
+
+</Project>

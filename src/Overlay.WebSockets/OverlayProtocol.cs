@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Text;
 using SharpSticks.InputAbstractions;
 
-namespace SharpSticks.OverlayServer;
+namespace SharpSticks.Overlay.WebSockets;
 
 /// <summary>
 /// Serializes the current device state into the compact little-endian binary frames the

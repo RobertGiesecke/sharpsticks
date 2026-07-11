@@ -1,6 +1,6 @@
 ﻿using Collections.Pooled;
 
-namespace SharpSticks.OverlayServer;
+namespace SharpSticks.Overlay.WebSockets;
 
 public static class ServeOptionsExtensions
 {
