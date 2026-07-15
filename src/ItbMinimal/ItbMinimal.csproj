@@ -10,20 +10,6 @@
         -->
     </PropertyGroup>
 
-    <!--
-        Windows-only debug aid for the source generator. The generator queries DirectInput
-        and vJoy at design time, which only resolves on Windows. On other platforms skip
-        the build entirely instead of producing reams of "DeviceNames does not contain
-        'VJoyDevice1'" errors.
-    -->
-    <PropertyGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
-        <OutputType>Library</OutputType>
-    </PropertyGroup>
-    <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
-        <Compile Remove="**\*.cs"/>
-        <ProjectReference Remove="@(ProjectReference)"/>
-    </ItemGroup>
-
     <ItemGroup>
 <!--      <ProjectReference Include="..\Config\Config.csproj" />-->
       <ProjectReference Include="..\Console\Console.csproj" />
@@ -33,8 +19,7 @@
 <!--      <ProjectReference Include="..\VJoy\VJoy.csproj" />-->
     </ItemGroup>
 
-    <ItemGroup>
-<!--      <PackageReference Include="$(PackageRootName).Console" Version="0.1.0-debug07" />-->
+    <ItemGroup><!--      <PackageReference Include="$(PackageRootName).Console" Version="0.1.0-debug07" />-->
     </ItemGroup>
 
 </Project>
