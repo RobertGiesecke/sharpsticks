@@ -14,6 +14,13 @@ public static class LinuxEventCodes
 
 	// Button code ranges (subset relevant to joysticks/gamepads)
 
+	/// BTN_MISC / BTN_0 — generic buttons below the mouse block. Joystick-safe (udev/SDL treat
+	/// them as buttons, not keyboard/mouse), but must stay below BTN_MOUSE (0x110).
+	public const ushort BtnMisc = 0x100;
+
+	/// BTN_MOUSE (0x110) — one past the last usable BTN_MISC code; 0x110+ tags the device a pointer.
+	public const ushort BtnMiscEnd = 0x110;
+
 	/// BTN_TRIGGER / BTN_JOYSTICK base
 	public const ushort BtnJoystick = 0x120;
 
