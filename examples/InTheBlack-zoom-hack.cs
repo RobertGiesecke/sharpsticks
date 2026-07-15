@@ -1,17 +1,38 @@
 #!/usr/bin/env dotnet
 
 //#:package SharpSticks.Editor@0.1.0-debug04
-#:project ../src/Editor/Editor.csproj
+#:project ../src/Console/Console.csproj
 
 using System.Collections.Immutable;
 using SharpSticks.InputSynthesis.Mouse;
 using static System.TimeSpan;
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
+
+#if WINDOWS
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
 [assembly: RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
 [assembly: RenameDevice(DeviceNames.VJoyDevice1, "VJoy1")]
 [assembly: RenameDevice(DeviceNames.VpcRudderPedals, "Pedals")]
+#elif LINUX
+[assembly: OutputDevice(1,
+    CodeName = "VJoy1",
+    Axes =
+    [
+        Axis.X,
+        Axis.Y,
+        Axis.Z,
+        Axis.Rx,
+        Axis.Ry,
+        Axis.Rz,
+        Axis.Slider1,
+        Axis.Slider2,
+    ],
+    ButtonCapacity = OutputButtonCapacity.Maximum)]
+[assembly: RenameDevice(DeviceNames.VirpilControls20220407RVpcStickWarBRD, "RightStick")]
+[assembly: RenameDevice(DeviceNames.VirpilControls20220407LVpcStickWarBRD, "LeftStick")]
+[assembly: RenameDevice(DeviceNames.VirpilControls20220407VpcRudderPedals, "Pedals")]
+#endif
 
 var groupedZoomAxes = Pedals.Axes.RightToeBrake
 	.GroupWith(LeftStick.Axes.BrakeLever)
@@ -118,18 +139,18 @@ BuildAndRunAsConsole(new()
 [RenameAxis(DeviceNames.Pedals, Axis.Slider1, SharedNames.LeftToeBrake)]
 [RenameAxis(DeviceNames.Pedals, Axis.Slider2, SharedNames.RightToeBrake)]
 // right stick
-[RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Z, "Twist")]
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 1, "Trigger")]
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 18, "CounterMeasureHatEast")]
-[RenameButton(DeviceNames.RightVpcStickWarBRD, 6, SharedNames.ThumbStick)]
-[RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Rx, SharedNames.ThumbStickHorizontal)]
-[RenameAxis(DeviceNames.RightVpcStickWarBRD, Axis.Ry, SharedNames.ThumbStickVertical)]
+[RenameAxis(DeviceNames.RightStick, Axis.Z, "Twist")]
+[RenameButton(DeviceNames.RightStick, 1, "Trigger")]
+[RenameButton(DeviceNames.RightStick, 18, "CounterMeasureHatEast")]
+[RenameButton(DeviceNames.RightStick, 6, SharedNames.ThumbStick)]
+[RenameAxis(DeviceNames.RightStick, Axis.Rx, SharedNames.ThumbStickHorizontal)]
+[RenameAxis(DeviceNames.RightStick, Axis.Ry, SharedNames.ThumbStickVertical)]
 // left stick
-[RenameAxis(DeviceNames.LeftVpcStickWarBRD, Axis.Slider1, SharedNames.BrakeLever)]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 1, "Trigger")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 2, "SecondStageTrigger")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 11, "Outer2WayUp")]
-[RenameButton(DeviceNames.LeftVpcStickWarBRD, 20, SharedNames.BrakeLever)]
+[RenameAxis(DeviceNames.LeftStick, Axis.Slider1, SharedNames.BrakeLever)]
+[RenameButton(DeviceNames.LeftStick, 1, "Trigger")]
+[RenameButton(DeviceNames.LeftStick, 2, "SecondStageTrigger")]
+[RenameButton(DeviceNames.LeftStick, 11, "Outer2WayUp")]
+[RenameButton(DeviceNames.LeftStick, 20, SharedNames.BrakeLever)]
 // vjoy device
 [RenameButton(DeviceNames.VJoy1, 1, "Fire")]
 [RenameButton(DeviceNames.VJoy1, 79, "CenterHeadTracking")]
