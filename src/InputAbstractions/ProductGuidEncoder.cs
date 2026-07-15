@@ -20,4 +20,23 @@ public static class ProductGuidEncoder
 		PidVidSuffix.CopyTo(bytes[8..]);
 		return new(bytes);
 	}
+
+	/// Inverse of <see cref="Encode"/>: recovers (vendor, product) from a PIDVID-shaped Guid.
+	/// Returns false for any Guid that isn't in this layout (wrong PIDVID suffix), so callers can
+	/// tell an encoded HID identity apart from an arbitrary product Guid.
+	public static bool TryDecode(Guid guid, out ushort vendor, out ushort product)
+	{
+		Span<byte> bytes = stackalloc byte[16];
+		if (!guid.TryWriteBytes(bytes) || !bytes[8..].SequenceEqual(PidVidSuffix))
+		{
+			vendor = 0;
+			product = 0;
+			return false;
+		}
+
+		var pidVid = BinaryPrimitives.ReadUInt32LittleEndian(bytes);
+		vendor = (ushort)(pidVid & 0xffff);
+		product = (ushort)(pidVid >> 16);
+		return true;
+	}
 }

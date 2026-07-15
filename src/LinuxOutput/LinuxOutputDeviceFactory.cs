@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Collections.Pooled;
 using SharpSticks.LinuxInput;
@@ -18,6 +19,43 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	private const ushort VirtualVendor = 0xfeed;
 
 	private static ushort VirtualProduct(uint deviceId) => (ushort)(0xc000 | (deviceId & 0xff));
+
+	private static uint DeviceIdFromProduct(ushort product) => (uint)(product & 0xff);
+
+	private static bool IsVirtualProduct(ushort vendor, ushort product) =>
+		vendor == VirtualVendor && (product & 0xff00) == 0xc000;
+
+	// uinput has no persistent slots to enumerate — a device exists only while some process holds
+	// it open. But a live SharpSticks output surfaces as an evdev input stamped with our (vendor,
+	// product), so we recover it from the input list: that gives the source generator the real
+	// name + product GUID, and lets it fold the input-side loopback into the output instead of
+	// listing it as a separate device.
+	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs()
+	{
+		var builder = ImmutableArray.CreateBuilder<AvailableOutputDevice>();
+		using var seenIds = new PooledSet<uint>();
+		foreach (var input in LinuxInputJoystickDeviceFactory.Instance.EnumerateAvailableInputs())
+		{
+			// Two processes can each hold a device with the same id; surface each id once so the
+			// generator (and any consumer keyed by id) doesn't see duplicates.
+			if (ProductGuidEncoder.TryDecode(input.ProductGuid, out var vendor, out var product)
+			    && IsVirtualProduct(vendor, product)
+			    && seenIds.Add(DeviceIdFromProduct(product)))
+			{
+				builder.Add(new(
+					DeviceIdFromProduct(product), input.Axes, input.ButtonCount, input.ProductGuid, input.ProductName));
+			}
+		}
+
+		return builder.ToImmutable();
+	}
+
+	// Identity a declared output id will have once created — deterministic from the id, so the
+	// generator can map a declared device even when it isn't live at build time.
+	public AvailableOutputDevice DescribeDeclaredOutput(uint deviceId, ImmutableArray<Axis> axes, uint buttonCount) =>
+		new(deviceId, axes, buttonCount,
+			ProductGuidEncoder.Encode(VirtualVendor, VirtualProduct(deviceId)),
+			$"SharpSticks Virtual Joystick {deviceId}");
 
 	string ISupportsOutputSetup.SetupSubcommandName => LinuxOutputSetup.SubcommandName;
 	

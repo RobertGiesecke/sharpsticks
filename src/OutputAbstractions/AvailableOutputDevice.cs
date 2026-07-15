@@ -5,8 +5,11 @@ namespace SharpSticks.OutputAbstractions;
 /// slot. <paramref name="InputProductGuid"/> identifies the product GUID of the
 /// input-side shadow each output device surfaces as (vJoy PIDVID on Windows; the
 /// per-uinput VID/PID encoding on Linux), or <see cref="Guid.Empty"/> when none.
+/// <paramref name="ProductName"/> is the device's real name (matching the input-side
+/// shadow's name), or empty when the backend can't name it ahead of materialization.
 public readonly record struct AvailableOutputDevice(
 	uint DeviceId,
 	ImmutableArray<Axis> Axes,
 	uint ButtonCount,
-	Guid InputProductGuid);
+	Guid InputProductGuid,
+	string ProductName);

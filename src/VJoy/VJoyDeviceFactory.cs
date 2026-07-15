@@ -13,7 +13,14 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 	/// stable sequential claim from the candidate pool.
 	internal static Guid VJoyProductGuid { get; } = ProductGuidEncoder.Encode(vendor: 0x1234, product: 0xBEAD);
 
+	/// The name vJoy's DirectInput entries report; used so a declared output maps to the same
+	/// identity as its input-side counterpart.
+	internal const string VJoyProductName = "vJoy Device";
+
 	public IInputSynthesizer? InputSynthesizer => WindowsInputSynthesizer.Instance;
+
+	public AvailableOutputDevice DescribeDeclaredOutput(uint deviceId, ImmutableArray<Axis> axes, uint buttonCount) =>
+		new(deviceId, axes, buttonCount, VJoyProductGuid, VJoyProductName);
 
 	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs()
 	{
@@ -36,7 +43,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 
 				var axes = EnumerateAxes(deviceId);
 				var buttonCount = (uint)Math.Max(0, VJoyNative.GetVJDButtonNumber(deviceId));
-				builder.Add(new(deviceId, axes, buttonCount, VJoyProductGuid));
+				builder.Add(new(deviceId, axes, buttonCount, VJoyProductGuid, VJoyProductName));
 			}
 
 			return builder.ToImmutable();
