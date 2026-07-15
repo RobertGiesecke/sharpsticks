@@ -330,6 +330,29 @@ public static class RuntimeBuilder
 							.Distinct()
 							.ToPooledList();
 						disposables.Add(macroButtonNumbers);
+
+						// When an [OutputDevice] declares this id, merge it with the routed capabilities:
+						// the device gets max(declared count, highest routed button) buttons and the
+						// declared axis set, so it materializes with its full advertised capability
+						// rather than only what a route happens to touch. Without a declaration
+						// ButtonCount stays 0 and the factory keeps its routed-only behaviour.
+						var buttonCount = 0u;
+						var declaredAxes = ImmutableArray<Axis>.Empty;
+						if (DeclaredOutputDevices.TryGet(deviceId, out var declared))
+						{
+							declaredAxes = declared.Axes;
+							buttonCount = declared.ButtonCount;
+							foreach (var button in outputButtonsForDevice)
+							{
+								buttonCount = Math.Max(buttonCount, (uint)button.ButtonNumber);
+							}
+
+							foreach (var number in macroButtonNumbers)
+							{
+								buttonCount = Math.Max(buttonCount, (uint)number);
+							}
+						}
+
 						outputRequests.Add(
 							new(
 								deviceId,
@@ -337,6 +360,10 @@ public static class RuntimeBuilder
 								axisRoutesForDevice,
 								macroButtonNumbers
 							)
+							{
+								ButtonCount = buttonCount,
+								DeclaredAxes = declaredAxes,
+							}
 						);
 					}
 
