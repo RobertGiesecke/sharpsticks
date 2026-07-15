@@ -21,6 +21,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 	private const string RenameDeviceAttributeMetadataName = nameof(RenameDeviceAttribute);
 	private const string RenameAxisAttributeMetadataName = nameof(RenameAxis);
 	private const string RenameButtonAttributeMetadataName = nameof(RenameButton);
+	private const string OutputDeviceAttributeMetadataName = nameof(OutputDeviceAttribute);
 	private const GenerateDeviceInfosLevels GenerateDeviceInfosLevelsDefault = GenerateDeviceInfosLevels.DeviceNames;
 
 	const string DiagnosticCodePrefix = "STICKS";
@@ -103,7 +104,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 							GetDeviceInfoLevels(syntaxContext.Attributes),
 							GetDeviceRenames(targetSymbol.GetAttributes()),
 							GetAxisRenames(targetSymbol.GetAttributes()),
-							GetButtonRenames(targetSymbol.GetAttributes())),
+							GetButtonRenames(targetSymbol.GetAttributes()),
+							GetOutputDevices(targetSymbol.GetAttributes())),
 						ISourceAssemblySymbol targetSymbol
 							when targetSymbol.Compilation.GetTypeByMetadataName(
 									     DefaultDevicesClassName) is
@@ -115,7 +117,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 								GetDeviceInfoLevels(allAttributes),
 								GetDeviceRenames(allAttributes),
 								GetAxisRenames(allAttributes),
-								GetButtonRenames(allAttributes)),
+								GetButtonRenames(allAttributes),
+								GetOutputDevices(allAttributes)),
 						ISourceAssemblySymbol targetSymbol
 							when targetSymbol.GetAttributes() is var allAttributes
 							=> new DeviceInfoTarget(
@@ -155,7 +158,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 								GetDeviceInfoLevels(allAttributes),
 								GetDeviceRenames(allAttributes),
 								GetAxisRenames(allAttributes),
-								GetButtonRenames(allAttributes)),
+								GetButtonRenames(allAttributes),
+								GetOutputDevices(allAttributes)),
 						_ => throw new ArgumentOutOfRangeException(nameof(syntaxContext.TargetSymbol),
 							syntaxContext.TargetSymbol,
 							$"unsupported target symbol: {syntaxContext.TargetSymbol.ToDisplayString()}"),
@@ -337,22 +341,29 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 				continue;
 			}
 
+			// Fold any [OutputDevice] declarations into the enumerated snapshots: merge
+			// capabilities with a matching enumerated device (or synthesize one where the
+			// platform enumerates none, e.g. uinput on Linux) and turn each CodeName into a
+			// device rename so the existing rename machinery emits the aliased accessor.
+			var (effectiveOutputs, effectiveDeviceRenames) =
+				MergeOutputDeclarations(outputDevices, target.OutputDevices, target.DeviceRenames);
+
 			if (HasLevel(target.Levels, GenerateDeviceInfosLevels.TypedDevices))
 			{
 				ValidateRenames(
 					context,
 					target.FirstLocation,
-					target.DeviceRenames,
+					effectiveDeviceRenames,
 					target.AxisRenames,
 					target.ButtonRenames,
 					directInputDevices,
-					outputDevices);
+					effectiveOutputs);
 			}
 
 			var source = GenerateDeviceInfosSource(
 				target.DeviceType, target.Levels,
-				target.DeviceRenames, target.AxisRenames, target.ButtonRenames,
-				directInputDevices, outputDevices);
+				effectiveDeviceRenames, target.AxisRenames, target.ButtonRenames,
+				directInputDevices, effectiveOutputs);
 			var hintName = GetDeviceInfosHintName(target.DeviceType);
 			GeneratorLog.Log(
 				$"AddSource: {hintName} ({source.Length} chars, target={target.DeviceType.DisplayString})");
@@ -694,6 +705,38 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 						.Append(alias)
 						.Append(" = ")
 						.Append(directInputNames[index])
+						.AppendLine(";");
+				}
+			}
+
+			// Output devices with no DirectInput counterpart (uinput on Linux, or a declared
+			// [OutputDevice] the platform doesn't enumerate) still need name constants so the
+			// typed output class and RenameAxis/RenameButton can reference them. Windows vJoy
+			// appears as a DirectInput device, so its constant is emitted above and skipped here.
+			// The name is a placeholder — output devices are resolved by id, not by name.
+			foreach (var outputDevice in outputDevices.OrderBy(static device => device.DeviceId))
+			{
+				var baseName = $"VJoyDevice{outputDevice.DeviceId}";
+				if (originalNameSet.Contains(baseName))
+				{
+					continue;
+				}
+
+				builder.Append(memberIndent)
+					.Append("public const string ")
+					.Append(baseName)
+					.Append(" = ")
+					.Append(SymbolDisplay.FormatLiteral(baseName, quote: true))
+					.AppendLine(";");
+
+				var alias = GetOutputDeviceIdentifier(baseName, deviceRenames);
+				if (alias != baseName)
+				{
+					builder.Append(memberIndent)
+						.Append("public const string ")
+						.Append(alias)
+						.Append(" = ")
+						.Append(baseName)
 						.AppendLine(";");
 				}
 			}
@@ -1158,6 +1201,100 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		return baseName;
 	}
 
+	// Merges declared output devices with the platform-enumerated snapshots. A declaration for
+	// an already-enumerated id widens that snapshot (union of axes, larger button count); a
+	// declaration for an id the platform did not enumerate synthesizes a snapshot from the
+	// declared capabilities. Each CodeName is appended as a VJoyDevice{id} rename (unless one is
+	// already present) so the accessor is emitted under the code name.
+	private static (ImmutableArray<OutputDeviceSnapshot> Outputs, ImmutableArray<DeviceRename> DeviceRenames)
+		MergeOutputDeclarations(
+			ImmutableArray<OutputDeviceSnapshot> enumerated,
+			ImmutableArray<OutputDeviceDeclaration> declarations,
+			ImmutableArray<DeviceRename> deviceRenames)
+	{
+		if (declarations.IsDefaultOrEmpty)
+		{
+			return (enumerated, deviceRenames);
+		}
+
+		var outputs = enumerated.IsDefault
+			? ImmutableArray.CreateBuilder<OutputDeviceSnapshot>()
+			: enumerated.ToBuilder();
+		var renames = deviceRenames.IsDefault
+			? ImmutableArray.CreateBuilder<DeviceRename>()
+			: deviceRenames.ToBuilder();
+
+		foreach (var declaration in declarations)
+		{
+			var index = -1;
+			for (var i = 0; i < outputs.Count; i++)
+			{
+				if (outputs[i].DeviceId == declaration.DeviceId)
+				{
+					index = i;
+					break;
+				}
+			}
+
+			if (index >= 0)
+			{
+				var existing = outputs[index];
+				outputs[index] = existing with
+				{
+					Axes = UnionAxes(existing.Axes, declaration.Axes),
+					ButtonCount = Math.Max(existing.ButtonCount, declaration.ButtonCount),
+				};
+			}
+			else
+			{
+				outputs.Add(new OutputDeviceSnapshot(
+					declaration.DeviceId, declaration.Axes, declaration.ButtonCount, Guid.Empty));
+			}
+
+			var baseName = $"VJoyDevice{declaration.DeviceId}";
+			if (!string.IsNullOrEmpty(declaration.CodeName)
+			    && !renames.Any(r => r.DeviceName == baseName))
+			{
+				renames.Add(new DeviceRename(baseName, declaration.CodeName!));
+			}
+		}
+
+		return (outputs.ToImmutable(), renames.ToImmutable());
+	}
+
+	private static ImmutableArray<Axis> UnionAxes(ImmutableArray<Axis> first, ImmutableArray<Axis> second)
+	{
+		if (second.IsDefaultOrEmpty)
+		{
+			return first;
+		}
+
+		if (first.IsDefaultOrEmpty)
+		{
+			return second;
+		}
+
+		var builder = ImmutableArray.CreateBuilder<Axis>(first.Length + second.Length);
+		using var seen = new PooledSet<Axis>();
+		foreach (var axis in first)
+		{
+			if (seen.Add(axis))
+			{
+				builder.Add(axis);
+			}
+		}
+
+		foreach (var axis in second)
+		{
+			if (seen.Add(axis))
+			{
+				builder.Add(axis);
+			}
+		}
+
+		return builder.ToImmutable();
+	}
+
 	private static PooledDictionary<Axis, string> BuildAxisPropertyNames(
 		string deviceProductName,
 		string deviceBaseIdentifier,
@@ -1251,6 +1388,73 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		}
 
 		return -1;
+	}
+
+	private static ImmutableArray<OutputDeviceDeclaration> GetOutputDevices(IEnumerable<AttributeData> attributes)
+	{
+		var builder = ImmutableArray.CreateBuilder<OutputDeviceDeclaration>();
+		foreach (var attr in attributes)
+		{
+			if (attr.AttributeClass?.ToDisplayString() != OutputDeviceAttributeMetadataName
+			    || attr.ConstructorArguments.Length < 1)
+			{
+				continue;
+			}
+
+			var deviceId = (uint)GetTypedConstantInt32(attr.ConstructorArguments[0], 0);
+			if (deviceId == 0)
+			{
+				continue;
+			}
+
+			string? codeName = null;
+			uint buttons = 0;
+			uint capacity = 0;
+			var axes = ImmutableArray<Axis>.Empty;
+			foreach (var named in attr.NamedArguments)
+			{
+				switch (named.Key)
+				{
+					case nameof(OutputDeviceDeclaration.CodeName):
+						codeName = named.Value.Value as string;
+						break;
+					case "Buttons":
+						buttons = (uint)GetTypedConstantInt32(named.Value, 0);
+						break;
+					case "ButtonCapacity":
+						capacity = (uint)GetTypedConstantInt32(named.Value, 0);
+						break;
+					case nameof(OutputDeviceDeclaration.Axes):
+						axes = ReadAxisArray(named.Value);
+						break;
+				}
+			}
+
+			// A preset tier (ButtonCapacity) wins over a raw Buttons count when set (non-None).
+			var buttonCount = capacity != 0 ? capacity : buttons;
+			builder.Add(new(deviceId, codeName, axes, buttonCount));
+		}
+
+		return builder.ToImmutable();
+	}
+
+	private static ImmutableArray<Axis> ReadAxisArray(TypedConstant value)
+	{
+		if (value.Kind != TypedConstantKind.Array || value.Values.IsDefaultOrEmpty)
+		{
+			return ImmutableArray<Axis>.Empty;
+		}
+
+		var builder = ImmutableArray.CreateBuilder<Axis>(value.Values.Length);
+		foreach (var element in value.Values)
+		{
+			if (GetAxis(GetTypedConstantInt32(element, -1)) is { } axis)
+			{
+				builder.Add(axis);
+			}
+		}
+
+		return builder.ToImmutable();
 	}
 
 	private static ImmutableArray<DeviceRename> GetDeviceRenames(IEnumerable<AttributeData> attributes)
@@ -1500,7 +1704,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 					existing.Levels | target.Levels,
 					existing.DeviceRenames.IsDefaultOrEmpty ? target.DeviceRenames : existing.DeviceRenames,
 					existing.AxisRenames.IsDefaultOrEmpty ? target.AxisRenames : existing.AxisRenames,
-					existing.ButtonRenames.IsDefaultOrEmpty ? target.ButtonRenames : existing.ButtonRenames);
+					existing.ButtonRenames.IsDefaultOrEmpty ? target.ButtonRenames : existing.ButtonRenames,
+					existing.OutputDevices.IsDefaultOrEmpty ? target.OutputDevices : existing.OutputDevices);
 			}
 			else
 			{
@@ -1795,7 +2000,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			GenerateDeviceInfosLevels Levels,
 			ImmutableArray<DeviceRename> DeviceRenames,
 			ImmutableArray<AxisRename> AxisRenames,
-			ImmutableArray<ButtonRename> ButtonRenames)
+			ImmutableArray<ButtonRename> ButtonRenames,
+			ImmutableArray<OutputDeviceDeclaration> OutputDevices)
 		{
 			this.DeviceType = DeviceType;
 			FirstLocation = firstLocation;
@@ -1803,6 +2009,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			this.DeviceRenames = DeviceRenames;
 			this.AxisRenames = AxisRenames;
 			this.ButtonRenames = ButtonRenames;
+			this.OutputDevices = OutputDevices;
 		}
 
 
@@ -1812,7 +2019,8 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			&& GetLocationTuple(FirstLocation).Equals(GetLocationTuple(other.FirstLocation))
 			&& DeviceRenames.SequenceEqual(other.DeviceRenames)
 			&& AxisRenames.SequenceEqual(other.AxisRenames)
-			&& ButtonRenames.SequenceEqual(other.ButtonRenames);
+			&& ButtonRenames.SequenceEqual(other.ButtonRenames)
+			&& OutputDevices.SequenceEqual(other.OutputDevices);
 
 		private static (int? Start, bool? IsInSource, string? FilePath) GetLocationTuple(Location? location) => (
 			location?.SourceSpan.Start,
@@ -1827,6 +2035,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			hc.Add(DeviceRenames.Length);
 			hc.Add(AxisRenames.Length);
 			hc.Add(ButtonRenames.Length);
+			hc.Add(OutputDevices.Length);
 			return hc.ToHashCode();
 		}
 
@@ -1836,6 +2045,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		public ImmutableArray<DeviceRename> DeviceRenames { get; init; }
 		public ImmutableArray<AxisRename> AxisRenames { get; init; }
 		public ImmutableArray<ButtonRename> ButtonRenames { get; init; }
+		public ImmutableArray<OutputDeviceDeclaration> OutputDevices { get; init; }
 	}
 
 
@@ -1844,4 +2054,27 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 	private readonly record struct AxisRename(string DeviceName, Axis OriginalAxis, string NewPropertyName);
 
 	private readonly record struct ButtonRename(string DeviceName, int Button, string NewPropertyName);
+
+	// A [OutputDevice] declaration. Axes carries an ImmutableArray, so equality is spelled out
+	// to compare the axes by value — the default record-struct equality would compare the array
+	// by reference and break the incremental cache.
+	private readonly record struct OutputDeviceDeclaration(
+		uint DeviceId, string? CodeName, ImmutableArray<Axis> Axes, uint ButtonCount)
+	{
+		public bool Equals(OutputDeviceDeclaration other) =>
+			DeviceId == other.DeviceId
+			&& CodeName == other.CodeName
+			&& ButtonCount == other.ButtonCount
+			&& Axes.SequenceEqual(other.Axes);
+
+		public override int GetHashCode()
+		{
+			var hc = new HashCode();
+			hc.Add(DeviceId);
+			hc.Add(CodeName);
+			hc.Add(ButtonCount);
+			hc.Add(Axes.Length);
+			return hc.ToHashCode();
+		}
+	}
 }
