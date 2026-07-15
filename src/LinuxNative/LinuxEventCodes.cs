@@ -23,6 +23,14 @@ public static class LinuxEventCodes
 	/// BTN_TOOL_PEN — start of stylus region, treat as upper joystick bound
 	public const ushort BtnDigi = 0x140;
 
+	/// BTN_TRIGGER_HAPPY / BTN_TRIGGER_HAPPY1 — extra joystick buttons beyond the 0x120 block.
+	/// Sticks with many buttons (e.g. VPC) map the overflow here.
+	public const ushort BtnTriggerHappy = 0x2c0;
+
+	/// One past BTN_TRIGGER_HAPPY40 (0x2e7), the last trigger-happy button — use as an exclusive
+	/// upper bound.
+	public const ushort BtnTriggerHappyEnd = 0x2e8;
+
 	// Absolute axis codes
 	public const ushort AbsX = 0x00;
 	public const ushort AbsY = 0x01;
