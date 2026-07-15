@@ -43,6 +43,15 @@ internal static class DeviceSnapshots
 			? LinuxDefaultDeviceFactory.Instance
 			: WindowsDefaultDeviceFactory.Instance;
 
+	// Identity a declared output device id resolves to on the active backend, without creating it.
+	public static OutputDeviceSnapshot DescribeDeclaredOutput(
+		uint deviceId, ImmutableArray<Axis> axes, uint buttonCount)
+	{
+		var described = GetFactory().DescribeDeclaredOutput(deviceId, axes, buttonCount);
+		return new(
+			described.DeviceId, described.Axes, described.ButtonCount, described.InputProductGuid, described.ProductName);
+	}
+
 	private static (bool, ImmutableArray<InputDeviceSnapshot>, string?) EnumerateInputDevicesCore()
 	{
 		GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateInputDevicesCore)}: start");
@@ -74,7 +83,7 @@ internal static class DeviceSnapshots
 			var builder = ImmutableArray.CreateBuilder<OutputDeviceSnapshot>(available.Length);
 			foreach (var slot in available)
 			{
-				builder.Add(new(slot.DeviceId, slot.Axes, slot.ButtonCount, slot.InputProductGuid));
+				builder.Add(new(slot.DeviceId, slot.Axes, slot.ButtonCount, slot.InputProductGuid, slot.ProductName));
 			}
 
 			GeneratorLog.Log($"{nameof(DeviceSnapshots)}.{nameof(EnumerateOutputDevicesCore)}: ok, count={available.Length}");
@@ -99,4 +108,5 @@ internal readonly record struct OutputDeviceSnapshot(
 	uint DeviceId,
 	ImmutableArray<Axis> Axes,
 	uint ButtonCount,
-	Guid InputProductGuid);
+	Guid InputProductGuid,
+	string ProductName);

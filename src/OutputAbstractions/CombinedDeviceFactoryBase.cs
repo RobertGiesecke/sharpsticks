@@ -31,4 +31,7 @@ public abstract class CombinedDeviceFactoryBase<TInput, TOutput> : ICombinedDevi
 
 	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs() =>
 		_OutputDeviceFactory.EnumerateAvailableOutputs();
+
+	public AvailableOutputDevice DescribeDeclaredOutput(uint deviceId, ImmutableArray<Axis> axes, uint buttonCount) =>
+		_OutputDeviceFactory.DescribeDeclaredOutput(deviceId, axes, buttonCount);
 }

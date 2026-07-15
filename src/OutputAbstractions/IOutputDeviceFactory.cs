@@ -51,8 +51,16 @@ public interface IOutputDeviceFactory
 
 	/// Non-claiming metadata snapshot of every available output slot. Used at design
 	/// time (e.g. by the source generator). Backends that materialize devices on demand
-	/// (Linux uinput) return empty.
+	/// (Linux uinput) return only the devices that happen to be live right now.
 	ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs() => ImmutableArray<AvailableOutputDevice>.Empty;
+
+	/// Resolve the identity a declared output device id would carry once materialized, without
+	/// creating it. Lets the source generator give a declared <c>[OutputDevice]</c> the same name
+	/// and input-side product GUID the running device reports, so the input-side loopback is
+	/// recognized as the same device rather than listed twice. Backends that can't predict an
+	/// identity echo the request with <see cref="Guid.Empty"/> and an empty name.
+	AvailableOutputDevice DescribeDeclaredOutput(uint deviceId, ImmutableArray<Axis> axes, uint buttonCount) =>
+		new(deviceId, axes, buttonCount, Guid.Empty, string.Empty);
 
 	/// <summary>
 	/// Platform sink for synthesized keyboard/mouse events (the macro key/mouse

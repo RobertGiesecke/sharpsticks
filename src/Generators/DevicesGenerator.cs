@@ -1247,8 +1247,11 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			}
 			else
 			{
-				outputs.Add(new OutputDeviceSnapshot(
-					declaration.DeviceId, declaration.Axes, declaration.ButtonCount, Guid.Empty));
+				// Ask the platform for the identity this id will materialize as (name + input-side
+				// product GUID), so a live loopback of it is recognized as the same device rather
+				// than listed twice — and so the name matches the running device.
+				outputs.Add(DeviceSnapshots.DescribeDeclaredOutput(
+					declaration.DeviceId, declaration.Axes, declaration.ButtonCount));
 			}
 
 			var baseName = $"VJoyDevice{declaration.DeviceId}";
