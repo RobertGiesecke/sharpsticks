@@ -176,9 +176,12 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 		// With a declared button count, materialize a dense 1..N button block (merged in the
 		// runtime to cover every routed button too). A dense block is what makes button N land at
 		// evdev index N — a sparse set would renumber by rank. Without a declaration, fall back to
-		// exactly the routed buttons.
-		var buttonNumbers = declaredButtonCount > 0
-			? Enumerable.Range(1, (int)declaredButtonCount)
+		// exactly the routed buttons. The declared count is clamped to what this backend can
+		// represent: a declaration of "up to N" buttons past the ceiling (e.g. vJoy's 128 reused on
+		// Linux) is honoured as far as the platform allows instead of throwing at GetButtonCode.
+		var denseCount = Math.Min(declaredButtonCount, LinuxOutputAxisCodes.MaxButtons);
+		var buttonNumbers = denseCount > 0
+			? Enumerable.Range(1, (int)denseCount)
 			: outputButtons.Select(static b => b.ButtonNumber).Concat(macroButtonNumbers ?? []).Distinct();
 
 		var hasJoystickRangeButton = false;

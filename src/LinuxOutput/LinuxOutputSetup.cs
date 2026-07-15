@@ -43,7 +43,7 @@ public static class LinuxOutputSetup
 		WriteUdevRule();
 		ReloadUdev();
 		AddInvokingUserToInputGroup();
-		ValidateOutputDevices(outputButtons, axisRoutes, macroButtonNumbers);
+		ValidateOutputDevices(outputButtons, axisRoutes);
 
 		Console.WriteLine();
 		Console.WriteLine("Setup complete.");
@@ -143,8 +143,7 @@ public static class LinuxOutputSetup
 
 	private static void ValidateOutputDevices(
 		IReadOnlyCollection<OutputButtonBinding> outputButtons,
-		IReadOnlyCollection<AxisRoute> axisRoutes,
-		IReadOnlyCollection<int> macroButtonNumbers)
+		IReadOnlyCollection<AxisRoute> axisRoutes)
 	{
 		var deviceIds = outputButtons.Select(static b => b.OutputDeviceId)
 			.Concat(axisRoutes.Select(static r => r.OutputBinding.OutputDeviceId))
@@ -163,12 +162,12 @@ public static class LinuxOutputSetup
 		{
 			var deviceButtons = outputButtons.Where(b => b.OutputDeviceId == deviceId).ToArray();
 			var deviceAxes = axisRoutes.Where(r => r.OutputBinding.OutputDeviceId == deviceId).ToArray();
-			var deviceMacroButtons = macroButtonNumbers
-				.Where(_ => deviceButtons.Length > 0 || deviceAxes.Length > 0)
-				.ToArray();
 
 			// Mirror the runtime merge (RuntimeBuilder) so the probe validates the same device the
 			// profile will create: full declared capability unioned with the routed buttons/axes.
+			// macroButtonNumbers carries no device id (and callers pass none for setup), so it can't
+			// be attributed to a specific device — validating direct-route buttons + the declared
+			// capacity is enough, and a declared count already covers any macro button within range.
 			var buttonCount = 0u;
 			var declaredAxes = ImmutableArray<Axis>.Empty;
 			if (DeclaredOutputDevices.TryGet(deviceId, out var declared))
@@ -179,11 +178,6 @@ public static class LinuxOutputSetup
 				{
 					buttonCount = Math.Max(buttonCount, (uint)button.ButtonNumber);
 				}
-
-				foreach (var number in deviceMacroButtons)
-				{
-					buttonCount = Math.Max(buttonCount, (uint)number);
-				}
 			}
 
 			var axisCount = deviceAxes.Select(r => r.OutputBinding.Axis).Concat(declaredAxes).Distinct().Count();
@@ -192,7 +186,7 @@ public static class LinuxOutputSetup
 			try
 			{
 				using var probe = factory.EnumerateConnectedOutputDevices(
-					[new(deviceId, deviceButtons, deviceAxes, deviceMacroButtons)
+					[new(deviceId, deviceButtons, deviceAxes, [])
 					{
 						ButtonCount = buttonCount,
 						DeclaredAxes = declaredAxes,
