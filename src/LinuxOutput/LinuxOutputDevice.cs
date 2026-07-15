@@ -7,6 +7,8 @@ public sealed class LinuxOutputDevice : OutputDevice, IOutputDeviceWithFactory<L
 {
 	internal const int AxisRangeMin = -32767;
 	internal const int AxisRangeMax = 32767;
+	public const uint MaxButtonCount = LinuxOutputAxisCodes.MaxButtons;
+	static uint IOutputDeviceWithFactory<LinuxOutputDevice>.MaxButtonCount => MaxButtonCount;
 
 	private readonly int _Fd;
 	private readonly FrozenDictionary<Axis, ushort> _AxisCodes;

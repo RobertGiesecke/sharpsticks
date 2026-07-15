@@ -8,6 +8,9 @@ public sealed class VJoyDevice : OutputDevice, IOutputDeviceWithFactory<VJoyDevi
 	private readonly PooledDictionary<Axis, int> _LastAxisValues;
 	private readonly PooledDictionary<int, bool> _LastButtonValues;
 
+	public const uint MaxButtonCount = 128;
+	static uint IOutputDeviceWithFactory<VJoyDevice>.MaxButtonCount => MaxButtonCount;
+
 	public static VJoyDeviceFactory Factory => VJoyDeviceFactory.Instance;
 	static IOutputDeviceFactory<VJoyDevice> IOutputDeviceWithFactory<VJoyDevice>.Factory => Factory;
 

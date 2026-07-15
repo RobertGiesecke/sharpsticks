@@ -18,4 +18,5 @@ public interface IOutputDeviceWithFactory<TSelf> : IOutputDevice
 	where TSelf : OutputDevice
 {
 	static abstract IOutputDeviceFactory<TSelf> Factory { get; }
+	static abstract uint MaxButtonCount { get; }
 }
