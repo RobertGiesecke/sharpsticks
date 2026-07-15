@@ -109,7 +109,8 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 
 		try
 		{
-			DeclareCapabilities(fd, request.AxisRoutes, request.OutputButtons, request.MacroButtonNumbers);
+			DeclareCapabilities(fd, request.AxisRoutes, request.OutputButtons, request.MacroButtonNumbers,
+				request.ButtonCount, request.DeclaredAxes);
 			SetupDevice(fd, request.DeviceId);
 			CreateDevice(fd);
 
@@ -137,13 +138,23 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 		int fd,
 		IReadOnlyCollection<AxisRoute> axisRoutes,
 		IReadOnlyCollection<OutputButtonBinding> outputButtons,
-		IReadOnlyCollection<int>? macroButtonNumbers)
+		IReadOnlyCollection<int>? macroButtonNumbers,
+		uint declaredButtonCount,
+		ImmutableArray<Axis> declaredAxes)
 	{
 		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, EvType.Key.ToNative()), "UI_SET_EVBIT(EV_KEY)");
 		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, EvType.Abs.ToNative()), "UI_SET_EVBIT(EV_ABS)");
 		MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetEvBit, EvType.Syn.ToNative()), "UI_SET_EVBIT(EV_SYN)");
 
-		foreach (var axis in axisRoutes.Select(static r => r.OutputBinding.Axis).Distinct())
+		// Declared axes (from [OutputDevice]) unioned with routed axes, so the device advertises
+		// its full axis set even for axes no route drives.
+		var axes = axisRoutes.Select(static r => r.OutputBinding.Axis);
+		if (!declaredAxes.IsDefaultOrEmpty)
+		{
+			axes = axes.Concat(declaredAxes);
+		}
+
+		foreach (var axis in axes.Distinct())
 		{
 			var code = LinuxOutputAxisCodes.GetAbsCode(axis);
 			MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetAbsBit, code), $"UI_SET_ABSBIT({axis})");
@@ -162,11 +173,16 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 				$"UI_ABS_SETUP({axis})");
 		}
 
+		// With a declared button count, materialize a dense 1..N button block (merged in the
+		// runtime to cover every routed button too). A dense block is what makes button N land at
+		// evdev index N — a sparse set would renumber by rank. Without a declaration, fall back to
+		// exactly the routed buttons.
+		var buttonNumbers = declaredButtonCount > 0
+			? Enumerable.Range(1, (int)declaredButtonCount)
+			: outputButtons.Select(static b => b.ButtonNumber).Concat(macroButtonNumbers ?? []).Distinct();
+
 		var hasJoystickRangeButton = false;
-		foreach (var buttonNumber in outputButtons
-			         .Select(static b => b.ButtonNumber)
-			         .Concat(macroButtonNumbers ?? [])
-			         .Distinct())
+		foreach (var buttonNumber in buttonNumbers)
 		{
 			var code = LinuxOutputAxisCodes.GetButtonCode(buttonNumber);
 			MustSucceed(LinuxLibc.IoctlInt(fd, LinuxUinput.UiSetKeyBit, code),

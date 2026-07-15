@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 
@@ -166,13 +167,39 @@ public static class LinuxOutputSetup
 				.Where(_ => deviceButtons.Length > 0 || deviceAxes.Length > 0)
 				.ToArray();
 
+			// Mirror the runtime merge (RuntimeBuilder) so the probe validates the same device the
+			// profile will create: full declared capability unioned with the routed buttons/axes.
+			var buttonCount = 0u;
+			var declaredAxes = ImmutableArray<Axis>.Empty;
+			if (DeclaredOutputDevices.TryGet(deviceId, out var declared))
+			{
+				declaredAxes = declared.Axes;
+				buttonCount = declared.ButtonCount;
+				foreach (var button in deviceButtons)
+				{
+					buttonCount = Math.Max(buttonCount, (uint)button.ButtonNumber);
+				}
+
+				foreach (var number in deviceMacroButtons)
+				{
+					buttonCount = Math.Max(buttonCount, (uint)number);
+				}
+			}
+
+			var axisCount = deviceAxes.Select(r => r.OutputBinding.Axis).Concat(declaredAxes).Distinct().Count();
+			var reportedButtons = buttonCount > 0 ? (int)buttonCount : deviceButtons.Length;
+
 			try
 			{
 				using var probe = factory.EnumerateConnectedOutputDevices(
-					[new(deviceId, deviceButtons, deviceAxes, deviceMacroButtons)]);
+					[new(deviceId, deviceButtons, deviceAxes, deviceMacroButtons)
+					{
+						ButtonCount = buttonCount,
+						DeclaredAxes = declaredAxes,
+					}]);
 				Console.WriteLineInterpolated(
 					$"  ✓ output device {deviceId} created + destroyed " +
-					$"({deviceAxes.Length} axes, {deviceButtons.Length} buttons)");
+					$"({axisCount} axes, {reportedButtons} buttons)");
 			}
 			catch (Exception ex)
 			{
