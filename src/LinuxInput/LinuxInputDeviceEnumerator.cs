@@ -42,7 +42,7 @@ internal static class LinuxInputDeviceEnumerator
 
 		try
 		{
-			Span<byte> keyBits = stackalloc byte[(LinuxEventCodes.BtnDigi / 8) + 1];
+			Span<byte> keyBits = stackalloc byte[(LinuxEventCodes.BtnTriggerHappyEnd / 8) + 1];
 			if (!TryGetBits(fd, EvType.Key, keyBits))
 			{
 				return false;
@@ -73,13 +73,8 @@ internal static class LinuxInputDeviceEnumerator
 			AddAxisIfPresent(absBits, LinuxEventCodes.AbsRudder, Axis.Slider2, axes);
 
 			var buttonCodes = ImmutableArray.CreateBuilder<ushort>(32);
-			for (ushort code = LinuxEventCodes.BtnJoystick; code < LinuxEventCodes.BtnDigi; code++)
-			{
-				if (TestBit(keyBits, code))
-				{
-					buttonCodes.Add(code);
-				}
-			}
+			AddPresentButtons(keyBits, LinuxEventCodes.BtnJoystick, LinuxEventCodes.BtnDigi, buttonCodes);
+			AddPresentButtons(keyBits, LinuxEventCodes.BtnTriggerHappy, LinuxEventCodes.BtnTriggerHappyEnd, buttonCodes);
 
 			info = new(
 				deviceId,
@@ -105,6 +100,23 @@ internal static class LinuxInputDeviceEnumerator
 			EvdevIoctls.EviocgBit(evType.ToNative(), (uint)bits.Length),
 			ref MemoryMarshal.GetReference(bits));
 		return result >= 0;
+	}
+
+	// Codes are appended in numeric order, so button index (position in ButtonCodes) stays stable
+	// and matches the runtime state decoder, which builds its code→index map from the same list.
+	private static void AddPresentButtons(
+		ReadOnlySpan<byte> keyBits,
+		ushort startInclusive,
+		ushort endExclusive,
+		ImmutableArray<ushort>.Builder buttonCodes)
+	{
+		for (var code = startInclusive; code < endExclusive; code++)
+		{
+			if (TestBit(keyBits, code))
+			{
+				buttonCodes.Add(code);
+			}
+		}
 	}
 
 	private static bool HasJoystickOrGamepadButton(ReadOnlySpan<byte> keyBits)
