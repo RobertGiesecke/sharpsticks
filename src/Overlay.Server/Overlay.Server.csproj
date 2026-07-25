@@ -3,6 +3,7 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
+        <AssemblyName>sharpsticks-overlay-cli</AssemblyName>
     </PropertyGroup>
 
     <!--
