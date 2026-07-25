@@ -2,6 +2,7 @@
 
 //#:package SharpSticks.Editor@0.1.0-debug04
 #:project ../src/Console/Console.csproj
+#:project ../src/Overlay.Integration/Overlay.Integration.csproj
 
 using System.Collections.Immutable;
 using SharpSticks.InputSynthesis.Mouse;
@@ -58,6 +59,14 @@ var modifierBlendCurve = new BlendedAxisCurve
 BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
+	RunEventFactory = f =>
+	[
+		f.ServeOverlay(new()
+		{
+			WebRoot = @"c:\tools\joystick-overlay",
+			WebRootPath = "joyviz.html",
+		}),
+	],
 	Routes =
 	[
 		RightStick.Axes.ThumbStickHorizontal.RouteToMouse(MouseDirection.X, sensitivity: 2000),

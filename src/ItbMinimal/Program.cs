@@ -50,6 +50,14 @@ var modifierBlendCurve = new BlendedAxisCurve
 BuildAndRunAsConsole(new()
 {
 	Name = "ItB minimal + scaled rotations",
+	RunEventFactory = f =>
+	[
+		f.ServeOverlay(new()
+		{
+			WebRoot = @"c:\tools\joystick-overlay",
+			WebRootPath = "joyviz.html",
+		}),
+	],
 	Routes =
 	[
 		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X, sensitivity: 2000),
