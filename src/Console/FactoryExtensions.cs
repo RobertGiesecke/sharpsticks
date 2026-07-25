@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 
 namespace SharpSticks.Console;
 
@@ -27,7 +28,27 @@ public static class FactoryExtensions
 			}
 
 			using var runtimeMapping = Build(effectiveOptions);
-			runtimeMapping.RunAsConsole(debugLogger);
+
+
+			using PooledList<IRuntimeEventInstance>? eventInstances =
+				effectiveOptions.RunEventFactory is null
+					? null
+					: new(ClearMode.Always);
+
+			if (effectiveOptions.RunEventFactory is not null)
+			{
+				var r = effectiveOptions.RunEventFactory(runtimeMapping);
+
+				foreach (var t in r)
+				{
+					if (t is not null)
+					{
+						eventInstances!.Add(t);
+					}
+				}
+			}
+
+			runtimeMapping.RunAsConsole(debugLogger, runtimeEventInstances: eventInstances);
 		}
 
 		private static bool TryRunSetupSubcommand(ConsoleExtensions<TInputDevice, TOutputDevice>.BuildOptions options)
@@ -94,7 +115,7 @@ public static class FactoryExtensions
 			OutputDeviceFactory = o.OutputDeviceFactory,
 			InputSynthesizer = o.InputSynthesizer,
 			InitializeInputSynthesizer = o.InitializeInputSynthesizer,
-			ConnectedDevices = o.ConnectedDevices ?? [..joystickDevices!],
+			ConnectedDevices = o.ConnectedDevices ?? [.. joystickDevices!],
 			Routes = o.Routes,
 		};
 
@@ -103,9 +124,11 @@ public static class FactoryExtensions
 		public static IOutputRuntimeContext<TInputDevice, TOutputDevice> BuildFromConfig(
 			AppConfig config)
 		{
-			
 			var buildOptions = EnsureOutputDeviceFactory(
-				Runtime<TInputDevice, TOutputDevice>.GetBuildOptionsFromConfig(config, TOutputDevice.Factory, TInputDevice.Factory));
+				Runtime<TInputDevice, TOutputDevice>.GetBuildOptionsFromConfig(
+					config,
+					TOutputDevice.Factory,
+					TInputDevice.Factory));
 			return Build<TInputDevice, TOutputDevice>(new()
 			{
 				Name = buildOptions.Name,
