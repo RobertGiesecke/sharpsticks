@@ -40,7 +40,7 @@ var groupedZoomAxes = Pedals.Axes.RightToeBrake
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
-	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 2.4d },
+	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 1.8d },
 	PrecisionCurve = new AxisCurve { Max = 0.05d },
 	// Whichever is engaged the furthest wins — ModifierAxes takes the max.
 	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
