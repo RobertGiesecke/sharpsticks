@@ -9,6 +9,4 @@ global using SharpSticks.InputSynthesis.Mouse;
 global using SharpSticks.OutputAbstractions;
 global using SharpSticks.Testing;
 global using Xunit;
-
-global using IFakesOutputRuntimeContext = SharpSticks.OutputAbstractions.IOutputRuntimeContext<SharpSticks.Testing.FakeJoystickDevice, SharpSticks.Testing.FakeOutputDevice>;
-global using FakesRuntime = SharpSticks.OutputAbstractions.Runtime<SharpSticks.Testing.FakeJoystickDevice, SharpSticks.Testing.FakeOutputDevice>;
+global using static System.TimeSpan;
