@@ -28,9 +28,9 @@ public sealed class MouseMoveMacroTests : IDisposable
 			OnPress = [Macros.MoveMouse(10, -5)],
 		});
 
-		runtime.ProcessFrame(); // baseline: released edge, no events
+		runtime.ProcessWithDefaultFrameTime(); // baseline: released edge, no events
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		var ev = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.MouseMove, ev.Kind);
@@ -47,9 +47,9 @@ public sealed class MouseMoveMacroTests : IDisposable
 			OnPress = [Macros.MoveMouseTo(0.25, 0.75)],
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		var ev = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.MouseMoveAbsolute, ev.Kind);
@@ -66,9 +66,9 @@ public sealed class MouseMoveMacroTests : IDisposable
 			OnPress = [Macros.CenterMouse()],
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		var ev = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.MouseMoveAbsolute, ev.Kind);

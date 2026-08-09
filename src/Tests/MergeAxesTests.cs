@@ -36,7 +36,7 @@ public sealed class MergeAxesTests : IDisposable
 
 		_Stick.SetAxisValue(Axis.X, xValue);
 		_Stick.SetAxisValue(Axis.Y, yValue);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
 	}
@@ -51,7 +51,7 @@ public sealed class MergeAxesTests : IDisposable
 
 		_Stick.SetAxisValue(Axis.X, 0.2);
 		_Stick.SetAxisValue(Axis.Y, 0.3);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(0.5, _Output.GetAxisValue(Axis.X), Precision);
 	}
@@ -72,7 +72,7 @@ public sealed class MergeAxesTests : IDisposable
 		// sum = -0.1
 		_Stick.SetAxisValue(Axis.X, 0.4);
 		_Stick.SetAxisValue(Axis.Y, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(-0.1, _Output.GetAxisValue(Axis.X), Precision);
 	}
@@ -94,7 +94,7 @@ public sealed class MergeAxesTests : IDisposable
 		// sum = 0.6
 		_Stick.SetAxisValue(Axis.X, 0.8);
 		_Stick.SetAxisValue(Axis.Y, 0.2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 	}
@@ -128,7 +128,7 @@ public sealed class MergeAxesTests : IDisposable
 
 		first.SetAxisValue(Axis.X, 0.4);
 		second.SetAxisValue(Axis.X, 0.8);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(0.6, output.GetAxisValue(Axis.X), Precision);
 	}
@@ -151,7 +151,7 @@ public sealed class MergeAxesTests : IDisposable
 
 		_Stick.SetAxisValue(Axis.X, xValue);
 		_Stick.SetAxisValue(Axis.Y, yValue);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
 	}
@@ -170,7 +170,7 @@ public sealed class MergeAxesTests : IDisposable
 		// first = -0.4, second = -0.6, sum = -1.0
 		_Stick.SetAxisValue(Axis.X, 0.4);
 		_Stick.SetAxisValue(Axis.Y, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(-1.0, _Output.GetAxisValue(Axis.X), Precision);
 	}
@@ -190,7 +190,7 @@ public sealed class MergeAxesTests : IDisposable
 		// second = 0
 		_Stick.SetAxisValue(Axis.X, 0.8);
 		_Stick.SetAxisValue(Axis.Y, 0.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(-0.5, _Output.GetAxisValue(Axis.X), Precision);
 	}
@@ -211,7 +211,7 @@ public sealed class MergeAxesTests : IDisposable
 		});
 
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-0.6, _Output.GetAxisValue(Axis.X), Precision);
 	}
 

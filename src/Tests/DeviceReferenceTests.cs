@@ -285,18 +285,18 @@ public sealed class DeviceReferenceTests : IDisposable
 
 		// Button route works against the real stick id.
 		stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(output.GetButtonState(3));
 
 		// Axis route, no modifier button pressed → identity.
 		stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, output.GetAxisValue(Axis.X), Precision);
 
 		// Modifier's nested ButtonBinding(configStickId, 2) was also translated
 		// to the real stick id, so pressing button 2 takes effect.
 		stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.3, output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -350,7 +350,7 @@ public sealed class DeviceReferenceTests : IDisposable
 		});
 
 		reconnected.SetAxisValue(Axis.X, 0.8);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.4, output.GetAxisValue(Axis.X), Precision); // 0.5x curve applied
 	}
 }

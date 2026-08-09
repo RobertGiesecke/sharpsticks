@@ -292,11 +292,11 @@ public sealed class AppConfigTests : IDisposable
 
 		using var runtime = BuildRuntime(config);
 		stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(output.GetButtonState(5));
 
 		stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(output.GetButtonState(5));
 	}
 
@@ -330,15 +330,15 @@ public sealed class AppConfigTests : IDisposable
 		using var runtime = BuildRuntime(config);
 
 		stick.SetAxisValue(Axis.Slider1, 0.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-1.0, output.GetAxisValue(Axis.Rz), Precision);
 
 		stick.SetAxisValue(Axis.Slider1, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.0, output.GetAxisValue(Axis.Rz), Precision);
 
 		stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(1.0, output.GetAxisValue(Axis.Rz), Precision);
 	}
 
@@ -369,11 +369,11 @@ public sealed class AppConfigTests : IDisposable
 		using var runtime = BuildRuntime(config);
 
 		stick.SetAxisValue(Axis.X, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-0.5, output.GetAxisValue(Axis.X), Precision);
 
 		stick.SetAxisValue(Axis.X, -0.3);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.3, output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -401,7 +401,7 @@ public sealed class AppConfigTests : IDisposable
 		using var runtime = BuildRuntime(config);
 
 		stick.SetAxisValue(Axis.X, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.5, output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -435,12 +435,12 @@ public sealed class AppConfigTests : IDisposable
 
 		// Modifier at rest → normal curve → output equals input.
 		stick.SetAxisValue(Axis.X, 0.8);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.8, output.GetAxisValue(Axis.X), Precision);
 
 		// Modifier fully engaged → precision curve → output halved.
 		stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.4, output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -473,11 +473,11 @@ public sealed class AppConfigTests : IDisposable
 		using var runtime = BuildRuntime(config);
 
 		stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, output.GetAxisValue(Axis.X), Precision);
 
 		stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.3, output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -518,7 +518,7 @@ public sealed class AppConfigTests : IDisposable
 		});
 
 		stick.SetAxisValue(Axis.X, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(1.0, output.GetAxisValue(Axis.Slider1), Precision);
 		Assert.Equal(0.0, output.GetAxisValue(Axis.Slider2), Precision);
 	}
@@ -558,12 +558,12 @@ public sealed class AppConfigTests : IDisposable
 			origHarness.Stick.SetAxisValue(Axis.X, x);
 			origHarness.Stick.SetAxisValue(Axis.Slider1, slider1);
 			origHarness.Stick.SetButtonState(1, buttonPressed);
-			origHarness.Runtime.ProcessFrame();
+			origHarness.Runtime.ProcessWithDefaultFrameTime();
 
 			rtHarness.Stick.SetAxisValue(Axis.X, x);
 			rtHarness.Stick.SetAxisValue(Axis.Slider1, slider1);
 			rtHarness.Stick.SetButtonState(1, buttonPressed);
-			rtHarness.Runtime.ProcessFrame();
+			rtHarness.Runtime.ProcessWithDefaultFrameTime();
 
 			Assert.Equal(
 				origHarness.Output.GetAxisValue(Axis.X),

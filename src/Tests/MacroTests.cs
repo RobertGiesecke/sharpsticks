@@ -12,7 +12,6 @@ public sealed class MacroTests : IDisposable
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
 	private readonly FakeOutputDevice _Output;
-	private readonly FakeTimeSource _Time = new();
 
 	public MacroTests()
 	{
@@ -34,17 +33,17 @@ public sealed class MacroTests : IDisposable
 		});
 
 		// Warm-up: edge detector establishes "released" baseline.
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 
 		// Rising edge -> OnPress runs; macro completes leaving press in place.
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Subsequent frames keep the press: macro completion does NOT auto-release.
-		runtime.ProcessFrame();
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 	}
 
@@ -59,13 +58,13 @@ public sealed class MacroTests : IDisposable
 			OnRelease = [Macros.Release(target)],
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 	}
 
@@ -86,25 +85,22 @@ public sealed class MacroTests : IDisposable
 			],
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
 
 		// First post-press frame: Press fires, Wait schedules, output held.
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Time has not advanced enough — Release does NOT run yet.
-		_Time.Advance(TimeSpan.FromMilliseconds(20));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(20.Milliseconds);
 		Assert.True(_Output.GetButtonState(3));
 
-		_Time.Advance(TimeSpan.FromMilliseconds(20));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(20.Milliseconds);
 		Assert.True(_Output.GetButtonState(3));
 
 		// Crossing the 50ms deadline — Release fires this frame.
-		_Time.Advance(TimeSpan.FromMilliseconds(20));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(20.Milliseconds);
 		Assert.False(_Output.GetButtonState(3));
 	}
 
@@ -127,31 +123,29 @@ public sealed class MacroTests : IDisposable
 			],
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 		Assert.False(_Output.GetButtonState(4));
 
 		// Release + re-press the source while the first run is still in Wait.
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		// First run is still mid-wait. Second run is queued — has not started.
 		Assert.True(_Output.GetButtonState(3));
 		Assert.False(_Output.GetButtonState(4));
 
 		// Cross first run's deadline: it finishes (Release A, Press B), then
 		// the queued second run starts (Press A, Wait, ...).
-		_Time.Advance(TimeSpan.FromMilliseconds(60));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(60.Milliseconds);
 		Assert.True(_Output.GetButtonState(3)); // second run pressed A again
 		Assert.True(_Output.GetButtonState(4)); // first run pressed B at the end
 
 		// Cross second run's deadline.
-		_Time.Advance(TimeSpan.FromMilliseconds(60));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(60.Milliseconds);
 		Assert.False(_Output.GetButtonState(3)); // second run released A
 		Assert.True(_Output.GetButtonState(4)); // B still held (never released)
 	}
@@ -173,27 +167,27 @@ public sealed class MacroTests : IDisposable
 				OnRelease = [Macros.Release(target)],
 			});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 
 		// Route presses output.
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Macro asserts too -> still held (OR).
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Route releases; macro still holding -> still held.
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Macro releases -> output drops.
 		_Stick.ReleaseButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 	}
 
@@ -215,25 +209,24 @@ public sealed class MacroTests : IDisposable
 			Reentry = MacroReentry.DropIfBusy,
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Re-trigger while busy: dropped, no new queue entry.
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// First run completes normally.
-		_Time.Advance(TimeSpan.FromMilliseconds(60));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(60.Milliseconds);
 		Assert.False(_Output.GetButtonState(3));
 
 		// Source still pressed but no edge happens this frame — no new macro starts.
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 	}
 
@@ -255,28 +248,26 @@ public sealed class MacroTests : IDisposable
 			Reentry = MacroReentry.CancelAndRestart,
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Re-trigger while first is in Wait. First gets cancelled — its press is
 		// released — and the new run starts immediately (re-presses).
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		// After cancel: previous press released. New run's Press fires this frame.
 		Assert.True(_Output.GetButtonState(3));
 
 		// New run is mid-wait — its press persists.
-		_Time.Advance(TimeSpan.FromMilliseconds(20));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(20.Milliseconds);
 		Assert.True(_Output.GetButtonState(3));
 
 		// New run completes.
-		_Time.Advance(TimeSpan.FromMilliseconds(40));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(40.Milliseconds);
 		Assert.False(_Output.GetButtonState(3));
 	}
 
@@ -293,9 +284,9 @@ public sealed class MacroTests : IDisposable
 			OnRelease = [Macros.Release(target)],
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		// OnPress is empty -> nothing happens.
 		Assert.False(_Output.GetButtonState(3));
 	}
@@ -325,20 +316,19 @@ public sealed class MacroTests : IDisposable
 				],
 			});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));   // route holds B3.
 
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		// Macro asserts force-release on B3. Route still has B1 down, but the
 		// suppressor overrides it.
 		Assert.False(_Output.GetButtonState(3));
 
 		// Wait elapses. Macro Press re-asserts; suppression clears.
-		_Time.Advance(TimeSpan.FromMilliseconds(25));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(25.Milliseconds);
 		Assert.True(_Output.GetButtonState(3));
 	}
 
@@ -358,24 +348,24 @@ public sealed class MacroTests : IDisposable
 				OnPress = [Macros.Release(target)],
 			});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Macro asserts force-release. Suppression engaged.
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 
 		// Route falling edge clears suppression. Output drops fully (no asserter).
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 
 		// Next route press asserts again — the prior suppression is gone.
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 	}
 
@@ -414,28 +404,27 @@ public sealed class MacroTests : IDisposable
 				],
 			});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1));
 		Assert.False(_Output.GetButtonState(3));
 		Assert.False(_Output.GetButtonState(4));
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(1));
 		Assert.False(_Output.GetButtonState(3));
 		Assert.False(_Output.GetButtonState(4));
 
 		// OnPress starts. Release(B1) suppresses out.B1, Press(B3), then Wait.
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1));
 		Assert.True(_Output.GetButtonState(3));
 		Assert.False(_Output.GetButtonState(4));
 
 		// Time elapses — OnPress runs the final Release(B3) and finishes. out.B1
 		// was never re-pressed by the macro, so its suppressor stays in place.
-		_Time.Advance(TimeSpan.FromMilliseconds(60));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(60.Milliseconds);
 		Assert.False(_Output.GetButtonState(1));
 		Assert.False(_Output.GetButtonState(3));
 		Assert.False(_Output.GetButtonState(4));
@@ -443,32 +432,31 @@ public sealed class MacroTests : IDisposable
 		// stick.B2 falling edge enqueues OnRelease. Release(B1) is a no-op
 		// against the prior suppression; Press(B4) asserts; then Wait.
 		_Stick.ReleaseButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1));
 		Assert.False(_Output.GetButtonState(3));
 		Assert.True(_Output.GetButtonState(4));
 
 		// OnRelease's wait elapses — Release(B4) runs.
-		_Time.Advance(TimeSpan.FromMilliseconds(60));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(60.Milliseconds);
 		Assert.False(_Output.GetButtonState(1));
 		Assert.False(_Output.GetButtonState(3));
 		Assert.False(_Output.GetButtonState(4));
 
 		// stick.B1 still held. Output stays released across additional frames.
-		runtime.ProcessFrame();
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1));
 
 		// Now release stick.B1: route group's falling edge clears suppression.
 		// Output is still released (no presser).
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1));
 
 		// Press stick.B1 again: rising edge re-asserts the output.
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(1));
 	}
 
@@ -490,32 +478,32 @@ public sealed class MacroTests : IDisposable
 				OnPress = [Macros.Release(b1)],
 			});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(1));
 
 		_Stick.PressButton(3);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1)); // suppressed
 
 		// Drop one binding: group still asserts via the other; no falling edge.
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1));
 
 		// Drop BOTH bindings: now the group falls and suppression clears.
 		_Stick.ReleaseButton(1);
 		_Stick.ReleaseButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(1));
 
 		// Press either binding again: rising edge asserts.
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(1));
 	}
 
@@ -530,15 +518,15 @@ public sealed class MacroTests : IDisposable
 			_Stick.BindButton(1).RouteTo(target),
 			_Stick.BindButton(2).RouteTo(target));
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		// Release one source: output stays held — the route group's edge-tracked
@@ -546,11 +534,11 @@ public sealed class MacroTests : IDisposable
 		// asserts. (Per-group contributes 1; the second binding's press is what
 		// keeps the group asserting.)
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.True(_Output.GetButtonState(3));
 
 		_Stick.ReleaseButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.False(_Output.GetButtonState(3));
 	}
 
@@ -562,7 +550,6 @@ public sealed class MacroTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			Routes = [..routes],
 		});
 }

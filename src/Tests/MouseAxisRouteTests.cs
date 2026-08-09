@@ -12,7 +12,6 @@ public sealed class MouseAxisRouteTests : IDisposable
 {
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
-	private readonly FakeTimeSource _Time = new();
 	private readonly FakeInputSynthesizer _Synth = new();
 
 	public MouseAxisRouteTests()
@@ -26,8 +25,7 @@ public sealed class MouseAxisRouteTests : IDisposable
 	// establishes the time baseline (elapsed 0), so movement appears from step 2.
 	private void Step(IFakesOutputRuntimeContext runtime)
 	{
-		_Time.Advance(TimeSpan.FromSeconds(1));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(1.Seconds);
 	}
 
 	[Fact]
@@ -93,7 +91,6 @@ public sealed class MouseAxisRouteTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			InputSynthesizer = _Synth,
 			Routes = [..routes],
 		});

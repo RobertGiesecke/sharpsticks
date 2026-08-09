@@ -12,7 +12,6 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
 	private readonly FakeInputSynthesizer _Synth = new();
-	private readonly FakeTimeSource _Time = new();
 
 	public AxisZoneToMouseButtonTests()
 	{
@@ -35,17 +34,17 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 		]);
 
 		_Stick.SetAxisValue(Axis.X, -0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		var down = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.MouseButtonDown, down.Kind);
 		Assert.Equal(OutputMouseButton.Left, down.MouseButton);
 
-		runtime.ProcessFrame(); // still in the Left zone → no new event
+		runtime.ProcessWithDefaultFrameTime(); // still in the Left zone → no new event
 		Assert.Single(_Synth.Events);
 
 		// Cross into the Right zone: Left releases, Right presses.
 		_Stick.SetAxisValue(Axis.X, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(3, _Synth.Events.Count);
 		Assert.Equal(EventKind.MouseButtonUp, _Synth.Events[1].Kind);
 		Assert.Equal(OutputMouseButton.Left, _Synth.Events[1].MouseButton);
@@ -68,17 +67,17 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 		]);
 
 		_Stick.SetAxisValue(Axis.X, -0.5); // Left zone active, Right idle
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		_Stick.PressButton(1);             // physical press holds Right down
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Contains(_Synth.Events, e =>
 			e.Kind == EventKind.MouseButtonDown && e.MouseButton == OutputMouseButton.Right);
 
 		// Release the button but move into the Right zone: the zone keeps Right held.
 		_Stick.ReleaseButton(1);
 		_Stick.SetAxisValue(Axis.X, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.DoesNotContain(_Synth.Events, e =>
 			e.Kind == EventKind.MouseButtonUp && e.MouseButton == OutputMouseButton.Right);
 	}
@@ -97,11 +96,9 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 		]);
 
 		_Stick.SetAxisValue(Axis.X, -0.5); // enter the Left zone
-		runtime.ProcessFrame();            // rising edge → pulse down
-		_Time.Advance(TimeSpan.FromMilliseconds(10));
-		runtime.ProcessFrame();            // still within the pulse window → no change
-		_Time.Advance(TimeSpan.FromMilliseconds(60));
-		runtime.ProcessFrame();            // pulse elapsed → up
+		runtime.ProcessWithDefaultFrameTime();            // rising edge → pulse down
+		runtime.ProcessWithDefaultFrameTime();            // still within the pulse window → no change
+		runtime.ProcessFrame(60.Milliseconds);            // pulse elapsed → up
 
 		var left = _Synth.Events.Where(e => e.MouseButton == OutputMouseButton.Left).ToArray();
 		Assert.Equal(2, left.Length);
@@ -116,7 +113,6 @@ public sealed class AxisZoneToMouseButtonTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			InputSynthesizer = _Synth,
 			Routes = [..routes],
 		});
