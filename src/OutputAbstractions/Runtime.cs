@@ -538,7 +538,10 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 				return 0;
 			}
 
-			var msLong = remaining * 1000 / _Time.Frequency;
+			// Round UP: truncating a sub-millisecond remainder to 0 would make
+			// WaitAny return immediately and spin full frames until the
+			// deadline actually passes.
+			var msLong = (remaining * 1000 + _Time.Frequency - 1) / _Time.Frequency;
 			ms = msLong > int.MaxValue ? int.MaxValue : (int)msLong;
 		}
 
