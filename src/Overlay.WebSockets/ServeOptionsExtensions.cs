@@ -12,6 +12,7 @@ public static class ServeOptionsExtensions
 
 			using var selectors = new PooledList<string>();
 			string? webRoot = null;
+			string? webPath = null;
 			Func<TInputDevice, bool>? predicate = null;
 
 			for (var i = 0; i < args.Length; i++)
@@ -33,6 +34,9 @@ public static class ServeOptionsExtensions
 						break;
 					case "--root" when i + 1 < args.Length:
 						webRoot = args[++i];
+						break;
+					case "--path" when i + 1 < args.Length:
+						webPath = args[++i];
 						break;
 					case "serve":
 						break;
@@ -78,6 +82,7 @@ public static class ServeOptionsExtensions
 			{
 				Port = port,
 				WebRoot = webRoot,
+				WebRootPath = webPath,
 				DevicePredicate = predicate,
 			};
 		}
