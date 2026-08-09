@@ -79,6 +79,27 @@ public sealed class MouseAxisRouteTests : IDisposable
 	}
 
 	[Fact]
+	public void ZeroElapsedFrame_MovesNothing_AndKeepsTheAccumulator()
+	{
+		using var runtime = Build(
+			_Stick.BindAxis(Axis.X).RouteToMouse(MouseDirection.X, MouseMovement.Relative, sensitivity: 1));
+
+		_Stick.SetAxisValue(Axis.X, 0.6);
+		Step(runtime);                        // baseline
+		Step(runtime);                        // accumulator 0.6
+
+		// Frames at the same instant integrate nothing — full deflection or not.
+		runtime.ProcessFrame(TimeSpan.Zero);
+		runtime.ProcessFrame(TimeSpan.Zero);
+		Assert.Empty(_Synth.Events);
+
+		// The carried 0.6 is still there: one more real second tips it to 1.2.
+		Step(runtime);
+		var move = Assert.Single(_Synth.Events);
+		Assert.Equal(1, move.Dx);
+	}
+
+	[Fact]
 	public void AbsoluteMovement_NotYetImplemented_ThrowsAtBuild()
 	{
 		Assert.Throws<NotSupportedException>(() => Build(
