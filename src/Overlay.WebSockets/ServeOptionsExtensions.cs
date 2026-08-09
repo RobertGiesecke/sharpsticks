@@ -61,13 +61,17 @@ public static class ServeOptionsExtensions
 					preparedSelectors.Add((usedId, selector));
 				}
 
-				predicate = preparedSelectors.Count < 1
-					? null
-					: device =>
-						// ReSharper disable once AccessToDisposedClosure
-						preparedSelectors.Exists(tpl =>
+				if (preparedSelectors.Count > 0)
+				{
+					// The predicate outlives this method — it runs when the serve
+					// path filters devices — so it must capture a plain array, not
+					// the pooled list that is disposed on return.
+					(int? deviceId, string namePart)[] capturedSelectors = [.. preparedSelectors.Span];
+					predicate = device =>
+						Array.Exists(capturedSelectors, tpl =>
 							tpl.deviceId == device.DeviceId ||
 							device.Name.Contains(tpl.namePart, StringComparison.OrdinalIgnoreCase));
+				}
 			}
 
 			return new()
