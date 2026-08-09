@@ -36,13 +36,13 @@ var groupedZoomAxes = Pedals.Axes.RightToeBrake
 
 var modifierBlendCurve = new BlendedAxisCurve
 {
-	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 2.4d },
+	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 1.8d },
 	PrecisionCurve = new AxisCurve { Max = 0.05d },
 	// Whichever is engaged the furthest wins — ModifierAxes takes the max.
 	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
 	ModifierAxes =
 	[
-		.. groupedZoomAxes.SourceAxes,
+		..groupedZoomAxes.SourceAxes,
 	],
 	Stateful = true,
 };
@@ -54,15 +54,17 @@ BuildAndRunAsConsole(new()
 	[
 		f.ServeOverlay(new()
 		{
-			WebRoot = @"c:\tools\joystick-overlay",
+			WebRoot = @"C:\Users\rober\RiderProjects\wasm-test\dist",
 			WebRootPath = "joyviz.html",
+			Port = 8787,
 		}),
 	],
 	Routes =
 	[
-		RightStick.Axes.Rx.RouteToMouse(MouseDirection.X, sensitivity: 2000),
-		RightStick.Axes.Ry.RouteToMouse(MouseDirection.Y, sensitivity: 2000),
+		RightStick.Axes.ThumbStickHorizontal.RouteToMouse(MouseDirection.X, sensitivity: 2000),
+		RightStick.Axes.ThumbStickVertical.RouteToMouse(MouseDirection.Y, sensitivity: 2000),
 		RightStick.Buttons.ThumbStick.RouteTo(MouseOutput.Buttons.Left),
+
 		// switch to gimbals while holding cm hat east
 		RightStick.Buttons.CounterMeasureHatEast.ComplexRoute(new()
 		{
@@ -148,7 +150,9 @@ BuildAndRunAsConsole(new()
 [RenameAxis(DeviceNames.RightStick, Axis.Z, "Twist")]
 [RenameButton(DeviceNames.RightStick, 1, "Trigger")]
 [RenameButton(DeviceNames.RightStick, 18, "CounterMeasureHatEast")]
-[RenameButton(DeviceNames.RightStick, 6, "ThumbStick")]
+[RenameButton(DeviceNames.RightStick, 6, SharedNames.ThumbStick)]
+[RenameAxis(DeviceNames.RightStick, Axis.Rx, SharedNames.ThumbStickHorizontal)]
+[RenameAxis(DeviceNames.RightStick, Axis.Ry, SharedNames.ThumbStickVertical)]
 // left stick
 [RenameAxis(DeviceNames.LeftStick, Axis.Slider1, SharedNames.BrakeLever)]
 [RenameButton(DeviceNames.LeftStick, 1, "Trigger")]
@@ -175,6 +179,9 @@ partial class Devices;
 static class SharedNames
 {
 	public const string BrakeLever = "BrakeLever";
+	public const string ThumbStick = "ThumbStick";
+	public const string ThumbStickHorizontal = $"{ThumbStick}Horizontal";
+	public const string ThumbStickVertical = $"{ThumbStick}Vertical";
 	public const string RightToeBrake = "RightToeBrake";
 	public const string LeftToeBrake = "LeftToeBrake";
 	public const string ZoomInOut = "ZoomInOut";

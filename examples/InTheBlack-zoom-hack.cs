@@ -1,7 +1,7 @@
 #!/usr/bin/env dotnet
 
 //#:package SharpSticks.Editor@0.1.0-debug04
-#:project ../src/Console/Console.csproj
+#:project ../src/Editor/Editor.csproj
 #:project ../src/Overlay.Integration/Overlay.Integration.csproj
 
 using System.Collections.Immutable;
@@ -9,6 +9,7 @@ using SharpSticks.InputSynthesis.Mouse;
 using static System.TimeSpan;
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
+
 
 #if WINDOWS
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
@@ -42,7 +43,7 @@ Console.WriteLine(
 var groupedZoomAxes = Pedals.Axes.RightToeBrake
 	.GroupWith(LeftStick.Axes.BrakeLever)
 	.WithAxisMode(AxisMode.Unsigned);
-
+var VJoy1 = Typed.VJoyDevice;
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 1.8d },
@@ -185,20 +186,20 @@ BuildAndRunAsConsole(new()
 [RenameButton(DeviceNames.LeftStick, 11, "Outer2WayUp")]
 [RenameButton(DeviceNames.LeftStick, 20, SharedNames.BrakeLever)]
 // vjoy device
-[RenameButton(DeviceNames.VJoy1, 1, "Fire")]
-[RenameButton(DeviceNames.VJoy1, 79, "CenterHeadTracking")]
-[RenameAxis(DeviceNames.VJoy1, Axis.X, "Roll")]
-[RenameAxis(DeviceNames.VJoy1, Axis.Y, "Pitch")]
-[RenameAxis(DeviceNames.VJoy1, Axis.Z, "Yaw")]
-[RenameAxis(DeviceNames.VJoy1, Axis.Rz, SharedNames.BrakeLever)]
-[RenameAxis(DeviceNames.VJoy1, Axis.Rx, SharedNames.RightToeBrake)]
-[RenameAxis(DeviceNames.VJoy1, Axis.Ry, SharedNames.ZoomInOut)]
-[RenameAxis(DeviceNames.VJoy1, Axis.Slider1, "ZoomIn")]
-[RenameAxis(DeviceNames.VJoy1, Axis.Slider2, "ZoomOut")]
-[RenameButton(DeviceNames.VJoy1, 71, "SwitchToWeaponGroup1")]
-[RenameButton(DeviceNames.VJoy1, 72, "SwitchToWeaponGroup2")]
-[RenameButton(DeviceNames.VJoy1, 20, "HoldForZoom")]
-[RenameButton(DeviceNames.VJoy1, 21, "HoldWhenNotZoomed")]
+[RenameButton(DeviceNames.VJoyDevice, 1, "Fire")]
+[RenameButton(DeviceNames.VJoyDevice, 79, "CenterHeadTracking")]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.X, "Roll")]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.Y, "Pitch")]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.Z, "Yaw")]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.Rz, SharedNames.BrakeLever)]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.Rx, SharedNames.RightToeBrake)]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.Ry, SharedNames.ZoomInOut)]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.Slider1, "ZoomIn")]
+[RenameAxis(DeviceNames.VJoyDevice, Axis.Slider2, "ZoomOut")]
+[RenameButton(DeviceNames.VJoyDevice, 71, "SwitchToWeaponGroup1")]
+[RenameButton(DeviceNames.VJoyDevice, 72, "SwitchToWeaponGroup2")]
+[RenameButton(DeviceNames.VJoyDevice, 20, "HoldForZoom")]
+[RenameButton(DeviceNames.VJoyDevice, 21, "HoldWhenNotZoomed")]
 partial class Devices;
 
 static class SharedNames
