@@ -22,6 +22,33 @@ public sealed class FakeDeviceManager : IDisposable
 
 	public IReadOnlyList<FakeOutputDevice> OutputDevices => _OutputDevicesList;
 
+	/// <summary>
+	/// Virtual clock handed to every runtime built via <see cref="BuildRuntime"/>.
+	/// Advance it with <see cref="FakeTimeSource.Advance"/> when a test exercises
+	/// time-dependent behavior.
+	/// </summary>
+	public FakeTimeSource TimeSource { get; } = new();
+
+	/// <summary>
+	/// Builds a runtime on this manager's fakes: unless the options say
+	/// otherwise, wires in <see cref="OutputDeviceFactory"/> and
+	/// <see cref="TimeSource"/>. Tests should build through this instead of
+	/// <c>Runtime.Build</c> so they run on virtual time by default — a modifier
+	/// that later grows time-dependent behavior then fails deterministically
+	/// (virtual time stands still until advanced) instead of silently running
+	/// on the wall clock.
+	/// </summary>
+	public IFakesOutputRuntimeContext BuildRuntime(
+		RuntimeBuilder.BuildOptions<FakeJoystickDevice, FakeOutputDevice> options)
+	{
+		ThrowIfDisposed();
+		return FakesRuntime.Build(options with
+		{
+			OutputDeviceFactory = options.OutputDeviceFactory ?? OutputDeviceFactory,
+			TimeSource = options.TimeSource ?? TimeSource,
+		});
+	}
+
 	public FakeInputDeviceBuilder AddInputDevice(string name, int? deviceId = null)
 	{
 		ThrowIfDisposed();
