@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using Collections.Pooled;
+
 namespace SharpSticks.Overlay.WebSockets;
 
 /// <summary>
@@ -9,13 +12,13 @@ namespace SharpSticks.Overlay.WebSockets;
 /// </summary>
 public static class OverlayFrames
 {
-	public sealed record Descriptor(byte Version, IReadOnlyList<Device> Devices);
+	public sealed record Descriptor(byte Version, ImmutableArray<Device> Devices);
 
-	public sealed record Device(bool IsOutput, string Name, IReadOnlyList<Axis> Axes, int ButtonCount);
+	public sealed record Device(bool IsOutput, string Name, ImmutableArray<Axis> Axes, int ButtonCount);
 
-	public sealed record State(byte Version, IReadOnlyList<DeviceState> Devices);
+	public sealed record State(byte Version, ImmutableArray<DeviceState> Devices);
 
-	public sealed record DeviceState(IReadOnlyList<double> Axes, IReadOnlyList<bool> Buttons);
+	public sealed record DeviceState(ImmutableArray<double> Axes, ImmutableArray<bool> Buttons);
 
 	public static FrameReader CreateReader(ReadOnlySpan<byte> frame) => new(frame);
 
@@ -35,7 +38,7 @@ public static class OverlayFrames
 		}
 
 		var cursor = reader.GetDeviceFrameReader().Value;
-		var devices = new List<Device>(deviceCount.Value);
+		using var devices = new PooledList<Device>(deviceCount.Value, ClearMode.Always);
 		for (var i = 0; i < deviceCount.Value; i++)
 		{
 			if (!cursor.MoveNext(out var info))
@@ -43,17 +46,17 @@ public static class OverlayFrames
 				throw new InvalidDataException($"Descriptor frame is truncated at device {i}.");
 			}
 
-			var axes = new Axis[info.AxisCount];
-			for (var a = 0; a < axes.Length; a++)
+			var axes = ImmutableArray.CreateBuilder<Axis>(info.AxisCount);
+			for (var a = 0; a < info.AxisCount; a++)
 			{
-				axes[a] = info.GetAxis(a);
+				axes.Add(info.GetAxis(a));
 			}
 
-			devices.Add(new(info.IsOutput, info.GetName(), axes, info.ButtonCount));
+			devices.Add(new(info.IsOutput, info.GetName(), axes.ToImmutable(), info.ButtonCount));
 		}
 
 		return cursor.RemainingBytes == 0
-			? new(version.Value, devices)
+			? new(version.Value, [.. devices.Span])
 			: throw new InvalidDataException($"Descriptor has {cursor.RemainingBytes} trailing byte(s).");
 	}
 
@@ -72,31 +75,31 @@ public static class OverlayFrames
 		}
 
 		var cursor = reader.GetDeviceStateReader();
-		var devices = new List<DeviceState>(descriptor.Devices.Count);
+		using var devices = new PooledList<DeviceState>(descriptor.Devices.Length, ClearMode.Always);
 		foreach (var device in descriptor.Devices)
 		{
-			if (!cursor.MoveNext((byte)device.Axes.Count, (byte)device.ButtonCount, out var info))
+			if (!cursor.MoveNext((byte)device.Axes.Length, (byte)device.ButtonCount, out var info))
 			{
 				throw new InvalidDataException($"State frame is truncated at device {devices.Count}.");
 			}
 
-			var axes = new double[info.AxisCount];
-			for (var a = 0; a < axes.Length; a++)
+			var axes = ImmutableArray.CreateBuilder<double>(info.AxisCount);
+			for (var a = 0; a < info.AxisCount; a++)
 			{
-				axes[a] = info.GetAxisValue(a);
+				axes.Add(info.GetAxisValue(a));
 			}
 
-			var buttons = new bool[device.ButtonCount];
-			for (var b = 0; b < buttons.Length; b++)
+			var buttons = ImmutableArray.CreateBuilder<bool>(device.ButtonCount);
+			for (var b = 0; b < device.ButtonCount; b++)
 			{
-				buttons[b] = info.IsButtonPressed(b + 1);
+				buttons.Add(info.IsButtonPressed(b + 1));
 			}
 
-			devices.Add(new(axes, buttons));
+			devices.Add(new(axes.ToImmutable(), buttons.ToImmutable()));
 		}
 
 		return cursor.RemainingBytes == 0
-			? new(version.Value, devices)
+			? new(version.Value, [.. devices.Span])
 			: throw new InvalidDataException($"State frame has {cursor.RemainingBytes} trailing byte(s).");
 	}
 }

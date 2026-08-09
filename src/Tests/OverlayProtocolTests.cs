@@ -27,7 +27,7 @@ public sealed class OverlayProtocolTests : IDisposable
 		var descriptor = OverlayFrames.ReadDescriptor(protocol.Descriptor);
 
 		Assert.Equal(7, descriptor.Version);
-		Assert.Equal(2, descriptor.Devices.Count);
+		Assert.Equal(2, descriptor.Devices.Length);
 
 		var first = descriptor.Devices[0];
 		Assert.False(first.IsOutput);
