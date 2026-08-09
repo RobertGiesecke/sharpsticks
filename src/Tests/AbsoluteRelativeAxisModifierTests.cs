@@ -18,7 +18,6 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	private static readonly TimeSpan FrameDt = TimeSpan.FromSeconds(1);
 
 	private readonly FakeDeviceManager _Fakes = new();
-	private readonly FakeTimeSource _Time = new();
 	private readonly FakeJoystickDevice _Stick;
 	private readonly FakeOutputDevice _Output;
 
@@ -37,8 +36,7 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	// model rate then sees a fixed 1 s elapsed every frame.
 	private void Step(IFakesOutputRuntimeContext runtime)
 	{
-		_Time.Advance(FrameDt);
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(FrameDt);
 	}
 
 	[Fact]
@@ -544,7 +542,6 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			Routes = [routes],
 		});
 	}

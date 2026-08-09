@@ -32,7 +32,7 @@ public sealed class AxisCurveTests : IDisposable
 	{
 		using var runtime = BuildRuntime(new() { Max = 1.0 });
 		_Stick.SetAxisValue(Axis.X, input);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -47,7 +47,7 @@ public sealed class AxisCurveTests : IDisposable
 	{
 		using var runtime = BuildRuntime(new() { Max = max });
 		_Stick.SetAxisValue(Axis.X, input);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -62,7 +62,7 @@ public sealed class AxisCurveTests : IDisposable
 	{
 		using var runtime = BuildRuntime(new() { Max = 0.0, Exponent = 2.0 });
 		_Stick.SetAxisValue(Axis.X, input);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.0, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -77,7 +77,7 @@ public sealed class AxisCurveTests : IDisposable
 	{
 		using var runtime = BuildRuntime(new() { Max = 1.0, Exponent = 2.0 });
 		_Stick.SetAxisValue(Axis.X, input);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -92,7 +92,7 @@ public sealed class AxisCurveTests : IDisposable
 	{
 		using var runtime = BuildRuntime(new() { Max = 1.0, Exponent = 0.5 });
 		_Stick.SetAxisValue(Axis.X, input);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -113,7 +113,7 @@ public sealed class AxisCurveTests : IDisposable
 		// Exponent=2 (quadratic), Max=0.5: input 0.5 → 0.5 * 0.25 = 0.125
 		using var runtime = BuildRuntime(new() { Max = 0.5, Exponent = 2.0 });
 		_Stick.SetAxisValue(Axis.X, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.125, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
