@@ -26,20 +26,20 @@ public sealed class KeyRouteTests : IDisposable
 	{
 		using var runtime = Build(_Stick.BindButton(1).RouteToKey(NamedKey.A));
 
-		runtime.ProcessFrame(); // baseline, not pressed
+		runtime.ProcessWithDefaultFrameTime(); // baseline, not pressed
 		Assert.Empty(_Synth.Events);
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		var down = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.KeyDown, down.Kind);
 		Assert.Equal((Key)NamedKey.A, down.Key);
 
-		runtime.ProcessFrame(); // still held → no new event
+		runtime.ProcessWithDefaultFrameTime(); // still held → no new event
 		Assert.Single(_Synth.Events);
 
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(2, _Synth.Events.Count);
 		Assert.Equal(EventKind.KeyUp, _Synth.Events[1].Kind);
 	}
@@ -58,13 +58,13 @@ public sealed class KeyRouteTests : IDisposable
 		]);
 
 		_Stick.SetAxisValue(Axis.X, -0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		var down = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.KeyDown, down.Kind);
 		Assert.Equal((Key)NamedKey.A, down.Key);
 
 		_Stick.SetAxisValue(Axis.X, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(3, _Synth.Events.Count);
 		Assert.Equal(EventKind.KeyUp, _Synth.Events[1].Kind);   // A released
 		Assert.Equal(EventKind.KeyDown, _Synth.Events[2].Kind); // B pressed

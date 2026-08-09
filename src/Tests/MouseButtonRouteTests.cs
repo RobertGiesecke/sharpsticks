@@ -11,7 +11,6 @@ public sealed class MouseButtonRouteTests : IDisposable
 {
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
-	private readonly FakeTimeSource _Time = new();
 	private readonly FakeInputSynthesizer _Synth = new();
 
 	public MouseButtonRouteTests()
@@ -26,20 +25,20 @@ public sealed class MouseButtonRouteTests : IDisposable
 	{
 		using var runtime = Build(_Stick.BindButton(1).RouteToMouse(OutputMouseButton.Left));
 
-		runtime.ProcessFrame(); // baseline, not pressed
+		runtime.ProcessWithDefaultFrameTime(); // baseline, not pressed
 		Assert.Empty(_Synth.Events);
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		var down = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.MouseButtonDown, down.Kind);
 		Assert.Equal(OutputMouseButton.Left, down.MouseButton);
 
-		runtime.ProcessFrame(); // still held → no new event
+		runtime.ProcessWithDefaultFrameTime(); // still held → no new event
 		Assert.Single(_Synth.Events);
 
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(2, _Synth.Events.Count);
 		Assert.Equal(EventKind.MouseButtonUp, _Synth.Events[1].Kind);
 	}
@@ -51,22 +50,22 @@ public sealed class MouseButtonRouteTests : IDisposable
 			_Stick.BindButton(1).RouteToMouse(OutputMouseButton.Left),
 			_Stick.BindButton(2).RouteToMouse(OutputMouseButton.Left));
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Single(_Synth.Events); // down
 
 		_Stick.PressButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Single(_Synth.Events); // still down, no new event
 
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Single(_Synth.Events); // button 2 still holds it
 
 		_Stick.ReleaseButton(2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(2, _Synth.Events.Count);
 		Assert.Equal(EventKind.MouseButtonUp, _Synth.Events[1].Kind);
 	}
@@ -77,7 +76,6 @@ public sealed class MouseButtonRouteTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			InputSynthesizer = _Synth,
 			Routes = [..routes],
 		});

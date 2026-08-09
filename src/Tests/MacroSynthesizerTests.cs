@@ -12,7 +12,6 @@ public sealed class MacroSynthesizerTests : IDisposable
 {
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
-	private readonly FakeTimeSource _Time = new();
 	private readonly FakeInputSynthesizer _Synth = new();
 
 	public MacroSynthesizerTests()
@@ -38,11 +37,11 @@ public sealed class MacroSynthesizerTests : IDisposable
 			],
 		});
 
-		runtime.ProcessFrame(); // baseline: establishes released edge, no events
+		runtime.ProcessWithDefaultFrameTime(); // baseline: establishes released edge, no events
 		Assert.Empty(_Synth.Events);
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame(); // rising edge -> all four (no waits) run this frame
+		runtime.ProcessWithDefaultFrameTime(); // rising edge -> all four (no waits) run this frame
 
 		Assert.Equal(
 			new Event[]
@@ -68,9 +67,9 @@ public sealed class MacroSynthesizerTests : IDisposable
 			],
 		});
 
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(
 			new Event[]
@@ -90,9 +89,9 @@ public sealed class MacroSynthesizerTests : IDisposable
 			OnPress = [Macros.PressKey(NamedKey.A)],
 		});
 
-		runtime.ProcessFrame();
-		runtime.ProcessFrame();
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
+		runtime.ProcessWithDefaultFrameTime();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(3, _Synth.FlushCount);
 	}
 
@@ -105,7 +104,6 @@ public sealed class MacroSynthesizerTests : IDisposable
 				Name = "test",
 				ConnectedDevices = _Fakes.InputDevices,
 				OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-				TimeSource = _Time,
 				Routes =
 				[
 					new ButtonMacroRoute
@@ -126,7 +124,6 @@ public sealed class MacroSynthesizerTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			InputSynthesizer = _Synth,
 			Routes = [..routes],
 		});

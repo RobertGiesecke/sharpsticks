@@ -10,7 +10,6 @@ public sealed class ScrollMacroTests : IDisposable
 {
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
-	private readonly FakeTimeSource _Time = new();
 	private readonly FakeInputSynthesizer _Synth = new();
 
 	public ScrollMacroTests()
@@ -29,9 +28,9 @@ public sealed class ScrollMacroTests : IDisposable
 			OnPress = [Macros.Scroll(ScrollDirection.Up, amount: 2)],
 		});
 
-		runtime.ProcessFrame(); // baseline: released edge, no events
+		runtime.ProcessWithDefaultFrameTime(); // baseline: released edge, no events
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		var ev = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.Scroll, ev.Kind);
@@ -46,7 +45,6 @@ public sealed class ScrollMacroTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			InputSynthesizer = _Synth,
 			Routes = [..routes],
 		});

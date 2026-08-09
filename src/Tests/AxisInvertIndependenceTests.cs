@@ -14,7 +14,6 @@ public sealed class AxisInvertIndependenceTests : IDisposable
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
 	private readonly FakeOutputDevice _Output;
-	private readonly FakeTimeSource _Time = new();
 	private readonly FakeInputSynthesizer _Synth = new();
 
 	public AxisInvertIndependenceTests()
@@ -41,7 +40,7 @@ public sealed class AxisInvertIndependenceTests : IDisposable
 		});
 
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);   // normal route unaffected
 		Assert.Equal(-0.6, _Output.GetAxisValue(Axis.Y), Precision);  // inverted route
@@ -55,7 +54,6 @@ public sealed class AxisInvertIndependenceTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			InputSynthesizer = _Synth,
 			Routes =
 			[
@@ -65,10 +63,8 @@ public sealed class AxisInvertIndependenceTests : IDisposable
 		});
 
 		_Stick.SetAxisValue(Axis.X, 1.0);
-		_Time.Advance(TimeSpan.FromSeconds(1));
-		runtime.ProcessFrame();                       // baseline frame (elapsed 0)
-		_Time.Advance(TimeSpan.FromSeconds(1));
-		runtime.ProcessFrame();                       // 1 s × 1.0 × 10 = 10 notches
+		runtime.ProcessFrame(1.Seconds);                       // baseline frame (elapsed 0)
+		runtime.ProcessFrame(1.Seconds);                       // 1 s × 1.0 × 10 = 10 notches
 
 		var scroll = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.Scroll, scroll.Kind);

@@ -36,11 +36,11 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		using var runtime = BuildRuntime(NewModifier());
 
 		_Stick.SetAxisValue(Axis.X, 0.3);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.3, _Output.GetAxisValue(Axis.X), Precision);
 
 		_Stick.SetAxisValue(Axis.X, -0.7);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-0.7, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -51,14 +51,14 @@ public sealed class BlendedAxisCurveTests : IDisposable
 
 		// Modifier at rest, input at 0.8 → identity curve.
 		_Stick.SetAxisValue(Axis.X, 0.8);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.8, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Fully engage the modifier with input unchanged.
 		// Output MUST stay at 0.8 — only future input changes should
 		// move through the precision curve.
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.8, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -70,21 +70,21 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// Seed: input 0.8, fully engaged → latched at 0.8.
 		_Stick.SetAxisValue(Axis.X, 0.8);
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.8, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Move input to 0.6 while engaged.
 		// delta = precision(0.6) - precision(0.8) = 0.3 - 0.4 = -0.1
 		// new output = 0.8 + (-0.1) = 0.7
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.7, _Output.GetAxisValue(Axis.X), Precision);
 
 		// And again: 0.6 → 0.4.
 		// delta = precision(0.4) - precision(0.6) = 0.2 - 0.3 = -0.1
 		// new output = 0.7 + (-0.1) = 0.6
 		_Stick.SetAxisValue(Axis.X, 0.4);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -100,9 +100,9 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// Seed at 0.8, engage, drift to 0.6 → latched _LastOutput = 0.7.
 		_Stick.SetAxisValue(Axis.X, 0.8);
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.7, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Now slowly release. Input held steady at 0.6 — only the modifier
@@ -110,20 +110,20 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// output blends between the normal curve (0.6) and the latched
 		// value (0.7) by factorT.
 		_Stick.SetAxisValue(Axis.Slider1, 0.75);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.675, _Output.GetAxisValue(Axis.X), Precision);
 
 		_Stick.SetAxisValue(Axis.Slider1, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.65, _Output.GetAxisValue(Axis.X), Precision);
 
 		_Stick.SetAxisValue(Axis.Slider1, 0.25);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.625, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Full release → fully on the normal curve.
 		_Stick.SetAxisValue(Axis.Slider1, 0.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -135,25 +135,25 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// Engage at 0.8, drift to 0.6 → latched 0.7.
 		_Stick.SetAxisValue(Axis.X, 0.8);
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.7, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Release fully — back to normal curve, state cleared.
 		_Stick.SetAxisValue(Axis.Slider1, 0.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Move input while at rest — pure normal curve.
 		_Stick.SetAxisValue(Axis.X, 0.4);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.4, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Re-engage. The previous latched 0.7 must not resurface — the
 		// new seed is the current normal-curve output (0.4).
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.4, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -166,7 +166,7 @@ public sealed class BlendedAxisCurveTests : IDisposable
 
 		_Stick.SetAxisValue(Axis.X, 0.5);
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.5, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Drift input upward: 0.5 → 0.8.
@@ -175,7 +175,7 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// output = lerp(normal(0.8)=0.8, 1.1, factorT=1) = 1.1 → clamped to 1.0
 		// _LastOutput back-solved to (1.0 - 0.8*0) / 1 = 1.0.
 		_Stick.SetAxisValue(Axis.X, 0.8);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(1.0, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Now reverse: 0.8 → 0.5.
@@ -184,7 +184,7 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// output = 0.4. No wind-up: the reversal moves immediately, NOT
 		// after un-doing 1.1 - 1.0 = 0.1 of imaginary drift.
 		_Stick.SetAxisValue(Axis.X, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.4, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -194,19 +194,19 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		using var runtime = BuildRuntime(NewModifier());
 
 		_Stick.SetAxisValue(Axis.X, -0.8);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-0.8, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Engage with input held → output stays at -0.8.
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-0.8, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Move input toward zero: -0.8 → -0.6.
 		// delta = precision(-0.6) - precision(-0.8) = -0.3 - -0.4 = 0.1
 		// latched = -0.8 + 0.1 = -0.7
 		_Stick.SetAxisValue(Axis.X, -0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-0.7, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -218,21 +218,21 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// Engage at +0.5 → latched 0.5.
 		_Stick.SetAxisValue(Axis.X, 0.5);
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.5, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Pull input across zero: +0.5 → -0.5.
 		// delta = precision(-0.5) - precision(0.5) = -0.25 - 0.25 = -0.5
 		// latched = 0.5 + -0.5 = 0.0
 		_Stick.SetAxisValue(Axis.X, -0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.0, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Continue past: -0.5 → -1.0.
 		// delta = precision(-1.0) - precision(-0.5) = -0.5 - -0.25 = -0.25
 		// latched = 0.0 + -0.25 = -0.25
 		_Stick.SetAxisValue(Axis.X, -1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(-0.25, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -246,31 +246,31 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// Build a latched offset.
 		_Stick.SetAxisValue(Axis.X, 0.8);
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.7, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Above threshold: lerp still active.
 		// output = lerp(normal(0.6)=0.6, latched=0.7, factorT=0.2) = 0.62
 		_Stick.SetAxisValue(Axis.Slider1, 0.2);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.62, _Output.GetAxisValue(Axis.X), Precision);
 
 		// At-threshold counts as "at rest" (`<=`) → snap to normal.
 		_Stick.SetAxisValue(Axis.Slider1, 0.1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Below threshold stays at normal.
 		_Stick.SetAxisValue(Axis.Slider1, 0.05);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Re-engage above threshold → fresh seed from current normal (0.6),
 		// not the stale 0.7.
 		_Stick.SetAxisValue(Axis.Slider1, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -288,28 +288,68 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		// output = lerp(0.8, 0.8, factorT=0.5) = 0.8.
 		_Stick.SetAxisValue(Axis.X, 0.8);
 		_Stick.SetAxisValue(Axis.Slider1, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.8, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Drift input to 0.6, factorT still 0.5 → blend = 0.5.
 		// blended_at_new  = 0.6*0.5 + 0.3*0.5 = 0.45
 		// blended_at_last = 0.8*0.5 + 0.4*0.5 = 0.6
 		// delta = -0.15. latched = 0.8 - 0.15 = 0.65.
-		// output = lerp(normal(0.6)=0.6, 0.65, 0.5) = 0.625.
+		// The output IS the latched value — partial engagement doesn't mix
+		// the normal curve back in; only a factorT drop fades toward it.
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
-		Assert.Equal(0.625, _Output.GetAxisValue(Axis.X), Precision);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(0.65, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Fully engage. Input steady, so latched stays at 0.65.
 		// output = lerp(0.6, 0.65, factorT=1.0) = 0.65.
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.65, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Release fully → normal curve (state reset), even though
 		// FactorLow=0.2 would otherwise leave a non-zero blend.
 		_Stick.SetAxisValue(Axis.Slider1, 0.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
+	}
+
+	[Fact]
+	public void Stateful_ReleaseFadeIsOneWay_ReEngagingDoesNotRestoreFadedOffset()
+	{
+		// A springless axis drifts while engaged, opening a gap between the
+		// latched output and the normal curve. Releasing fades the gap out —
+		// and re-pulling the lever must NOT re-apply it: with the input
+		// steady, the output holds no matter how the lever moves.
+		using var runtime = BuildRuntime(NewModifier());
+
+		// Engage at 0.8, drift to 0.6 → latched 0.7 (gap of +0.1 vs normal).
+		_Stick.SetAxisValue(Axis.X, 0.8);
+		_Stick.SetAxisValue(Axis.Slider1, 1.0);
+		runtime.ProcessWithDefaultFrameTime();
+		_Stick.SetAxisValue(Axis.X, 0.6);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(0.7, _Output.GetAxisValue(Axis.X), Precision);
+
+		// Half release: gap fades by the factorT drop → 0.6 + 0.1·0.5 = 0.65.
+		_Stick.SetAxisValue(Axis.Slider1, 0.5);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(0.65, _Output.GetAxisValue(Axis.X), Precision);
+
+		// Re-pull to full: the faded offset stays faded — output holds 0.65
+		// (previously the lerp swept it back out to the stale 0.7).
+		_Stick.SetAxisValue(Axis.Slider1, 1.0);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(0.65, _Output.GetAxisValue(Axis.X), Precision);
+
+		// Deeper release fades the remaining gap: 0.6 + 0.05·0.25 = 0.6125.
+		_Stick.SetAxisValue(Axis.Slider1, 0.25);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(0.6125, _Output.GetAxisValue(Axis.X), Precision);
+
+		// Full rest → normal curve, state cleared.
+		_Stick.SetAxisValue(Axis.Slider1, 0.0);
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
@@ -321,17 +361,17 @@ public sealed class BlendedAxisCurveTests : IDisposable
 		using var runtime = BuildRuntime(NewModifier(stateful: false));
 
 		_Stick.SetAxisValue(Axis.X, 0.8);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.8, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Half-engaged → blend = 0.5, blended(0.8) = 0.8*0.5 + 0.4*0.5 = 0.6.
 		_Stick.SetAxisValue(Axis.Slider1, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.6, _Output.GetAxisValue(Axis.X), Precision);
 
 		// Fully engaged → blend = 1.0, output = precision(0.8) = 0.4.
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		Assert.Equal(0.4, _Output.GetAxisValue(Axis.X), Precision);
 	}
 

@@ -72,30 +72,27 @@ public sealed class WhenButtonPressedOverStatefulModifierTests : IDisposable
 		// Both blends seed their latched value from the normal curve: 0.0.
 		_Stick.SetAxisValue(Axis.X, 0.0);
 		_Stick.SetAxisValue(Axis.Slider1, 0.5);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		AssertBothOutputs(expected: 0.0);
 
 		// Frame 2: move the input 0.0 → 0.8, blend fixed at 0.5.
 		// blended(x) = x*0.5 + 0.5x*0.5 = 0.75x
 		// latched   = 0.0 + 0.75*0.8 = 0.6
-		// output    = lerp(normal(0.8)=0.8, 0.6, factorT=0.5) = 0.7
+		// The output IS the latched value (no mixing at partial engagement).
 		// (The wrapper's second Apply already rolls its inner blend's state
 		// back to the previous input here, but the corruption is not yet
 		// visible in the output.)
 		_Stick.SetAxisValue(Axis.X, 0.8);
-		runtime.ProcessFrame();
-		AssertBothOutputs(expected: 0.7);
+		runtime.ProcessWithDefaultFrameTime();
+		AssertBothOutputs(expected: 0.6);
 
 		// Frame 3: input HELD at 0.8, lever pulled fully (factorT 0.5 → 1.0).
-		// The input didn't move, so the latched value must stay at 0.6 and
-		// the output must fade fully onto it:
-		//   output = lerp(normal(0.8)=0.8, 0.6, factorT=1.0) = 0.6
-		// The wrapped route instead re-integrates the stale previous-input
-		// delta under the NEW blend and its outer integrator sees a zero
-		// branch delta — the output freezes at 0.7 and the inner latched
-		// value is corrupted to 0.4.
+		// The input didn't move and the fade only runs on a factorT drop, so
+		// the latched value and the output both stay at 0.6.
+		// A wrapper that re-integrates the stale previous-input delta under
+		// the NEW blend corrupts the inner latched value here.
 		_Stick.SetAxisValue(Axis.Slider1, 1.0);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		AssertBothOutputs(expected: 0.6);
 
 		// Frame 4: the corruption persists — move the input 0.8 → 0.6 while
@@ -103,7 +100,7 @@ public sealed class WhenButtonPressedOverStatefulModifierTests : IDisposable
 		//   latched = 0.6 + (precision(0.6) - precision(0.8)) = 0.6 - 0.1 = 0.5
 		//   output  = 0.5
 		_Stick.SetAxisValue(Axis.X, 0.6);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		AssertBothOutputs(expected: 0.5);
 	}
 

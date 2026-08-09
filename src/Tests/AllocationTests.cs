@@ -17,7 +17,6 @@ public sealed class AllocationTests : IDisposable
 	private readonly FakeJoystickDevice _Stick2;
 	private readonly FakeOutputDevice _Output1;
 	private readonly FakeOutputDevice _Output2;
-	private readonly FakeTimeSource _Time = new();
 
 	public AllocationTests()
 	{
@@ -53,7 +52,7 @@ public sealed class AllocationTests : IDisposable
 		{
 			for (var i = 0; i < 200; i++)
 			{
-				runtime.ProcessFrame();
+				runtime.ProcessWithDefaultFrameTime();
 			}
 		});
 
@@ -98,8 +97,7 @@ public sealed class AllocationTests : IDisposable
 					_Stick2.ReleaseButton(1);
 				}
 
-				_Time.Advance(TimeSpan.FromMilliseconds(20));
-				runtime.ProcessFrame();
+				runtime.ProcessFrame(20.Milliseconds);
 			}
 		});
 
@@ -136,15 +134,13 @@ public sealed class AllocationTests : IDisposable
 			_Stick1.SetAxisValue(Axis.X, 0.45); _Stick1.SetAxisValue(Axis.Y, 0.5);
 			_Stick1.SetAxisValue(Axis.Z, 0.3); _Stick1.SetAxisValue(Axis.Slider1, 0.6);
 			_Stick2.SetAxisValue(Axis.X, -0.3); _Stick2.SetAxisValue(Axis.Y, 0.4);
-			_Time.Advance(TimeSpan.FromMilliseconds(20));
-			runtime.ProcessFrame();
+			runtime.ProcessFrame(20.Milliseconds);
 
 			_Stick1.ReleaseButton(1); _Stick1.ReleaseButton(2); _Stick2.ReleaseButton(1);
 			_Stick1.SetAxisValue(Axis.X, 0.1); _Stick1.SetAxisValue(Axis.Y, 0.1);
 			_Stick1.SetAxisValue(Axis.Z, -0.4); _Stick1.SetAxisValue(Axis.Slider1, 0.0);
 			_Stick2.SetAxisValue(Axis.X, 0.8); _Stick2.SetAxisValue(Axis.Y, 0.9);
-			_Time.Advance(TimeSpan.FromMilliseconds(100));
-			runtime.ProcessFrame();
+			runtime.ProcessFrame(100.Milliseconds);
 		}
 	}
 
@@ -180,7 +176,6 @@ public sealed class AllocationTests : IDisposable
 			Name = "alloc-comprehensive",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			Routes =
 			[
 				// AxisRoute with AxisCurve (non-linear)

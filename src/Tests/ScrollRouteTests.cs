@@ -13,7 +13,6 @@ public sealed class ScrollRouteTests : IDisposable
 {
 	private readonly FakeDeviceManager _Fakes = new();
 	private readonly FakeJoystickDevice _Stick;
-	private readonly FakeTimeSource _Time = new();
 	private readonly FakeInputSynthesizer _Synth = new();
 
 	public ScrollRouteTests()
@@ -25,8 +24,7 @@ public sealed class ScrollRouteTests : IDisposable
 
 	private void Step(IFakesOutputRuntimeContext runtime)
 	{
-		_Time.Advance(TimeSpan.FromSeconds(1));
-		runtime.ProcessFrame();
+		runtime.ProcessFrame(1.Seconds);
 	}
 
 	[Fact]
@@ -34,18 +32,18 @@ public sealed class ScrollRouteTests : IDisposable
 	{
 		using var runtime = Build(_Stick.BindButton(1).RouteToScroll(ScrollDirection.Up));
 
-		runtime.ProcessFrame(); // baseline, not pressed
+		runtime.ProcessWithDefaultFrameTime(); // baseline, not pressed
 		Assert.Empty(_Synth.Events);
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		var pulse = Assert.Single(_Synth.Events);
 		Assert.Equal(EventKind.Scroll, pulse.Kind);
 		Assert.Equal(1, pulse.Dy);  // vertical, up
 		Assert.Equal(0, pulse.Dx);
 		Assert.Equal(MouseScrollUnit.Notch, pulse.Unit);
 
-		runtime.ProcessFrame(); // still held → no repeat
+		runtime.ProcessWithDefaultFrameTime(); // still held → no repeat
 		Assert.Single(_Synth.Events);
 	}
 
@@ -55,11 +53,11 @@ public sealed class ScrollRouteTests : IDisposable
 		using var runtime = Build(_Stick.BindButton(1).RouteToScroll(ScrollDirection.Up));
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.ReleaseButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		Assert.Equal(2, _Synth.Events.Count);
 		Assert.All(_Synth.Events, e => Assert.Equal(EventKind.Scroll, e.Kind));
@@ -75,7 +73,7 @@ public sealed class ScrollRouteTests : IDisposable
 		using var runtime = Build(_Stick.BindButton(1).RouteToScroll(direction));
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		var pulse = Assert.Single(_Synth.Events);
 		Assert.Equal(expectedHorizontal, pulse.Dx);
@@ -89,7 +87,7 @@ public sealed class ScrollRouteTests : IDisposable
 			_Stick.BindButton(1).RouteToScroll(ScrollDirection.Up, amount: 3, unit: MouseScrollUnit.HighResolution));
 
 		_Stick.PressButton(1);
-		runtime.ProcessFrame();
+		runtime.ProcessWithDefaultFrameTime();
 
 		var pulse = Assert.Single(_Synth.Events);
 		Assert.Equal(3, pulse.Dy);
@@ -163,7 +161,6 @@ public sealed class ScrollRouteTests : IDisposable
 			Name = "test",
 			ConnectedDevices = _Fakes.InputDevices,
 			OutputDeviceFactory = _Fakes.OutputDeviceFactory,
-			TimeSource = _Time,
 			InputSynthesizer = _Synth,
 			Routes = [..routes],
 		});
