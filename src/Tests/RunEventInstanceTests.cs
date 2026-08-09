@@ -51,11 +51,11 @@ public sealed class RunEventInstanceTests : IDisposable
 				afterOutcome = (args.RunStarted, args.RunFailed);
 			});
 
-		var handle = instance.BeforeRun(new() { Runtime = _Runtime });
+		var handle = instance.BeforeRun(new() { Runtime = _Runtime }, TestContext.Current.CancellationToken);
 		Assert.NotNull(handle);
 		Assert.Same(_Runtime, beforeRuntime);
 
-		handle!.OnAfterRun(new() { RunStarted = true, RunFailed = false });
+		handle!.OnAfterRun(new() { RunStarted = true, RunFailed = false }, TestContext.Current.CancellationToken);
 		Assert.Same(_Runtime, afterRuntime);
 		Assert.Equal("the-state", afterState);
 		Assert.Equal((true, false), afterOutcome);
@@ -70,7 +70,7 @@ public sealed class RunEventInstanceTests : IDisposable
 			.NewRunEvent((_, _) => (string?)null)
 			.WithAfterRun((_, _) => afterRan = true);
 
-		Assert.Null(instance.BeforeRun(new() { Runtime = _Runtime }));
+		Assert.Null(instance.BeforeRun(new() { Runtime = _Runtime }, TestContext.Current.CancellationToken));
 		Assert.False(afterRan);
 	}
 
@@ -84,11 +84,11 @@ public sealed class RunEventInstanceTests : IDisposable
 			.NewRunEvent((_, _) => { beforeRan = true; })
 			.WithAfterRun((_, _) => afterRan = true);
 
-		var handle = instance.BeforeRun(new() { Runtime = _Runtime });
+		var handle = instance.BeforeRun(new() { Runtime = _Runtime }, TestContext.Current.CancellationToken);
 		Assert.True(beforeRan);
 		Assert.NotNull(handle);
 
-		handle!.OnAfterRun(new() { RunStarted = true, RunFailed = false });
+		handle!.OnAfterRun(new() { RunStarted = true, RunFailed = false }, TestContext.Current.CancellationToken);
 		Assert.True(afterRan);
 	}
 
@@ -102,7 +102,7 @@ public sealed class RunEventInstanceTests : IDisposable
 			.NoAfterRun();
 
 		// Nothing to unwind → no handle for the run loop to track.
-		Assert.Null(instance.BeforeRun(new() { Runtime = _Runtime }));
+		Assert.Null(instance.BeforeRun(new() { Runtime = _Runtime }, TestContext.Current.CancellationToken));
 		Assert.True(beforeRan);
 	}
 
@@ -116,8 +116,8 @@ public sealed class RunEventInstanceTests : IDisposable
 				(_, _) => order.Add("before"),
 				(_, _) => order.Add("after"));
 
-		var handle = instance.BeforeRun(new() { Runtime = _Runtime });
-		handle!.OnAfterRun(new() { RunStarted = true, RunFailed = false });
+		var handle = instance.BeforeRun(new() { Runtime = _Runtime }, TestContext.Current.CancellationToken);
+		handle!.OnAfterRun(new() { RunStarted = true, RunFailed = false }, TestContext.Current.CancellationToken);
 
 		Assert.Equal(["before", "after"], order);
 	}
@@ -132,8 +132,8 @@ public sealed class RunEventInstanceTests : IDisposable
 				(_, _) => "threaded",
 				(args, _) => seen = args.State);
 
-		instance.BeforeRun(new() { Runtime = _Runtime })!
-			.OnAfterRun(new() { RunStarted = true, RunFailed = false });
+		instance.BeforeRun(new() { Runtime = _Runtime }, TestContext.Current.CancellationToken)!
+			.OnAfterRun(new() { RunStarted = true, RunFailed = false }, TestContext.Current.CancellationToken);
 
 		Assert.Equal("threaded", seen);
 	}
