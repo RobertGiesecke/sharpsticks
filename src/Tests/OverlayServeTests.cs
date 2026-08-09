@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using SharpSticks.Overlay.WebSockets;
 
@@ -101,21 +100,24 @@ public sealed class OverlayServeTests : IDisposable
 
 		using var ws = await OverlayWire.ConnectAsync(port, wire.Token);
 
-		// Descriptor first: one input device, one axis, two buttons.
-		var descriptor = await OverlayWire.ReceiveBinaryAsync(ws, wire.Token);
-		Assert.Equal((byte)0x01, descriptor[0]);
-		Assert.Equal((byte)1, descriptor[2]);
+		// Descriptor first: one input device with the fake's shape.
+		var descriptor = OverlayFrameReader.ReadDescriptor(
+			await OverlayWire.ReceiveBinaryAsync(ws, wire.Token));
+		var described = Assert.Single(descriptor.Devices);
+		Assert.Equal("Stick", described.Name);
+		Assert.Equal([Axis.X], described.Axes);
+		Assert.Equal(2, described.ButtonCount);
 
 		// Move the fake input; a state frame reflecting it arrives within the
-		// server's ~60 Hz send cadence. [0x02][ver][X int16][button byte]
+		// server's ~60 Hz send cadence.
 		stick.SetAxisValue(Axis.X, 0.5);
 		stick.PressButton(2);
 		while (true)
 		{
-			var frame = await OverlayWire.ReceiveBinaryAsync(ws, wire.Token);
-			Assert.Equal((byte)0x02, frame[0]);
-			if (BinaryPrimitives.ReadInt16LittleEndian(frame.AsSpan(2)) == 16384 &&
-			    (frame[4] & 0b10) != 0)
+			var state = OverlayFrameReader.ReadState(
+				await OverlayWire.ReceiveBinaryAsync(ws, wire.Token), descriptor);
+			var device = Assert.Single(state.Devices);
+			if (Math.Abs(device.Axes[0] - 0.5) < 1.0 / 32767.0 && device.Buttons[1])
 			{
 				break;
 			}

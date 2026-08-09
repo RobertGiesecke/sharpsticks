@@ -1,24 +1,24 @@
-using System.Buffers.Binary;
-using System.Text;
 using SharpSticks.Overlay.WebSockets;
 
 namespace SharpSticks.Tests;
 
 /// <summary>
-/// Pins the binary layout the joyviz overlay consumes: the descriptor frame
-/// (kind / axes / buttons / name per device, in order) and the state frame
-/// (int16 axes at round(v·32767), buttons bit-packed LSB-first with button
-/// (i+1) on bit i). Devices are flagged as output purely by the "vJoy" name
-/// prefix.
+/// Round-trips the overlay's binary frames through <see cref="OverlayFrameReader"/>
+/// and asserts on the deserialized form. One golden byte-level test pins the
+/// raw grammar itself — that is the actual contract with the joyviz client;
+/// everything else stays readable as scenarios.
 /// </summary>
 public sealed class OverlayProtocolTests : IDisposable
 {
+	// One int16 step of quantization noise.
+	private const double Quantum = 1.0 / 32767.0;
+
 	private readonly FakeDeviceManager _Fakes = new();
 
 	public void Dispose() => _Fakes.Dispose();
 
 	[Fact]
-	public void Descriptor_EncodesKindAxesButtonsAndName_PerDeviceInOrder()
+	public void Descriptor_RoundTrips_KindAxesButtonsAndName_PerDeviceInOrder()
 	{
 		var stick = _Fakes.AddInputDevice("Stick")
 			.AddAxis(Axis.X).AddAxis(Axis.Ry).AddButtons(3).Build();
@@ -26,62 +26,50 @@ public sealed class OverlayProtocolTests : IDisposable
 			.AddAxis(Axis.Z).AddButtons(9).Build();
 
 		var protocol = OverlayProtocol.Create<FakeJoystickDevice>([stick, mirror], version: 7);
-		var d = protocol.Descriptor;
+		var descriptor = OverlayFrameReader.ReadDescriptor(protocol.Descriptor);
 
-		Assert.Equal((byte)0x01, d[0]);
-		Assert.Equal((byte)7, d[1]);
-		Assert.Equal((byte)2, d[2]);
+		Assert.Equal(7, descriptor.Version);
+		Assert.Equal(2, descriptor.Devices.Count);
 
-		var pos = 3;
-		// Stick: input kind, 2 axes, 3 buttons, name, axis enum bytes.
-		Assert.Equal((byte)0, d[pos++]);
-		Assert.Equal((byte)2, d[pos++]);
-		Assert.Equal((byte)3, d[pos++]);
-		var nameLen = d[pos++];
-		Assert.Equal("Stick", Encoding.UTF8.GetString(d, pos, nameLen));
-		pos += nameLen;
-		Assert.Equal((byte)Axis.X, d[pos++]);
-		Assert.Equal((byte)Axis.Ry, d[pos++]);
+		var first = descriptor.Devices[0];
+		Assert.False(first.IsOutput);
+		Assert.Equal("Stick", first.Name);
+		Assert.Equal([Axis.X, Axis.Ry], first.Axes);
+		Assert.Equal(3, first.ButtonCount);
 
 		// The vJoy mirror is flagged as an output device by its name.
-		Assert.Equal((byte)1, d[pos++]);
-		Assert.Equal((byte)1, d[pos++]);
-		Assert.Equal((byte)9, d[pos++]);
-		nameLen = d[pos++];
-		Assert.Equal("vJoy Device", Encoding.UTF8.GetString(d, pos, nameLen));
-		pos += nameLen;
-		Assert.Equal((byte)Axis.Z, d[pos++]);
-
-		Assert.Equal(d.Length, pos);
+		var second = descriptor.Devices[1];
+		Assert.True(second.IsOutput);
+		Assert.Equal("vJoy Device", second.Name);
+		Assert.Equal([Axis.Z], second.Axes);
+		Assert.Equal(9, second.ButtonCount);
 	}
 
 	[Fact]
-	public void WriteState_EncodesAxesAsInt16_AndButtonsLsbFirst()
+	public void State_RoundTrips_AxisValuesAndButtons_AcrossByteBoundaries()
 	{
 		var stick = _Fakes.AddInputDevice("Stick")
 			.AddAxis(Axis.X).AddAxis(Axis.Y).AddButtons(9).Build();
 		stick.SetAxisValue(Axis.X, 0.5);
 		stick.SetAxisValue(Axis.Y, -1.0);
 		stick.PressButton(1);
-		stick.PressButton(9);
+		stick.PressButton(9); // second button byte
 		Assert.True(stick.TryReadState(out var state, out _));
 
 		var protocol = OverlayProtocol.Create<FakeJoystickDevice>([stick], version: 1);
-		var frame = protocol.WriteState([state]).ToArray();
+		var descriptor = OverlayFrameReader.ReadDescriptor(protocol.Descriptor);
+		var decoded = OverlayFrameReader.ReadState(protocol.WriteState([state]), descriptor);
 
-		// [0x02][ver][X int16][Y int16][2 button bytes for 9 buttons]
-		Assert.Equal(8, frame.Length);
-		Assert.Equal((byte)0x02, frame[0]);
-		Assert.Equal((byte)1, frame[1]);
-		Assert.Equal((short)16384, BinaryPrimitives.ReadInt16LittleEndian(frame.AsSpan(2)));
-		Assert.Equal((short)-32767, BinaryPrimitives.ReadInt16LittleEndian(frame.AsSpan(4)));
-		// Button (i+1) lands on bit i: button 1 → byte 0 bit 0, button 9 → byte 1 bit 0.
-		Assert.Equal((byte)0b1, frame[6]);
-		Assert.Equal((byte)0b1, frame[7]);
+		var device = Assert.Single(decoded.Devices);
+		Assert.Equal(0.5, device.Axes[0], Quantum);
+		Assert.Equal(-1.0, device.Axes[1], Quantum);
+		Assert.Equal(
+			[true, false, false, false, false, false, false, false, true],
+			device.Buttons);
 	}
 
 	[Fact]
-	public void WriteState_NullState_SerializesCenteredAxesAndReleasedButtons()
+	public void State_NullDeviceState_DecodesAsCenteredAndReleased()
 	{
 		var stick = _Fakes.AddInputDevice("Stick")
 			.AddAxis(Axis.X).AddButtons(2).Build();
@@ -89,28 +77,53 @@ public sealed class OverlayProtocolTests : IDisposable
 		stick.PressButton(1);
 
 		var protocol = OverlayProtocol.Create<FakeJoystickDevice>([stick], version: 1);
-		var frame = protocol.WriteState([null]).ToArray();
+		var descriptor = OverlayFrameReader.ReadDescriptor(protocol.Descriptor);
+		var decoded = OverlayFrameReader.ReadState(protocol.WriteState([null]), descriptor);
 
-		Assert.Equal(5, frame.Length);
-		Assert.Equal((short)0, BinaryPrimitives.ReadInt16LittleEndian(frame.AsSpan(2)));
-		Assert.Equal((byte)0, frame[4]);
+		var device = Assert.Single(decoded.Devices);
+		Assert.Equal([0.0], device.Axes);
+		Assert.Equal([false, false], device.Buttons);
 	}
 
 	[Fact]
-	public void WriteState_ClearsStaleBits_WhenReusingTheBuffer()
+	public void State_ClearsStaleBits_WhenReusingTheBuffer()
 	{
 		var stick = _Fakes.AddInputDevice("Stick")
 			.AddAxis(Axis.X).AddButtons(2).Build();
+		var protocol = OverlayProtocol.Create<FakeJoystickDevice>([stick], version: 1);
+		var descriptor = OverlayFrameReader.ReadDescriptor(protocol.Descriptor);
 
 		stick.PressButton(2);
 		Assert.True(stick.TryReadState(out var pressed, out _));
-		var protocol = OverlayProtocol.Create<FakeJoystickDevice>([stick], version: 1);
-		Assert.Equal((byte)0b10, protocol.WriteState([pressed]).ToArray()[4]);
+		Assert.True(OverlayFrameReader.ReadState(protocol.WriteState([pressed]), descriptor)
+			.Devices[0].Buttons[1]);
 
 		// The state buffer is reused frame-to-frame; a released button must not
 		// leave its old bit behind.
 		stick.ReleaseButton(2);
 		Assert.True(stick.TryReadState(out var released, out _));
-		Assert.Equal((byte)0, protocol.WriteState([released]).ToArray()[4]);
+		Assert.False(OverlayFrameReader.ReadState(protocol.WriteState([released]), descriptor)
+			.Devices[0].Buttons[1]);
+	}
+
+	[Fact]
+	public void WireGrammar_GoldenBytes()
+	{
+		// The raw byte layout IS the contract with the joyviz client — pin it
+		// once, literally: [0x01][ver][count] [kind][axes][buttons][nameLen]"Go"[axis]
+		// and [0x02][ver][X int16 LE][one button byte].
+		var stick = _Fakes.AddInputDevice("Go").AddAxis(Axis.X).AddButtons(2).Build();
+		stick.SetAxisValue(Axis.X, 1.0);
+		stick.PressButton(1);
+		Assert.True(stick.TryReadState(out var state, out _));
+
+		var protocol = OverlayProtocol.Create<FakeJoystickDevice>([stick], version: 1);
+
+		Assert.Equal(
+			(byte[])[0x01, 1, 1, 0, 1, 2, 2, (byte)'G', (byte)'o', (byte)Axis.X],
+			protocol.Descriptor);
+		Assert.Equal(
+			(byte[])[0x02, 1, 0xFF, 0x7F, 0b1],
+			protocol.WriteState([state]).ToArray());
 	}
 }
