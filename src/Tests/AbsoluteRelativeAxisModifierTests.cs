@@ -104,6 +104,40 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	}
 
 	[Fact]
+	public void ZeroElapsedFrames_FreezeThePulseAndTheModel()
+	{
+		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
+		{
+			OutputRiseTime = TimeSpan.FromSeconds(1.0),
+			OutputFallTime = TimeSpan.FromSeconds(1.0),
+			IncreaseTimeToFull = TimeSpan.FromSeconds(4.0),
+			Gain = 10.0,
+			ErrorTolerance = 1e-6,
+		});
+
+		// Two frames of convergence: Current 0 → 0.25 → 0.5, pulse saturated.
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		Step(runtime);
+		Step(runtime);
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// Frames at the same instant integrate nothing: the pulse holds and the
+		// model must not advance.
+		runtime.ProcessFrame(TimeSpan.Zero);
+		runtime.ProcessFrame(TimeSpan.Zero);
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// Convergence resumes exactly on schedule: two more real frames reach
+		// the target (0.5 → 0.75 → 1.0), the fifth drops the pulse. Had the
+		// zero-elapsed frames advanced the model, the drop would come earlier.
+		Step(runtime);
+		Step(runtime);
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+		Step(runtime);
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
 	public void SourceInputRange_MapsLinearlyOntoTargetRange_AndClampsOutside()
 	{
 		using var runtime = BuildRuntime(MakeOptions(initial: 0.0) with
