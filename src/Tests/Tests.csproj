@@ -21,6 +21,7 @@
         <ProjectReference Include="..\LinuxNative\LinuxNative.csproj" />
         <ProjectReference Include="..\InputSynthesis.Windows\InputSynthesis.Windows.csproj" />
         <ProjectReference Include="..\OutputAbstractions\OutputAbstractions.csproj" />
+        <ProjectReference Include="..\Overlay.WebSockets\Overlay.WebSockets.csproj" />
         <ProjectReference Include="..\Testing\Testing.csproj" />
         <ProjectReference Include="..\VJoy\VJoy.csproj" />
     </ItemGroup>
