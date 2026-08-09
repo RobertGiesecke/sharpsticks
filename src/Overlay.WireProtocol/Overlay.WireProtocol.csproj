@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <!--
+        The overlay's wire grammar and nothing else: allocation-free frame
+        readers/writers over plain spans, with axis identities as raw bytes.
+        Deliberately dependency-free so any consumer (the WASM overlay client,
+        tools, tests) can read or write frames without dragging in the device
+        abstractions or the WebSocket server. The Axis-typed conveniences live
+        in Overlay.WebSockets next to the enum.
+    -->
+
+</Project>

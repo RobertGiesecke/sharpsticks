@@ -13,6 +13,7 @@
     <ItemGroup>
         <PackageReference Include="Collections.Pooled.V2" Version="2.4.1"/>
         <ProjectReference Include="..\InputAbstractions\InputAbstractions.csproj"/>
+        <ProjectReference Include="..\Overlay.WireProtocol\Overlay.WireProtocol.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

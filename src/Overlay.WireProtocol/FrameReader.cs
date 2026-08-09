@@ -1,4 +1,4 @@
-namespace SharpSticks.Overlay.WebSockets;
+namespace SharpSticks.Overlay.WireProtocol;
 
 /// <summary>
 /// Entry point for decoding overlay frames without allocating: tag-checks the

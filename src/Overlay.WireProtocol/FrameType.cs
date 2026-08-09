@@ -1,4 +1,4 @@
-namespace SharpSticks.Overlay.WebSockets;
+namespace SharpSticks.Overlay.WireProtocol;
 
 /// <summary>First byte of every overlay frame — the wire grammar's tag.</summary>
 public enum FrameType : byte

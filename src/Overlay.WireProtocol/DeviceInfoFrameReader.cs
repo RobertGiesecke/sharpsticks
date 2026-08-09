@@ -1,4 +1,4 @@
-﻿namespace SharpSticks.Overlay.WebSockets;
+﻿namespace SharpSticks.Overlay.WireProtocol;
 
 public ref struct DeviceInfoFrameReader
 {

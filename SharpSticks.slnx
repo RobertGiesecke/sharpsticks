@@ -17,6 +17,7 @@
   <Project Path="src/ItbMinimal/ItbMinimal.csproj" />
   <Project Path="src/OutputAbstractions/OutputAbstractions.csproj" />
   <Project Path="src/Overlay.WebSockets/Overlay.WebSockets.csproj" />
+  <Project Path="src/Overlay.WireProtocol/Overlay.WireProtocol.csproj" />
   <Project Path="src/Overlay.Integration/Overlay.Integration.csproj" />
   <Project Path="src/Overlay.Server/Overlay.Server.csproj" />
   <Project Path="src/PlatformDefaults/PlatformDefaults.csproj" />

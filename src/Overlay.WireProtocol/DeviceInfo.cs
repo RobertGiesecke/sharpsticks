@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace SharpSticks.Overlay.WebSockets;
+namespace SharpSticks.Overlay.WireProtocol;
 
 /// <summary>One descriptor entry, viewed in place over the frame bytes.</summary>
 public readonly ref struct DeviceInfo
@@ -11,7 +11,10 @@ public readonly ref struct DeviceInfo
 	public required byte ButtonCount { get; init; }
 
 	public int AxisCount => AxesBytes.Length;
-	public Axis GetAxis(int index) => (Axis)AxesBytes[index];
+
+	/// <summary>The wire's one-byte axis identity — the typed accessor lives
+	/// with the axis enum (Overlay.WebSockets' <c>GetAxis</c>).</summary>
+	public byte GetAxisCode(int index) => AxesBytes[index];
 
 	public string GetName() => Encoding.UTF8.GetString(NameBytes);
 

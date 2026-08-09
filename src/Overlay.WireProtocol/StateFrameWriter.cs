@@ -1,4 +1,4 @@
-﻿namespace SharpSticks.Overlay.WebSockets;
+﻿namespace SharpSticks.Overlay.WireProtocol;
 
 /// <summary>
 /// The write-side mirror of <see cref="StateFrameReader"/> /

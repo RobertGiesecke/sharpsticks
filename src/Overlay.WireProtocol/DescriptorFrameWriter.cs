@@ -1,4 +1,4 @@
-namespace SharpSticks.Overlay.WebSockets;
+namespace SharpSticks.Overlay.WireProtocol;
 
 /// <summary>
 /// The write-side mirror of <see cref="DescriptorFrameReader"/>: emits the
@@ -33,31 +33,29 @@ public ref struct DescriptorFrameWriter
 	public static int MeasureDevice(int nameByteCount, int axisCount) =>
 		4 + nameByteCount + axisCount; // kind, axisCount, buttonCount, nameLen
 
+	/// <summary>Writes one entry; <paramref name="axisCodes"/> carries the wire's
+	/// one-byte axis identities (the typed overload lives with the axis enum).</summary>
 	public bool TryWriteDevice(
 		bool isOutput,
-		ReadOnlySpan<byte> nameUtf8,
-		ReadOnlySpan<Axis> axes,
+		scoped ReadOnlySpan<byte> nameUtf8,
+		scoped ReadOnlySpan<byte> axisCodes,
 		byte buttonCount)
 	{
-		if (nameUtf8.Length > byte.MaxValue || axes.Length > byte.MaxValue ||
-		    _Frame.Length - _Offset < MeasureDevice(nameUtf8.Length, axes.Length))
+		if (nameUtf8.Length > byte.MaxValue || axisCodes.Length > byte.MaxValue ||
+		    _Frame.Length - _Offset < MeasureDevice(nameUtf8.Length, axisCodes.Length))
 		{
 			return false;
 		}
 
 		var pos = _Offset;
 		_Frame[pos++] = isOutput ? (byte)1 : (byte)0;
-		_Frame[pos++] = (byte)axes.Length;
+		_Frame[pos++] = (byte)axisCodes.Length;
 		_Frame[pos++] = buttonCount;
 		_Frame[pos++] = (byte)nameUtf8.Length;
 		nameUtf8.CopyTo(_Frame[pos..]);
 		pos += nameUtf8.Length;
-		foreach (var axis in axes)
-		{
-			_Frame[pos++] = (byte)axis;
-		}
-
-		_Offset = pos;
+		axisCodes.CopyTo(_Frame[pos..]);
+		_Offset = pos + axisCodes.Length;
 		return true;
 	}
 

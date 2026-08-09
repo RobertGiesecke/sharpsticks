@@ -1,6 +1,6 @@
 ﻿using System.Buffers.Binary;
 
-namespace SharpSticks.Overlay.WebSockets;
+namespace SharpSticks.Overlay.WireProtocol;
 
 /// <summary>One device's state, viewed in place over the frame bytes.</summary>
 public readonly ref struct DeviceStateInfo
@@ -17,7 +17,7 @@ public readonly ref struct DeviceStateInfo
 	/// <summary>Normalized [-1, 1] — the client-side division by 32767.</summary>
 	public double GetAxisValue(int index) => GetRawAxisValue(index) / 32767.0;
 
-	/// <summary>1-based like <see cref="JoystickState.IsButtonPressed"/>;
+	/// <summary>1-based (button 1 = bit 0, LSB first);
 	/// out-of-range numbers and padding bits read as released.</summary>
 	public bool IsButtonPressed(int buttonNumber)
 	{

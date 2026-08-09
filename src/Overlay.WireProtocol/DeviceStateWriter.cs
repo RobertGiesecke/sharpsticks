@@ -1,6 +1,6 @@
 ﻿using System.Buffers.Binary;
 
-namespace SharpSticks.Overlay.WebSockets;
+namespace SharpSticks.Overlay.WireProtocol;
 
 /// <summary>Fills one device's slot in a state frame — the write-side mirror
 /// of <see cref="DeviceStateInfo"/>.</summary>
