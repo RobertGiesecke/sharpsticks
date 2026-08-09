@@ -10,3 +10,4 @@ global using SharpSticks.OutputAbstractions;
 global using SharpSticks.Testing;
 global using Xunit;
 global using static System.TimeSpan;
+global using static SharpSticks.Tests.TestDefaults;
