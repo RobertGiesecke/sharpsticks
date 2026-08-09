@@ -105,7 +105,7 @@ public static class RuntimeEventInstance
 			public RuntimeEventInstance<TInputDevice, TOutputDevice, TState> NoAfterRun() => new()
 			{
 				OnBeforeRun = _OnBeforeRun,
-				OnAfterRun = (_, _) => { },
+				OnAfterRun = null,
 			};
 
 			public RuntimeEventInstance<TInputDevice, TOutputDevice, TState> WithAfterRun(
@@ -140,7 +140,7 @@ public static class RuntimeEventInstance
 
 						return NoState.Instance;
 					},
-					OnAfterRun = (_, _) => { },
+					OnAfterRun = null,
 				};
 			}
 
@@ -171,15 +171,16 @@ public sealed class RuntimeEventInstance<TInputDevice, TOutputDevice, TState> : 
 	where TOutputDevice : OutputDevice
 	where TState : class?
 {
-	static readonly bool HasState = typeof(TState) != typeof(RuntimeEventInstance.NoState);
-
+	// A handle exists only when BeforeRun produced state AND an after-run was
+	// wired — gating on the state TYPE would silently disable WithAfterRun on
+	// the no-state variants (NoState.Instance is real state).
 	public IInitializedOnAfterRunEvent? BeforeRun(
 		RuntimeEventInstance.BeforeRunArgs<TInputDevice, TOutputDevice> args,
 		CancellationToken cancellationToken = default) =>
 		OnBeforeRun(args, cancellationToken) switch
 		{
 #pragma warning disable CS8634 // The type cannot be used as type parameter in the generic type or method. Nullability of type argument doesn't match 'class' constraint.
-			{ } state when HasState => new InitializedOnAfterRunEvent<TInputDevice, TOutputDevice, TState>()
+			{ } state when OnAfterRun is not null => new InitializedOnAfterRunEvent<TInputDevice, TOutputDevice, TState>()
 #pragma warning restore CS8634 // The type cannot be used as type parameter in the generic type or method. Nullability of type argument doesn't match 'class' constraint.
 			{
 				Self = this,
@@ -192,7 +193,7 @@ public sealed class RuntimeEventInstance<TInputDevice, TOutputDevice, TState> : 
 	public required Func<RuntimeEventInstance.BeforeRunArgs<TInputDevice, TOutputDevice>, CancellationToken, TState?>
 		OnBeforeRun { get; init; }
 
-	public required Action<RuntimeEventInstance.AfterRunArgs<TInputDevice, TOutputDevice, TState>, CancellationToken>
+	public required Action<RuntimeEventInstance.AfterRunArgs<TInputDevice, TOutputDevice, TState>, CancellationToken>?
 		OnAfterRun { get; init; }
 
 
@@ -216,7 +217,8 @@ internal readonly record struct InitializedOnAfterRunEvent<TInputDevice, TOutput
 
 	public void OnAfterRun(AfterRunArgs args, CancellationToken cancellationToken)
 	{
-		Self.OnAfterRun(new()
+		// The handle is only created when an after-run was wired (see BeforeRun).
+		Self.OnAfterRun!(new()
 		{
 			RunStarted = args.RunStarted,
 			RunFailed = args.RunFailed,
