@@ -14,5 +14,6 @@ public readonly record struct ServeOptions<TInputDevice>
 public readonly record struct OverlayServeEvents<TInputDevice> 
 	where TInputDevice : JoystickDevice
 {
+	public Action<OverlayServeRuntimeOptions<TInputDevice>>? Starting { get; init; }
 	public Action<OverlayServeRuntimeOptions<TInputDevice>>? Started { get; init; }
 }

@@ -83,6 +83,8 @@ public sealed class OverlayServer : IOverlayServer
 		var protocol = OverlayProtocol.Create(runtimeOptions.Devices, version: 1);
 		using var server = new OverlayWebSocketServer(runtimeOptions.Port, protocol.Descriptor, runtimeOptions.WebRoot);
 
+		events?.Starting?.Invoke(runtimeOptions);
+
 		server.Start();
 
 		events?.Started?.Invoke(runtimeOptions);
