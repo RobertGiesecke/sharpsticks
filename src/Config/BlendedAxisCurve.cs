@@ -22,9 +22,11 @@ public sealed record BlendedAxisCurve :
 	// When true, the output is integrated from input deltas through the
 	// currently-active blended curve, so engaging or moving the modifier
 	// axis no longer makes the output jump. Releasing the modifier axis
-	// fades the integrated value back toward the normal curve; reaching
-	// the rest position resets the state so the normal curve fully takes
-	// over again.
+	// fades the integrated value back toward the normal curve; the fade is
+	// one-way (folded into the latched state), so re-engaging holds the
+	// output where it is instead of re-applying a previously faded offset.
+	// Reaching the rest position resets the state so the normal curve fully
+	// takes over again.
 	public bool Stateful { get; init; }
 
 	// Modifier-axis values whose normalized magnitude is at or below this
@@ -55,6 +57,7 @@ public sealed record BlendedAxisCurve :
 			public bool HasState;
 			public double LastInput;
 			public double LastOutput;
+			public double LastFactorT;
 		}
 
 		private readonly ImmutableArray<IRuntimeAxisModifier> _ModifierAxisModifiers;
@@ -107,31 +110,31 @@ public sealed record BlendedAxisCurve :
 				// curve moves the latched value.
 				state.LastOutput += blended - BlendAt(state.LastInput, blend, states);
 				state.LastInput = input;
+
+				// Releasing fades the latched offset toward the normal curve in
+				// proportion to the drop of the raw modifier factor. The fade is
+				// folded into the state and only runs on a drop, so re-engaging
+				// never re-applies a faded offset — pumping the modifier axis
+				// with a steady input must not move the output. LastFactorT is
+				// always above RestThreshold (the reset above), keeping the
+				// division safe.
+				if (factorT < state.LastFactorT)
+				{
+					state.LastOutput = normal + (state.LastOutput - normal) * (factorT / state.LastFactorT);
+				}
+
+				//TODO: optional movement-gated catch-up ("soft takeover"): also bleed
+				// the latched offset proportionally to input travel, so a springless
+				// axis re-anchors to the normal curve during long fully-engaged spells.
 			}
 
-			// Lerp on the raw modifier factor so releasing the axis fades the
-			// integrated value back toward the normal curve.
-			var output = normal * (1.0 - factorT) + state.LastOutput * factorT;
+			state.LastFactorT = factorT;
 
-			// Clamp to the axis limits and bleed any excess off the latched
-			// value — otherwise the integrator winds up beyond what's
-			// representable and the user has to "unwind" before the output
-			// moves again.
-			const double max = 1.0;
-			const double min = -1.0;
-			if (output > max)
-			{
-				state.LastOutput = (max - normal * (1.0 - factorT)) / factorT;
-				return max;
-			}
-
-			if (output < min)
-			{
-				state.LastOutput = (min - normal * (1.0 - factorT)) / factorT;
-				return min;
-			}
-
-			return output;
+			// Clamp to the axis limits directly on the latched value —
+			// otherwise the integrator winds up beyond what's representable
+			// and the user has to "unwind" before the output moves again.
+			state.LastOutput = Math.Clamp(state.LastOutput, -1.0, 1.0);
+			return state.LastOutput;
 		}
 
 		// Probes the curves at a hypothetical (previous) input — always a peek:
