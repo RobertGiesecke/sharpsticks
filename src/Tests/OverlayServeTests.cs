@@ -101,7 +101,7 @@ public sealed class OverlayServeTests : IDisposable
 		using var ws = await OverlayWire.ConnectAsync(port, wire.Token);
 
 		// Descriptor first: one input device with the fake's shape.
-		var descriptor = OverlayFrameReader.ReadDescriptor(
+		var descriptor = OverlayFrames.ReadDescriptor(
 			await OverlayWire.ReceiveBinaryAsync(ws, wire.Token));
 		var described = Assert.Single(descriptor.Devices);
 		Assert.Equal("Stick", described.Name);
@@ -114,7 +114,7 @@ public sealed class OverlayServeTests : IDisposable
 		stick.PressButton(2);
 		while (true)
 		{
-			var state = OverlayFrameReader.ReadState(
+			var state = OverlayFrames.ReadState(
 				await OverlayWire.ReceiveBinaryAsync(ws, wire.Token), descriptor);
 			var device = Assert.Single(state.Devices);
 			if (Math.Abs(device.Axes[0] - 0.5) < 1.0 / 32767.0 && device.Buttons[1])

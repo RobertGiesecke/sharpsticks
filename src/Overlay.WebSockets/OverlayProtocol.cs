@@ -1,24 +1,17 @@
-using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Text;
-using SharpSticks.InputAbstractions;
 
 namespace SharpSticks.Overlay.WebSockets;
 
 /// <summary>
-/// Serializes the current device state into the compact little-endian binary frames the
-/// joyviz overlay consumes over WebSocket. See <c>docs</c> in the plan for the layout:
-///
-/// <code>
-/// Descriptor (0x01): [0x01][ver][deviceCount]  per device:
-///     [kind(0=input,1=output)][axisCount][buttonCount][nameLen][name UTF-8][axisCount x Axis-enum byte]
-/// State (0x02):      [0x02][ver]  per device, in descriptor order:
-///     axes:    int16 x axisCount   (round(v*32767), client divides by 32767)
-///     buttons: ceil(buttonCount/8) bytes, bit i = button (i+1), LSB first
-/// </code>
-///
-/// The descriptor is built once (the device set is fixed for the process lifetime) and the
-/// state buffer is allocated once and reused every frame — no per-frame allocation.
+/// Serializes the current device state into the binary frames the joyviz
+/// overlay consumes over WebSocket. The byte grammar itself lives in the
+/// frame primitives (<see cref="DescriptorFrameWriter"/> /
+/// <see cref="StateFrameWriter"/> for writing, <see cref="FrameReader"/> and
+/// friends for reading) — this type only binds them to live
+/// <see cref="JoystickDevice"/>s: the descriptor is built once (the device
+/// set is fixed for the process lifetime) and the state buffer is allocated
+/// once and reused every frame, so the per-frame path never allocates.
 /// </summary>
 internal static class OverlayProtocol
 {
@@ -27,12 +20,10 @@ internal static class OverlayProtocol
 		byte version)
 		where TInputDevice : JoystickDevice => new(devices, version);
 }
+
 internal sealed class OverlayProtocol<TInputDevice>
 	where TInputDevice : JoystickDevice
 {
-	public const byte FrameDescriptor = 0x01;
-	public const byte FrameState = 0x02;
-
 	private readonly ImmutableArray<TInputDevice> _Devices;
 	private readonly AxisBinding[][] _AxisBindings;
 	private readonly int[] _ButtonCounts;
@@ -43,12 +34,19 @@ internal sealed class OverlayProtocol<TInputDevice>
 
 	public OverlayProtocol(ImmutableArray<TInputDevice> devices, byte version)
 	{
+		if (devices.Length > byte.MaxValue)
+		{
+			throw new ArgumentException(
+				$"The overlay protocol carries at most {byte.MaxValue} devices; got {devices.Length}.",
+				nameof(devices));
+		}
+
 		_Devices = devices;
 		_Version = version;
 		_AxisBindings = new AxisBinding[devices.Length][];
 		_ButtonCounts = new int[devices.Length];
 
-		var stateSize = 2; // [0x02][ver]
+		var stateSize = StateFrameWriter.HeaderSize;
 		for (var i = 0; i < devices.Length; i++)
 		{
 			var device = devices[i];
@@ -60,56 +58,49 @@ internal sealed class OverlayProtocol<TInputDevice>
 			}
 
 			_AxisBindings[i] = bindings;
-			_ButtonCounts[i] = (int)device.Capabilities.NumButtons;
-			stateSize += axes.Length * 2 + ByteCount(_ButtonCounts[i]);
+			// Clamped ONCE: descriptor and state frames must derive their
+			// button-byte counts from the same number or readers desync.
+			_ButtonCounts[i] = Math.Min((int)device.Capabilities.NumButtons, byte.MaxValue);
+			stateSize += StateFrameWriter.MeasureDevice(axes.Length, _ButtonCounts[i]);
 		}
 
 		_StateBuffer = new byte[stateSize];
 		Descriptor = BuildDescriptor();
 	}
 
-	private static int ByteCount(int buttons) => (buttons + 7) / 8;
-
 	private static bool IsOutput(string name) =>
 		name.StartsWith("vJoy", StringComparison.OrdinalIgnoreCase);
 
 	private byte[] BuildDescriptor()
 	{
-		// Size the descriptor exactly, then write it.
-		var size = 3; // [0x01][ver][deviceCount]
+		// Size the descriptor exactly, then write it through the frame writer.
+		var size = DescriptorFrameWriter.HeaderSize;
 		var nameBytes = new byte[_Devices.Length][];
 		for (var i = 0; i < _Devices.Length; i++)
 		{
 			var name = _Devices[i].Name ?? "";
 			var bytes = Encoding.UTF8.GetBytes(name);
-			if (bytes.Length > 255)
+			if (bytes.Length > byte.MaxValue)
 			{
-				bytes = bytes[..255];
+				bytes = bytes[..byte.MaxValue];
 			}
 
 			nameBytes[i] = bytes;
-			// kind, axisCount, buttonCount, nameLen, name, axisCount x axis-enum byte
-			size += 4 + bytes.Length + _Devices[i].PhysicalAxes.Length;
+			size += DescriptorFrameWriter.MeasureDevice(bytes.Length, _Devices[i].PhysicalAxes.Length);
 		}
 
 		var buffer = new byte[size];
-		buffer[0] = FrameDescriptor;
-		buffer[1] = _Version;
-		buffer[2] = (byte)_Devices.Length;
-		var pos = 3;
+		var writer = new DescriptorFrameWriter(buffer, _Version, (byte)_Devices.Length);
 		for (var i = 0; i < _Devices.Length; i++)
 		{
 			var device = _Devices[i];
-			var axes = device.PhysicalAxes;
-			buffer[pos++] = (byte)(IsOutput(device.Name ?? "") ? 1 : 0);
-			buffer[pos++] = (byte)axes.Length;
-			buffer[pos++] = (byte)Math.Min(_ButtonCounts[i], 255);
-			buffer[pos++] = (byte)nameBytes[i].Length;
-			Array.Copy(nameBytes[i], 0, buffer, pos, nameBytes[i].Length);
-			pos += nameBytes[i].Length;
-			for (var a = 0; a < axes.Length; a++)
+			if (!writer.TryWriteDevice(
+				    IsOutput(device.Name ?? ""),
+				    nameBytes[i],
+				    device.PhysicalAxes.AsSpan(),
+				    (byte)_ButtonCounts[i]))
 			{
-				buffer[pos++] = (byte)axes[a];
+				throw new InvalidOperationException("Descriptor buffer was sized incorrectly.");
 			}
 		}
 
@@ -123,47 +114,38 @@ internal sealed class OverlayProtocol<TInputDevice>
 	/// </summary>
 	public ReadOnlySpan<byte> WriteState(JoystickState?[] states)
 	{
-		var buffer = _StateBuffer;
-		Array.Clear(buffer); // zero button bits + any padding up front
-		buffer[0] = FrameState;
-		buffer[1] = _Version;
-		var pos = 2;
+		var writer = new StateFrameWriter(_StateBuffer, _Version);
 
 		for (var i = 0; i < _Devices.Length; i++)
 		{
 			var device = _Devices[i];
 			var bindings = _AxisBindings[i];
-			var state = states[i];
+			var buttonCount = _ButtonCounts[i];
+			if (!writer.TryBeginDevice((byte)bindings.Length, (byte)buttonCount, out var deviceWriter))
+			{
+				throw new InvalidOperationException("State buffer was sized incorrectly.");
+			}
+
+			// A null state leaves the freshly-zeroed slot as-is: centered + released.
+			if (states[i] is not { } state)
+			{
+				continue;
+			}
 
 			for (var a = 0; a < bindings.Length; a++)
 			{
-				var normalized = state is { } s ? device.ReadNormalizedAxisValue(s, bindings[a]) : 0.0;
-				BinaryPrimitives.WriteInt16LittleEndian(buffer.AsSpan(pos), ToInt16(normalized));
-				pos += 2;
+				deviceWriter.WriteAxisValue(a, device.ReadNormalizedAxisValue(state, bindings[a]));
 			}
 
-			var buttonCount = _ButtonCounts[i];
-			var buttonBytes = ByteCount(buttonCount);
-			if (state is { } bs)
+			for (var b = 1; b <= buttonCount; b++)
 			{
-				for (var b = 0; b < buttonCount; b++)
+				if (state.IsButtonPressed(b))
 				{
-					if (bs.IsButtonPressed(b + 1))
-					{
-						buffer[pos + (b >> 3)] |= (byte)(1 << (b & 7));
-					}
+					deviceWriter.SetButton(b);
 				}
 			}
-
-			pos += buttonBytes;
 		}
 
-		return buffer.AsSpan(0, pos);
-	}
-
-	private static short ToInt16(double normalized)
-	{
-		var clamped = Math.Clamp(normalized, -1.0, 1.0);
-		return (short)Math.Round(clamped * 32767.0);
+		return _StateBuffer.AsSpan(0, writer.BytesWritten);
 	}
 }
