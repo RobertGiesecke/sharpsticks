@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -72,28 +73,43 @@ internal sealed class OverlayProtocol<TInputDevice>
 	{
 		// Size the descriptor exactly, then write it through the frame writer.
 		var size = DescriptorFrameWriter.HeaderSize;
-		var nameBytes = new byte[_Devices.Length][];
+		using var nameBytesOwner = MemoryPool<IMemoryOwner<byte>>.Shared.Rent(_Devices.Length);
+		using var nameLengthOwner = MemoryPool<int>.Shared.Rent(_Devices.Length);
+
+
+		var utf8 = Encoding.UTF8;
 		for (var i = 0; i < _Devices.Length; i++)
 		{
 			var name = _Devices[i].Name ?? "";
-			var bytes = Encoding.UTF8.GetBytes(name);
-			if (bytes.Length > byte.MaxValue)
+			var byteCount = utf8.GetByteCount(name);
+			using var deferBytesOwner = MemoryPool<byte>.Shared.Rent(byteCount).Defer();
+			var usedByteCount = utf8.GetBytes(name, deferBytesOwner.Value.Memory.Span);
+
+			if (usedByteCount > byte.MaxValue)
 			{
-				bytes = bytes[..byte.MaxValue];
+				usedByteCount = byte.MaxValue;
 			}
 
-			nameBytes[i] = bytes;
-			size += DescriptorFrameWriter.MeasureDevice(bytes.Length, _Devices[i].PhysicalAxes.Length);
+			size += DescriptorFrameWriter.MeasureDevice(usedByteCount, _Devices[i].PhysicalAxes.Length);
+			nameLengthOwner.Memory.Span[i] = usedByteCount;
+			nameBytesOwner.Memory.Span[i] = deferBytesOwner.GetAndSkipDispose();
 		}
 
-		var buffer = new byte[size];
-		var writer = new DescriptorFrameWriter(buffer, _Version, (byte)_Devices.Length);
+		using var deferBuffer =  MemoryPool<byte>.Shared.Rent(size).Defer();
+		var buffer = deferBuffer.Value;
+
+		var writer = new DescriptorFrameWriter(buffer.Memory.Span, _Version, (byte)_Devices.Length);
 		for (var i = 0; i < _Devices.Length; i++)
 		{
 			var device = _Devices[i];
+			var usedByteCount = nameLengthOwner.Memory.Span[i];
+
+			using var usedBytesOwner = nameBytesOwner.Memory.Span[i].Defer();
+
+			var usedBytes = usedBytesOwner.Value.Memory.Span[..usedByteCount];
 			if (!writer.TryWriteDevice(
 				    device.IsVirtualOutputMirror,
-				    nameBytes[i],
+				    usedBytes,
 				    device.PhysicalAxes.AsSpan(),
 				    (byte)_ButtonCounts[i]))
 			{
@@ -101,7 +117,7 @@ internal sealed class OverlayProtocol<TInputDevice>
 			}
 		}
 
-		return buffer;
+		return deferBuffer.GetAndSkipDispose().Memory.ToArray();
 	}
 
 	/// <summary>
@@ -111,14 +127,14 @@ internal sealed class OverlayProtocol<TInputDevice>
 	/// </summary>
 	public ReadOnlySpan<byte> WriteState(JoystickState?[] states)
 	{
-		var writer = new StateFrameWriter(_StateBuffer, _Version);
+		scoped var writer = new StateFrameWriter(_StateBuffer, _Version);
 
 		for (var i = 0; i < _Devices.Length; i++)
 		{
 			var device = _Devices[i];
 			var bindings = _AxisBindings[i];
 			var buttonCount = _ButtonCounts[i];
-			if (!writer.TryBeginDevice((byte)bindings.Length, (byte)buttonCount, out var deviceWriter))
+			if (!writer.TryBeginDevice((byte)bindings.Length, (byte)buttonCount, out scoped var deviceWriter))
 			{
 				throw new InvalidOperationException("State buffer was sized incorrectly.");
 			}
