@@ -16,14 +16,15 @@ public sealed class LinuxOutputDeviceFactory : IOutputDeviceFactory<LinuxOutputD
 	// Identity stamped on every virtual device (see SetupDevice). The same (vendor, product)
 	// lets us find the freshly-created evdev node again after UI_DEV_CREATE and read back the
 	// DeviceId the input enumerator assigns it, so InputDeviceId correlates output ↔ input.
-	private const ushort VirtualVendor = 0xfeed;
+	private const ushort VirtualVendor = VirtualOutputProducts.UinputVendorId;
 
-	private static ushort VirtualProduct(uint deviceId) => (ushort)(0xc000 | (deviceId & 0xff));
+	private static ushort VirtualProduct(uint deviceId) =>
+		(ushort)(VirtualOutputProducts.UinputProductBase | (deviceId & 0xff));
 
 	private static uint DeviceIdFromProduct(ushort product) => (uint)(product & 0xff);
 
 	private static bool IsVirtualProduct(ushort vendor, ushort product) =>
-		vendor == VirtualVendor && (product & 0xff00) == 0xc000;
+		vendor == VirtualVendor && (product & 0xff00) == VirtualOutputProducts.UinputProductBase;
 
 	// uinput has no persistent slots to enumerate — a device exists only while some process holds
 	// it open. But a live SharpSticks output surfaces as an evdev input stamped with our (vendor,

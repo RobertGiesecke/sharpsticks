@@ -11,7 +11,7 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 	/// surfaces under the same ProductGuid; we disambiguate which DirectInput entry
 	/// corresponds to which vJoy slot by (axis count, button count) fingerprint and
 	/// stable sequential claim from the candidate pool.
-	internal static Guid VJoyProductGuid { get; } = ProductGuidEncoder.Encode(vendor: 0x1234, product: 0xBEAD);
+	internal static Guid VJoyProductGuid { get; } = VirtualOutputProducts.VJoyProductGuid;
 
 	/// The name vJoy's DirectInput entries report; used so a declared output maps to the same
 	/// identity as its input-side counterpart.
