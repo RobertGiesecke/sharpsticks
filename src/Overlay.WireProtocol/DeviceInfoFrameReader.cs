@@ -20,9 +20,9 @@ public ref struct DeviceInfoFrameReader
 
 	public bool MoveNext(out DeviceInfo deviceInfo)
 	{
-		deviceInfo = default;
 		if (_DeviceIndex >= _DeviceCount)
 		{
+			deviceInfo = default;
 			return false;
 		}
 
@@ -30,6 +30,7 @@ public ref struct DeviceInfoFrameReader
 		var pos = _Offset;
 		if (frame.Length - pos < 4)
 		{
+			deviceInfo = default;
 			return false; // truncated header — never read out of bounds
 		}
 
@@ -39,6 +40,7 @@ public ref struct DeviceInfoFrameReader
 		int nameLength = frame[pos++];
 		if (frame.Length - pos < nameLength + axisCount)
 		{
+			deviceInfo = default;
 			return false; // truncated name/axes
 		}
 
