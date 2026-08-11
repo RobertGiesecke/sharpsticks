@@ -65,7 +65,7 @@ public sealed class OverlayFrameWriterTests : IDisposable
 		var reader = OverlayFrames.CreateReader(original).GetDescriptorFrameReader().Value;
 		foreach (var info in reader.EnumerateDevices())
 		{
-			Assert.True(writer.TryWriteDevice(in info));
+			Assert.True(writer.TryWriteDevice(info));
 		}
 
 		Assert.True(rewritten[..writer.BytesWritten].SequenceEqual(original));

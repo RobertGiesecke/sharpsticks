@@ -59,7 +59,7 @@ public ref struct DescriptorFrameWriter
 	}
 
 	/// <summary>Writes an entry from its read-side view — <c>write(read(x)) == x</c>.</summary>
-	public bool TryWriteDevice(in DeviceInfo deviceInfo)
+	public bool TryWriteDevice(scoped DeviceInfo deviceInfo)
 	{
 		if (deviceInfo.NameBytes.Length > byte.MaxValue || deviceInfo.AxesBytes.Length > byte.MaxValue ||
 		    _Frame.Length - BytesWritten < MeasureDevice(deviceInfo.NameBytes.Length, deviceInfo.AxesBytes.Length))
