@@ -16,6 +16,7 @@ public sealed class FakeInputDeviceBuilder
 	private int _ButtonCount;
 	private string? _InstanceName;
 	private Guid? _InstanceGuid;
+	private Guid? _ProductGuid;
 	private FakeJoystickDevice? _Built;
 
 	internal FakeInputDeviceBuilder(FakeDeviceManager manager, int deviceId, string name)
@@ -64,6 +65,18 @@ public sealed class FakeInputDeviceBuilder
 		return this;
 	}
 
+	/// <summary>
+	/// Sets the HID product identity. Use e.g.
+	/// <see cref="VirtualOutputProducts.VJoyProductGuid"/> to simulate the
+	/// input-side mirror of a virtual output device.
+	/// </summary>
+	public FakeInputDeviceBuilder WithProductGuid(Guid productGuid)
+	{
+		ThrowIfBuilt();
+		_ProductGuid = productGuid;
+		return this;
+	}
+
 	public FakeJoystickDevice Build()
 	{
 		if (_Built is not null)
@@ -77,7 +90,8 @@ public sealed class FakeInputDeviceBuilder
 			[.._Axes],
 			Math.Max(_ButtonCount, 1),
 			_InstanceName,
-			_InstanceGuid);
+			_InstanceGuid,
+			_ProductGuid);
 
 		foreach (var (axis, rest) in _RestValues)
 		{

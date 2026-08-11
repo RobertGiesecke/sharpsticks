@@ -11,12 +11,20 @@ public sealed class FakeDeviceManager : IDisposable
 {
 	private readonly List<FakeJoystickDevice> _InputDevices = [];
 	private readonly FakeOutputDeviceFactory _OutputDeviceFactory = new();
+	private FakeInputDeviceFactory? _InputDeviceFactory;
 	private readonly List<FakeOutputDevice> _OutputDevicesList = [];
 	private int _NextInputDeviceId = 1;
 	private uint _NextOutputDeviceId = 1;
 	private bool _Disposed;
 
 	public IOutputDeviceFactory<FakeOutputDevice> OutputDeviceFactory => _OutputDeviceFactory;
+
+	/// <summary>
+	/// Enumerates this manager's registered input devices, for code paths that
+	/// take a factory instead of a device list (e.g. the overlay serve path).
+	/// </summary>
+	public IJoystickDeviceFactory<FakeJoystickDevice> InputDeviceFactory =>
+		_InputDeviceFactory ??= new(this);
 
 	public ImmutableArray<FakeJoystickDevice> InputDevices => [.._InputDevices];
 
