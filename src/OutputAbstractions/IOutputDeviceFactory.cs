@@ -13,21 +13,13 @@ public interface IOutputDeviceFactory<T> : IOutputDeviceFactory
 		IReadOnlyList<JoystickDevice> availableInputs)
 	{
 		using var list = EnumerateConnectedOutputDevices(requests, availableInputs);
-		var result = new PooledList<OutputDevice>(list.Count);
-		try
+		using var result = new PooledList<OutputDevice>(list.Count).Defer();
+		foreach (var device in list)
 		{
-			foreach (var device in list)
-			{
-				result.Add(device);
-			}
+			result.Value.Add(device);
+		}
 
-			return result;
-		}
-		catch
-		{
-			result.Dispose();
-			throw;
-		}
+		return result.GetAndSkipDispose();
 	}
 }
 

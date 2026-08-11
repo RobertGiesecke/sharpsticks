@@ -45,33 +45,26 @@ public static partial class VJoyNative
 
 	private static PooledList<string?> GetCandidatePaths()
 	{
-		var result = new PooledList<string?>();
-		try
+		using var deferResult = new PooledList<string?>().Defer();
+		var result = deferResult.Value;
+		result.Add(Environment.GetEnvironmentVariable("VJOY_DLL_PATH"));
+		result.Add(Path.Combine(AppContext.BaseDirectory, "vJoyInterface.dll"));
+
+		var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+		var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+
+		if (Environment.Is64BitProcess)
 		{
-			result.Add(Environment.GetEnvironmentVariable("VJOY_DLL_PATH"));
-			result.Add(Path.Combine(AppContext.BaseDirectory, "vJoyInterface.dll"));
-
-			var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-			var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-
-			if (Environment.Is64BitProcess)
-			{
-				result.Add(Path.Combine(programFiles, "vJoy", "x64", "vJoyInterface.dll"));
-				result.Add(Path.Combine(programFilesX86, "vJoy", "x64", "vJoyInterface.dll"));
-			}
-			else
-			{
-				result.Add(Path.Combine(programFilesX86, "vJoy", "x86", "vJoyInterface.dll"));
-				result.Add(Path.Combine(programFiles, "vJoy", "x86", "vJoyInterface.dll"));
-			}
-
-			return result;
+			result.Add(Path.Combine(programFiles, "vJoy", "x64", "vJoyInterface.dll"));
+			result.Add(Path.Combine(programFilesX86, "vJoy", "x64", "vJoyInterface.dll"));
 		}
-		catch
+		else
 		{
-			result.Dispose();
-			throw;
+			result.Add(Path.Combine(programFilesX86, "vJoy", "x86", "vJoyInterface.dll"));
+			result.Add(Path.Combine(programFiles, "vJoy", "x86", "vJoyInterface.dll"));
 		}
+
+		return deferResult.GetAndSkipDispose();
 	}
 
 	// vJoy's export is lowercase `vJoyEnabled`; the others match their PascalCase method names.

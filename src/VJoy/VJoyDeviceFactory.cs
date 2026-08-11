@@ -78,18 +78,9 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 		IReadOnlyCollection<OutputDeviceRequest> requests,
 		IReadOnlyList<JoystickDevice>? availableInputs = null)
 	{
-		var devices = new PooledList<VJoyDevice>(requests.Count);
-		try
-		{
-			OpenAll(requests, availableInputs, devices);
-			return devices;
-		}
-		catch
-		{
-			DisposeAll(devices);
-			devices.Dispose();
-			throw;
-		}
+		using var devices = new PooledList<VJoyDevice>(requests.Count).DeferList();
+		OpenAll(requests, availableInputs, devices.List);
+		return devices.GetAndSkipDispose();
 	}
 
 	private static void OpenAll<TInputDevice, TDevice>(
