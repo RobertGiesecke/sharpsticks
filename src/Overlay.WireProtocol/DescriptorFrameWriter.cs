@@ -9,7 +9,6 @@ namespace SharpSticks.Overlay.WireProtocol;
 public ref struct DescriptorFrameWriter
 {
 	private readonly Span<byte> _Frame;
-	private int _Offset;
 
 	public DescriptorFrameWriter(Span<byte> frame, byte version, byte deviceCount)
 	{
@@ -23,12 +22,12 @@ public ref struct DescriptorFrameWriter
 		frame[1] = version;
 		frame[2] = deviceCount;
 		_Frame = frame;
-		_Offset = HeaderSize;
+		BytesWritten = HeaderSize;
 	}
 
 	public const int HeaderSize = 3; // [0x01][ver][deviceCount]
 
-	public int BytesWritten => _Offset;
+	public int BytesWritten { get; private set; }
 
 	public static int MeasureDevice(int nameByteCount, int axisCount) =>
 		4 + nameByteCount + axisCount; // kind, axisCount, buttonCount, nameLen
@@ -42,12 +41,12 @@ public ref struct DescriptorFrameWriter
 		byte buttonCount)
 	{
 		if (nameUtf8.Length > byte.MaxValue || axisCodes.Length > byte.MaxValue ||
-		    _Frame.Length - _Offset < MeasureDevice(nameUtf8.Length, axisCodes.Length))
+		    _Frame.Length - BytesWritten < MeasureDevice(nameUtf8.Length, axisCodes.Length))
 		{
 			return false;
 		}
 
-		var pos = _Offset;
+		var pos = BytesWritten;
 		_Frame[pos++] = isOutput ? (byte)1 : (byte)0;
 		_Frame[pos++] = (byte)axisCodes.Length;
 		_Frame[pos++] = buttonCount;
@@ -55,7 +54,7 @@ public ref struct DescriptorFrameWriter
 		nameUtf8.CopyTo(_Frame[pos..]);
 		pos += nameUtf8.Length;
 		axisCodes.CopyTo(_Frame[pos..]);
-		_Offset = pos + axisCodes.Length;
+		BytesWritten = pos + axisCodes.Length;
 		return true;
 	}
 
@@ -63,12 +62,12 @@ public ref struct DescriptorFrameWriter
 	public bool TryWriteDevice(in DeviceInfo deviceInfo)
 	{
 		if (deviceInfo.NameBytes.Length > byte.MaxValue || deviceInfo.AxesBytes.Length > byte.MaxValue ||
-		    _Frame.Length - _Offset < MeasureDevice(deviceInfo.NameBytes.Length, deviceInfo.AxesBytes.Length))
+		    _Frame.Length - BytesWritten < MeasureDevice(deviceInfo.NameBytes.Length, deviceInfo.AxesBytes.Length))
 		{
 			return false;
 		}
 
-		var pos = _Offset;
+		var pos = BytesWritten;
 		_Frame[pos++] = deviceInfo.IsOutput ? (byte)1 : (byte)0;
 		_Frame[pos++] = (byte)deviceInfo.AxesBytes.Length;
 		_Frame[pos++] = deviceInfo.ButtonCount;
@@ -76,7 +75,7 @@ public ref struct DescriptorFrameWriter
 		deviceInfo.NameBytes.CopyTo(_Frame[pos..]);
 		pos += deviceInfo.NameBytes.Length;
 		deviceInfo.AxesBytes.CopyTo(_Frame[pos..]);
-		_Offset = pos + deviceInfo.AxesBytes.Length;
+		BytesWritten = pos + deviceInfo.AxesBytes.Length;
 		return true;
 	}
 }
