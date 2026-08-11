@@ -23,7 +23,7 @@ public sealed class OverlayServer : IOverlayServer
 
 		{
 			using var enumerated = deviceFactory.EnumerateConnectedInputDevices();
-			devices = FilterDevices(enumerated, options.DevicePredicate);
+			devices = FilterDevices(enumerated, BuildDevicePredicate(options));
 		}
 
 		if (devices.Length == 0)
@@ -153,6 +153,23 @@ public sealed class OverlayServer : IOverlayServer
 			server.Broadcast(protocol.WriteState(states));
 			lastSendMs = nowMs;
 		}
+	}
+
+	private static Func<TInputDevice, bool>? BuildDevicePredicate<TInputDevice>(
+		in ServeOptions<TInputDevice> options)
+		where TInputDevice : JoystickDevice
+	{
+		var predicate = options.DevicePredicate;
+		if (options.IncludeOutputDevices)
+		{
+			return predicate;
+		}
+
+		return predicate switch
+		{
+			null => static device => !device.IsVirtualOutputMirror,
+			_ => device => !device.IsVirtualOutputMirror && predicate(device),
+		};
 	}
 
 	private static ImmutableArray<TInputDevice> FilterDevices<TInputDevice>(

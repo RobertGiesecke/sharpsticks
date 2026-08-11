@@ -1,12 +1,14 @@
-// SharpSticks.Overlay.Server — reads the selected DirectInput devices (physical sticks and,
-// since vJoy also enumerates as a DirectInput game controller, the vJoy output) and
-// broadcasts their full state to the joyviz overlay over a local binary WebSocket.
+// SharpSticks.Overlay.Server — reads the selected DirectInput devices and broadcasts
+// their full state to the joyviz overlay over a local binary WebSocket.
 //
 //   OverlayServer list
-//   OverlayServer serve [--port 8787] [--device <name|id|substring>]...
+//   OverlayServer serve [--port 8787] [--device <name|id|substring>]... [--include-outputs]
 //
 // Runs as its own process alongside the routing engine; DirectInput is opened non-exclusive
-// so both can read the same devices at once.
+// so both can read the same physical devices at once. Virtual output devices (vJoy) are
+// skipped by default — holding their DirectInput mirror open blocks the routing engine
+// from feeding them. Pass --include-outputs to serve them anyway (e.g. when no engine
+// is running); the in-process ServeOverlay integration serves them safely instead.
 
 namespace SharpSticks.Overlay.Server;
 
@@ -98,9 +100,12 @@ public static class Program
 		Console.WriteLine($"{devices.Count} device(s):");
 		foreach (var device in devices)
 		{
+			var outputMarker = device.IsVirtualOutputMirror
+				? " (virtual output; served only with --include-outputs)"
+				: "";
 			Console.WriteLine(
 				$"  id={device.DeviceId,-3} axes={device.PhysicalAxes.Length} " +
-				$"buttons={device.Capabilities.NumButtons,-3} \"{device.Name}\"");
+				$"buttons={device.Capabilities.NumButtons,-3} \"{device.Name}\"{outputMarker}");
 			device.Dispose();
 		}
 	}
