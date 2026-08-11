@@ -68,9 +68,6 @@ internal sealed class OverlayProtocol<TInputDevice>
 		Descriptor = BuildDescriptor();
 	}
 
-	private static bool IsOutput(string name) =>
-		name.StartsWith("vJoy", StringComparison.OrdinalIgnoreCase);
-
 	private byte[] BuildDescriptor()
 	{
 		// Size the descriptor exactly, then write it through the frame writer.
@@ -95,7 +92,7 @@ internal sealed class OverlayProtocol<TInputDevice>
 		{
 			var device = _Devices[i];
 			if (!writer.TryWriteDevice(
-				    IsOutput(device.Name ?? ""),
+				    device.IsVirtualOutputMirror,
 				    nameBytes[i],
 				    device.PhysicalAxes.AsSpan(),
 				    (byte)_ButtonCounts[i]))

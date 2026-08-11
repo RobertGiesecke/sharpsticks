@@ -2,6 +2,19 @@
 
 public static class OverlayUtils
 {
+	extension(JoystickDevice device)
+	{
+		/// <summary>
+		/// Whether this device is the input-side mirror of a virtual output device
+		/// (vJoy's DirectInput entry, a SharpSticks uinput node). Recognized by HID
+		/// identity via <see cref="VirtualOutputProducts"/>, with a name fallback for
+		/// vJoy entries that don't carry the product guid (e.g. test fakes).
+		/// </summary>
+		public bool IsVirtualOutputMirror =>
+			VirtualOutputProducts.IsVirtualOutput(device.ProductGuid)
+			|| device.Name.StartsWith("vJoy", StringComparison.OrdinalIgnoreCase);
+	}
+
 	public static void ShowServerStatus<TInputDevice>(OverlayServeRuntimeOptions<TInputDevice> runtimeOptions)
 		where TInputDevice : JoystickDevice
 	{
