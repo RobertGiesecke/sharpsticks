@@ -133,7 +133,7 @@ BuildAndRunAsConsole(new()
 			IncreaseResponseDeadzone = 0.042,
 			DecreaseResponseDeadzone = 0.041,
 			IncreaseResponseExponent = 0.95,
-			DecreaseResponseExponent = 0.75,
+			DecreaseResponseExponent = 0.84,
 			// Do not model response inertia here. Predicting coast after the lever
 			// stops causes an opposite correction and a visible backward bounce.
 			IncreaseResponseTimeConstant = TimeSpan.Zero,
@@ -152,7 +152,7 @@ BuildAndRunAsConsole(new()
 			// Step-and-hold calibration: these deliberately advance the internal
 			// model faster than the earlier full-pulse fit, which otherwise kept the
 			// minimum pulse active and drove through every requested position.
-			IncreaseTimeToFull = FromSeconds(0.540),
+			IncreaseTimeToFull = FromSeconds(0.900),
 			DecreaseTimeToFull = FromSeconds(0.700),
 		}),
 	],
