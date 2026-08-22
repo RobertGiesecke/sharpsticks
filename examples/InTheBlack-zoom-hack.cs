@@ -34,6 +34,11 @@ using static System.TimeSpan;
 [assembly: RenameDevice(DeviceNames.VirpilControls20220407VpcRudderPedals, "Pedals")]
 #endif
 
+var VJoy1 = Typed.VJoyDevice;
+var zoomProfile = ZoomProfile.FromEnvironment();
+Console.WriteLine(
+	$"Zoom profile: {zoomProfile.Name} (set SHARPSTICKS_ZOOM_PROFILE to low-latency, balanced, or smooth)");
+
 var groupedZoomAxes = Pedals.Axes.RightToeBrake
 	.GroupWith(LeftStick.Axes.BrakeLever)
 	.WithAxisMode(AxisMode.Unsigned);
@@ -41,12 +46,12 @@ var groupedZoomAxes = Pedals.Axes.RightToeBrake
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 1.8d },
-	PrecisionCurve = new AxisCurve { Max = 0.05d },
+	PrecisionCurve = new AxisCurve { Max = 0.01d },
 	// Whichever is engaged the furthest wins — ModifierAxes takes the max.
 	// Unsigned: both rest at the hardware minimum → factor 0 at rest.
 	ModifierAxes =
 	[
-		..groupedZoomAxes.SourceAxes,
+		.. groupedZoomAxes.SourceAxes,
 	],
 	Stateful = true,
 };
@@ -84,14 +89,16 @@ BuildAndRunAsConsole(new()
 		}),
 		RightStick.Buttons.Trigger.RouteTo(VJoy1.Buttons.Fire),
 		LeftStick.Buttons.Outer2WayUp.RouteTo(VJoy1.Buttons.CenterHeadTracking),
-		..LeftStick.Axes.BrakeLever.RouteWhenInRange(-0.95d, 1d, VJoy1.Buttons.HoldForZoom,
-			options: new()
+		// Leave the first 5% of lever travel completely unzoomed. Beyond -0.9,
+		// the remaining physical travel maps continuously onto 0..100% zoom.
+		.. LeftStick.Axes.BrakeLever.RouteWhenInRange(-0.9d, 1d, VJoy1.Buttons.HoldForZoom,
+				options: new()
+				{
+					IncludeMax = true,
+					Mode = AxisZoneTriggerMode.Hold,
+				}) switch
 			{
-				IncludeMax = true,
-				Mode = AxisZoneTriggerMode.Hold,
-			}) switch
-			{
-				var x => ImmutableArray.Create(x, x with 
+				var x => ImmutableArray.Create(x, x with
 				{
 					Target = VJoy1.Buttons.HoldWhenNotZoomed,
 					Inverted = true,
@@ -101,7 +108,7 @@ BuildAndRunAsConsole(new()
 		RightStick.Axes.Y.RouteTo(VJoy1.Axes.Pitch, modifier: modifierBlendCurve),
 		RightStick.Axes.Twist.RouteTo(VJoy1.Axes.Yaw, modifier: modifierBlendCurve),
 
-		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever/*, scale: 2, offset: -1*/),
+		LeftStick.Axes.BrakeLever.RouteTo(VJoy1.Axes.BrakeLever /*, scale: 2, offset: -1*/),
 		Pedals.Axes.RightToeBrake.RouteTo(VJoy1.Axes.RightToeBrake, scale: 2, offset: -1),
 		// simulate absolute zoom with 2 virtual relative axes
 		LeftStick.Axes.BrakeLever.RouteAbsoluteRelative(new()
@@ -110,25 +117,43 @@ BuildAndRunAsConsole(new()
 			DecreaseAxis = VJoy1.Axes.ZoomInOut,
 			// The lever is a signed axis resting at -1. The default source
 			// range is [0, 1], which throws away the first half of the pull.
-			SourceInputMinimum = -1.0,
+			SourceInputMinimum = -0.9,
 			SourceInputMaximum = 1.0,
-			Gain = 6.0,
-			// Must clear the game's deadzone: pulses below it advance the
-			// model but not the game, so the zoom never reaches the stops.
-			// Tune to just above where the game starts reacting.
-			MinOutput = 0.015,
-			ErrorTolerance = 0.00003,
+			Gain = zoomProfile.Gain,
+			// Feed the requested target velocity forward immediately; Gain then
+			// corrects residual position error instead of trailing smooth pulls.
+			TargetVelocityFeedForward = zoomProfile.TargetVelocityFeedForward,
+			TargetVelocitySmoothingTimeConstant = zoomProfile.TargetVelocitySmoothingTimeConstant,
+			TargetVelocityDeadband = zoomProfile.TargetVelocityDeadband,
+			TargetPositionSmoothingTimeConstant = zoomProfile.TargetPositionSmoothingTimeConstant,
+			SuppressOpposingPulseUntilSourceReverses = true,
+			DirectionReversalBoostTime = zoomProfile.DirectionReversalBoostTime,
+			// Fitted from direct fixed-pulse tests, independently of the tracking
+			// controller. Pulses below about 0.07 produced no visible HUD motion.
+			IncreaseResponseDeadzone = 0.042,
+			DecreaseResponseDeadzone = 0.041,
+			IncreaseResponseExponent = 0.95,
+			DecreaseResponseExponent = 0.75,
+			// Do not model response inertia here. Predicting coast after the lever
+			// stops causes an opposite correction and a visible backward bounce.
+			IncreaseResponseTimeConstant = TimeSpan.Zero,
+			DecreaseResponseTimeConstant = TimeSpan.Zero,
+			// Clear the larger directional pickup deadzone when a correction is
+			// required. One normalized visible meter step was about 0.00245.
+			MinOutput = zoomProfile.MinOutput,
+			ErrorTolerance = zoomProfile.ErrorTolerance,
 			// Pin the lever at a rail → drive a full pulse that way for this
 			// long, so the game is slammed to the stop and mirrors the lever.
 			// Set ≥ the *TimeToFull below (the game's full-travel time).
-			IncreaseEdgeHoldTime = FromSeconds(1.2),
-			DecreaseEdgeHoldTime = FromSeconds(1.2),
-			// Output smoothing time (pulse 0→1); small = snappy.
-			OutputRiseTime = FromSeconds(0.2),
-			OutputFallTime = FromSeconds(0.2),
-			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
-			IncreaseTimeToFull = FromSeconds(1.2),
-			DecreaseTimeToFull = FromSeconds(1.2),
+			IncreaseEdgeHoldTime = FromSeconds(0.75),
+			DecreaseEdgeHoldTime = FromSeconds(0.75),
+			OutputRiseTime = zoomProfile.OutputRiseTime,
+			OutputFallTime = zoomProfile.OutputFallTime,
+			// Step-and-hold calibration: these deliberately advance the internal
+			// model faster than the earlier full-pulse fit, which otherwise kept the
+			// minimum pulse active and drove through every requested position.
+			IncreaseTimeToFull = FromSeconds(0.540),
+			DecreaseTimeToFull = FromSeconds(0.700),
 		}),
 	],
 });
@@ -177,4 +202,36 @@ static class SharedNames
 	public const string RightToeBrake = "RightToeBrake";
 	public const string LeftToeBrake = "LeftToeBrake";
 	public const string ZoomInOut = "ZoomInOut";
+}
+
+readonly record struct ZoomProfile(
+	string Name,
+	double Gain,
+	double TargetVelocityFeedForward,
+	TimeSpan TargetVelocitySmoothingTimeConstant,
+	double TargetVelocityDeadband,
+	TimeSpan TargetPositionSmoothingTimeConstant,
+	double MinOutput,
+	double ErrorTolerance,
+	TimeSpan OutputRiseTime,
+	TimeSpan OutputFallTime,
+	TimeSpan DirectionReversalBoostTime)
+{
+	public static ZoomProfile FromEnvironment()
+	{
+		var name = Environment.GetEnvironmentVariable("SHARPSTICKS_ZOOM_PROFILE") ?? "balanced";
+		return name.Trim().ToLowerInvariant() switch
+		{
+			"low-latency" or "latency" => new("low-latency", 5.0, 1.0, FromMilliseconds(5), 0.005, TimeSpan.Zero, 0.070,
+				0.0032,
+				TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero),
+			"balanced" => new("balanced", 5.0, 1.0, FromMilliseconds(10), 0.005, FromMilliseconds(25), 0.070, 0.0032,
+				FromMilliseconds(8), FromMilliseconds(12), TimeSpan.Zero),
+			"smooth" or "smoothness" => new("smooth", 5.0, 1.0, FromMilliseconds(20), 0.005, FromMilliseconds(60),
+				0.070, 0.0032,
+				FromMilliseconds(20), FromMilliseconds(30), TimeSpan.Zero),
+			_ => throw new ArgumentException(
+				$"Unknown SHARPSTICKS_ZOOM_PROFILE '{name}'. Use low-latency, balanced, or smooth."),
+		};
+	}
 }

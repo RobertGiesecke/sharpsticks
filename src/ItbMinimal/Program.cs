@@ -108,23 +108,26 @@ BuildAndRunAsConsole(new()
 			// range is [0, 1], which throws away the first half of the pull.
 			SourceInputMinimum = -1.0,
 			SourceInputMaximum = 1.0,
-			Gain = 6.0,
+			Gain = 5.0,
 			// Must clear the game's deadzone: pulses below it advance the
 			// model but not the game, so the zoom never reaches the stops.
 			// Tune to just above where the game starts reacting.
 			MinOutput = 0.015,
-			ErrorTolerance = 0.00003,
+			// One visible HUD step is roughly 1/124 of the rail. Settling inside
+			// that avoids a continuous end-of-travel hunt for invisible movement.
+			ErrorTolerance = 0.01,
 			// Pin the lever at a rail → drive a full pulse that way for this
 			// long, so the game is slammed to the stop and mirrors the lever.
 			// Set ≥ the *TimeToFull below (the game's full-travel time).
-			IncreaseEdgeHoldTime = FromSeconds(1.2),
-			DecreaseEdgeHoldTime = FromSeconds(1.2),
+			IncreaseEdgeHoldTime = FromSeconds(1.4),
+			DecreaseEdgeHoldTime = FromSeconds(1.25),
 			// Output smoothing time (pulse 0→1); small = snappy.
-			OutputRiseTime = FromSeconds(0.2),
-			OutputFallTime = FromSeconds(0.2),
-			// Wall-clock: a 100% pulse drives the game's zoom fully in ~1 s.
-			IncreaseTimeToFull = FromSeconds(1.2),
-			DecreaseTimeToFull = FromSeconds(1.2),
+			OutputRiseTime = FromSeconds(0.05),
+			OutputFallTime = FromSeconds(0.05),
+			// Provisional values. The feedback sweep must own vJoy exclusively
+			// before it can validate replacement full-travel timings.
+			IncreaseTimeToFull = FromSeconds(1.18),
+			DecreaseTimeToFull = FromSeconds(1.08),
 		}),
 	],
 });
