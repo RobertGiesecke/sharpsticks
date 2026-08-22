@@ -478,6 +478,82 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 	}
 
 	[Fact]
+	public void SameAxis_ResponseCurve_InvertsVelocityForFeedForward()
+	{
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.0) with
+		{
+			Gain = 0.0,
+			TargetVelocityFeedForward = 1.0,
+			IncreaseTimeToFull = TimeSpan.FromSeconds(1.0),
+			IncreaseResponseDeadzone = 0.20,
+			IncreaseResponseExponent = 0.50,
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+			ErrorTolerance = 1e-9,
+		});
+
+		// Target velocity is 0.5 range/s. Inverting
+		// velocity=((pulse-.2)/.8)^.5 gives pulse=.4.
+		_Stick.SetAxisValue(Axis.X, 0.0);
+		Step(runtime); // establish the previous target used for velocity
+		_Stick.SetAxisValue(Axis.X, 0.5);
+		Step(runtime);
+		Assert.Equal(0.4, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// The curved prediction advances by exactly 0.5, so it is settled.
+		Step(runtime);
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_ResponseDeadzone_DoesNotAdvanceInternalPosition()
+	{
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.0) with
+		{
+			Gain = 0.1,
+			IncreaseTimeToFull = TimeSpan.FromSeconds(1.0),
+			IncreaseResponseDeadzone = 0.20,
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+			ErrorTolerance = 1e-9,
+		});
+
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		Step(runtime);
+		Assert.Equal(0.1, _Output.GetAxisValue(Axis.Slider1), Precision);
+		Step(runtime);
+		Assert.Equal(0.1, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_DynamicResponse_PredictsCoastAfterPulseStops()
+	{
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.0) with
+		{
+			Gain = 10.0,
+			IncreaseTimeToFull = TimeSpan.FromSeconds(1.0),
+			DecreaseTimeToFull = TimeSpan.FromSeconds(1.0),
+			IncreaseResponseTimeConstant = TimeSpan.FromSeconds(1.0),
+			DecreaseResponseTimeConstant = TimeSpan.FromSeconds(1.0),
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+			ErrorTolerance = 1e-9,
+		});
+
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		Step(runtime);
+		Assert.Equal(1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// After one second the first-order model is at e^-1. Holding that
+		// position stops the pulse, but its velocity continues to coast.
+		_Stick.SetAxisValue(Axis.X, Math.Exp(-1.0));
+		Step(runtime);
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+		Step(runtime);
+		Assert.True(_Output.GetAxisValue(Axis.Slider1) < 0.0);
+	}
+
+	[Fact]
 	public void SameAxis_ConvergesEachWay_AndReturnsToCenter()
 	{
 		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.0) with
@@ -544,6 +620,91 @@ public sealed class AbsoluteRelativeAxisModifierTests : IDisposable
 		Step(runtime);
 		Assert.Equal(-0.8, _Output.GetAxisValue(Axis.Slider1), Precision);
 
+		Step(runtime);
+		Assert.Equal(-1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_TargetPositionSmoothing_DelaysPathButPreservesFinalTarget()
+	{
+		_Stick.SetAxisValue(Axis.X, 0.0);
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.0) with
+		{
+			Gain = 1.0,
+			TargetPositionSmoothingTimeConstant = TimeSpan.FromSeconds(2),
+			IncreaseTimeToFull = TimeSpan.Zero,
+			DecreaseTimeToFull = TimeSpan.Zero,
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+		});
+		Step(runtime);
+
+		_Stick.SetAxisValue(Axis.X, 1.0);
+		Step(runtime);
+		Assert.Equal(1.0 - Math.Exp(-0.5), _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		for (var i = 0; i < 40; i++) Step(runtime);
+		Assert.InRange(_Output.GetAxisValue(Axis.Slider1), 0.999999, 1.0);
+	}
+
+	[Fact]
+	public void SameAxis_TargetVelocitySmoothing_RemovesQuantizedDerivativeSpike()
+	{
+		_Stick.SetAxisValue(Axis.X, 0.5);
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.5) with
+		{
+			Gain = 0.0,
+			TargetVelocityFeedForward = 1.0,
+			TargetVelocitySmoothingTimeConstant = TimeSpan.FromMilliseconds(20),
+			TargetVelocityDeadband = 0.005,
+			MinOutput = 0.07,
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+		});
+		runtime.ProcessFrame(TimeSpan.FromMilliseconds(2));
+
+		// A one-percent device step in one 2 ms frame has a raw derivative of
+		// 5/s, which would clamp to a full pulse. The filtered derivative starts
+		// near 0.476/s and spreads the command over subsequent frames instead.
+		_Stick.SetAxisValue(Axis.X, 0.51);
+		runtime.ProcessFrame(TimeSpan.FromMilliseconds(2));
+		Assert.InRange(_Output.GetAxisValue(Axis.Slider1), 0.45, 0.50);
+
+		runtime.ProcessFrame(TimeSpan.FromMilliseconds(2));
+		Assert.InRange(_Output.GetAxisValue(Axis.Slider1), 0.40, 0.46);
+
+		// Once the quantized source is stationary, the residual derivative falls
+		// through the velocity deadband and must not be promoted to MinOutput.
+		for (var i = 0; i < 100; i++)
+			runtime.ProcessFrame(TimeSpan.FromMilliseconds(2));
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+	}
+
+	[Fact]
+	public void SameAxis_Suppression_DoesNotCorrectOppositeLastSourceDirectionUntilSourceReverses()
+	{
+		_Stick.SetAxisValue(Axis.X, 0.4);
+		using var runtime = BuildRuntime(MakeSameAxisOptions(initial: 0.8) with
+		{
+			SuppressOpposingPulseUntilSourceReverses = true,
+			IncreaseTimeToFull = TimeSpan.Zero,
+			DecreaseTimeToFull = TimeSpan.Zero,
+			OutputRiseTime = TimeSpan.Zero,
+			OutputFallTime = TimeSpan.Zero,
+			Gain = 10.0,
+		});
+		Step(runtime);
+
+		_Stick.SetAxisValue(Axis.X, 0.6);
+		Step(runtime);
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// Stopping retains the last source direction and cannot bounce backward.
+		Step(runtime);
+		Assert.Equal(0.0, _Output.GetAxisValue(Axis.Slider1), Precision);
+
+		// An actual source reversal authorizes the decrease command.
+		_Stick.SetAxisValue(Axis.X, 0.3);
 		Step(runtime);
 		Assert.Equal(-1.0, _Output.GetAxisValue(Axis.Slider1), Precision);
 	}

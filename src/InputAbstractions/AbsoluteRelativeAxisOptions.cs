@@ -124,6 +124,96 @@ public readonly record struct AbsoluteRelativeAxisOptions()
 	public double Gain { get; init; } = 4.0;
 
 	/// <summary>
+	/// Predictive component for a moving source axis. At <c>1</c>, a smooth
+	/// source movement immediately emits the relative-axis pulse needed to
+	/// reproduce that target velocity according to the configured
+	/// <see cref="IncreaseTimeToFull"/>/<see cref="DecreaseTimeToFull"/>.
+	/// The proportional <see cref="Gain"/> term still corrects any residual
+	/// position error. Set <c>0</c> to use the original proportional-only
+	/// behavior; values above <c>1</c> deliberately lead the source.
+	/// </summary>
+	public double TargetVelocityFeedForward { get; init; }
+
+	/// <summary>
+	/// Low-pass time constant applied to the source-derived target velocity before
+	/// feed-forward and reversal detection. Physical axes report quantized steps;
+	/// differentiating one step over a 2 ms runtime frame otherwise turns a slow,
+	/// small hand movement into a short near-full pulse. Zero preserves the raw
+	/// frame-to-frame derivative.
+	/// </summary>
+	public TimeSpan TargetVelocitySmoothingTimeConstant { get; init; }
+
+	/// <summary>
+	/// Ignores source-derived target velocities at or below this magnitude before
+	/// feed-forward is converted into an output pulse. This prevents floating-point
+	/// and device-report quantization at a stationary lever from being promoted to
+	/// <see cref="MinOutput"/>. Position-error correction is unaffected.
+	/// </summary>
+	public double TargetVelocityDeadband { get; init; }
+
+	/// <summary>
+	/// Optional first-order smoothing of the absolute target position in
+	/// bidirectional mode. It changes only the path and delay used to approach a
+	/// target; a held source still converges to exactly the same final position.
+	/// Zero follows the raw source target immediately.
+	/// </summary>
+	public TimeSpan TargetPositionSmoothingTimeConstant { get; init; }
+
+	/// <summary>
+	/// Prevents position-error correction from driving opposite to the source
+	/// axis's most recent direction of travel. When the source stops, that last
+	/// direction remains authoritative until the source actually reverses.
+	/// </summary>
+	public bool SuppressOpposingPulseUntilSourceReverses { get; init; }
+
+	/// <summary>
+	/// On a real source-direction reversal, immediately drives the new direction
+	/// at full output for this long. This brakes a consumer whose visible velocity
+	/// has a release tail. Zero disables reversal braking.
+	/// </summary>
+	public TimeSpan DirectionReversalBoostTime { get; init; }
+
+	/// <summary>
+	/// Relative-axis pulse below which the consumer does not move while increasing.
+	/// Used only by the internal motion prediction and velocity feed-forward; it
+	/// does not itself clamp the emitted pulse (see <see cref="MinOutput"/>).
+	/// Zero preserves the original linear response model.
+	/// </summary>
+	public double IncreaseResponseDeadzone { get; init; }
+
+	/// <summary>
+	/// Relative-axis pulse below which the consumer does not move while decreasing.
+	/// <inheritdoc cref="IncreaseResponseDeadzone"/>
+	/// </summary>
+	public double DecreaseResponseDeadzone { get; init; }
+
+	/// <summary>
+	/// Exponent of the consumer's increasing pulse-to-velocity curve after its
+	/// deadzone. <c>1</c> is linear; values below one produce proportionally more
+	/// motion at small pulses. Must be positive.
+	/// </summary>
+	public double IncreaseResponseExponent { get; init; } = 1.0;
+
+	/// <summary>
+	/// Exponent of the consumer's decreasing pulse-to-velocity curve.
+	/// <inheritdoc cref="IncreaseResponseExponent"/>
+	/// </summary>
+	public double DecreaseResponseExponent { get; init; } = 1.0;
+
+	/// <summary>
+	/// First-order time constant of the consumer's increasing velocity response.
+	/// Models acceleration and coast-down after the relative pulse changes.
+	/// <see cref="TimeSpan.Zero"/> preserves instantaneous response.
+	/// </summary>
+	public TimeSpan IncreaseResponseTimeConstant { get; init; } = TimeSpan.Zero;
+
+	/// <summary>
+	/// First-order time constant of the consumer's decreasing velocity response.
+	/// <inheritdoc cref="IncreaseResponseTimeConstant"/>
+	/// </summary>
+	public TimeSpan DecreaseResponseTimeConstant { get; init; } = TimeSpan.Zero;
+
+	/// <summary>
 	/// Upper clamp on pulse magnitude, <c>[0,1]</c> — the strongest the output
 	/// ever drives, i.e. the fastest the consumer's value may change. Lower it
 	/// to cap slew; <c>1</c> allows full deflection.

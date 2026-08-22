@@ -71,6 +71,7 @@ internal sealed record AbsoluteRelativeAxisModifier :
 		private readonly AbsoluteRelativeAxisOptions _Options;
 		private readonly double _Minimum;
 		private readonly double _Maximum;
+		private double _Velocity;
 
 		public SharedStateClass(AbsoluteRelativeAxisOptions options)
 		{
@@ -97,7 +98,7 @@ internal sealed record AbsoluteRelativeAxisModifier :
 		/// top rail, 0 at the bottom. Used to detect the edge-hold extremes.</summary>
 		public double NormalizedTargetFor(double input) => NormalizeTarget(MapInputToTarget(input));
 
-		public double GetDesiredPulseMagnitude(double input, RelativeDirection direction)
+		public double GetDesiredPulseMagnitude(double input, RelativeDirection direction, double signedFeedForward = 0.0)
 		{
 			var target = MapInputToTarget(input);
 			var error = target - Current;
@@ -106,14 +107,20 @@ internal sealed record AbsoluteRelativeAxisModifier :
 			LastError = error;
 			LastCurrentBefore = Current;
 			LastCurrentAfter = Current;
-			if (Math.Abs(error) <= _Options.ErrorTolerance)
+			// Deadband suppresses only the proportional correction. A moving target
+			// must retain velocity feed-forward even when each small frame-to-frame
+			// increment is inside ErrorTolerance, otherwise the internal position
+			// advances while the real consumer receives no pulse.
+			var correction = Math.Abs(error) > _Options.ErrorTolerance ? error * _Options.Gain : 0.0;
+			var signedOutput = correction + signedFeedForward;
+			if (Math.Abs(signedOutput) <= 1e-12)
 			{
 				LastActiveDirection = null;
 				SetDesired(direction, 0.0);
 				return 0.0;
 			}
 
-			var isIncrease = error > 0.0;
+			var isIncrease = signedOutput > 0.0;
 			LastActiveDirection = isIncrease ? RelativeDirection.Increase : RelativeDirection.Decrease;
 			if ((direction == RelativeDirection.Increase) != isIncrease)
 			{
@@ -121,8 +128,11 @@ internal sealed record AbsoluteRelativeAxisModifier :
 				return 0.0;
 			}
 
-			var output = Math.Abs(error) * _Options.Gain;
-			var outputMagnitude = Math.Min(output, Math.Abs(_Options.MaxOutput));
+			// A purely proportional controller must wait for a position error to
+			// exist, so it always trails a smoothly moving absolute source. The
+			// optional feed-forward term sends the pulse implied by target velocity
+			// immediately; the error term keeps it calibrated to the real consumer.
+			var outputMagnitude = Math.Min(Math.Abs(signedOutput), Math.Abs(_Options.MaxOutput));
 			if (outputMagnitude <= 0.0)
 			{
 				SetDesired(direction, 0.0);
@@ -148,6 +158,15 @@ internal sealed record AbsoluteRelativeAxisModifier :
 			SetActual(RelativeDirection.Decrease, Math.Max(-netPulse, 0.0));
 			var target = MapInputToTarget(input);
 			var error = target - Current;
+			if (HasDynamicResponse())
+			{
+				AdvanceDynamic(netPulse, elapsedSeconds);
+				if (netPulse == 0.0 && Math.Abs(_Velocity) < 1e-6 && Math.Abs(error) <= _Options.ErrorTolerance)
+					Current = target;
+				LastCurrentAfter = Current;
+				return;
+			}
+
 			if (Math.Abs(error) <= _Options.ErrorTolerance)
 			{
 				Current = target;
@@ -155,18 +174,19 @@ internal sealed record AbsoluteRelativeAxisModifier :
 				return;
 			}
 
-			var unitsPerSecond = UnitsPerSecond(netPulse > 0.0 ? RelativeDirection.Increase : RelativeDirection.Decrease);
+			var direction = netPulse > 0.0 ? RelativeDirection.Increase : RelativeDirection.Decrease;
+			var unitsPerSecond = UnitsPerSecond(direction);
 			if (netPulse == 0.0 || unitsPerSecond <= 0.0)
 			{
 				LastCurrentAfter = Current;
 				return;
 			}
 
-			var step = netPulse * unitsPerSecond * elapsedSeconds;
+			var step = Math.Sign(netPulse) * VelocityFraction(direction, Math.Abs(netPulse)) *
+				unitsPerSecond * elapsedSeconds;
 
-			// Moving toward the target must not overshoot it (mirrors Advance);
-			// moving away from it integrates as-is — the consumer moved, so
-			// the model follows.
+			// Moving toward the target must not overshoot it; moving away from it
+			// integrates as-is because the consumer moved too.
 			if (Math.Sign(step) == Math.Sign(error) && Math.Abs(step) > Math.Abs(error))
 			{
 				step = error;
@@ -201,14 +221,69 @@ internal sealed record AbsoluteRelativeAxisModifier :
 				return;
 			}
 
-			var step = actualPulseMagnitude * unitsPerSecond * elapsedSeconds;
-			if (step > Math.Abs(error))
-			{
-				step = Math.Abs(error);
-			}
-
+			var step = VelocityFraction(direction, actualPulseMagnitude) * unitsPerSecond * elapsedSeconds;
+			if (step > Math.Abs(error)) step = Math.Abs(error);
 			Current = Clamp(Current + (isIncrease ? step : -step));
 			LastCurrentAfter = Current;
+		}
+
+		private bool HasDynamicResponse() =>
+			_Options.IncreaseResponseTimeConstant > TimeSpan.Zero ||
+			_Options.DecreaseResponseTimeConstant > TimeSpan.Zero;
+
+		private void AdvanceDynamic(double netPulse, double elapsedSeconds)
+		{
+			var pulseDirection = netPulse > 0.0 ? RelativeDirection.Increase : RelativeDirection.Decrease;
+			var desiredVelocity = netPulse == 0.0
+				? 0.0
+				: Math.Sign(netPulse) * VelocityFraction(pulseDirection, Math.Abs(netPulse)) *
+					UnitsPerSecond(pulseDirection);
+			var responseDirection = desiredVelocity != 0.0
+				? (desiredVelocity > 0.0 ? RelativeDirection.Increase : RelativeDirection.Decrease)
+				: (_Velocity >= 0.0 ? RelativeDirection.Increase : RelativeDirection.Decrease);
+			var tau = (responseDirection == RelativeDirection.Increase
+				? _Options.IncreaseResponseTimeConstant
+				: _Options.DecreaseResponseTimeConstant).TotalSeconds;
+			if (tau <= 0.0)
+			{
+				_Velocity = desiredVelocity;
+				Current = Clamp(Current + _Velocity * elapsedSeconds);
+				return;
+			}
+
+			var decay = Math.Exp(-Math.Max(elapsedSeconds, 0.0) / tau);
+			var displacement = desiredVelocity * elapsedSeconds +
+				(_Velocity - desiredVelocity) * tau * (1.0 - decay);
+			var unclamped = Current + displacement;
+			_Velocity = desiredVelocity + (_Velocity - desiredVelocity) * decay;
+			Current = Clamp(unclamped);
+			if ((Current <= _Minimum && _Velocity < 0.0) || (Current >= _Maximum && _Velocity > 0.0))
+				_Velocity = 0.0;
+		}
+
+		public double GetPulseForTargetVelocity(double targetVelocity)
+		{
+			if (Math.Abs(targetVelocity) <= Math.Abs(_Options.TargetVelocityDeadband) ||
+				_Options.TargetVelocityFeedForward <= 0.0)
+			{
+				return 0.0;
+			}
+
+			var direction = targetVelocity > 0.0 ? RelativeDirection.Increase : RelativeDirection.Decrease;
+			var unitsPerSecond = UnitsPerSecond(direction);
+			if (unitsPerSecond <= 0.0) return 0.0;
+			var desiredFraction = Math.Abs(targetVelocity) / unitsPerSecond * _Options.TargetVelocityFeedForward;
+			return Math.CopySign(PulseForVelocityFraction(direction, desiredFraction), targetVelocity);
+		}
+
+		public double TargetForInput(double input) => MapInputToTarget(input);
+
+		public double InputForTarget(double target)
+		{
+			if (_Maximum <= _Minimum) return _Options.SourceInputMinimum;
+			var normalized = Math.Clamp((target - _Minimum) / (_Maximum - _Minimum), 0.0, 1.0);
+			return _Options.SourceInputMinimum +
+				normalized * (_Options.SourceInputMaximum - _Options.SourceInputMinimum);
 		}
 
 		// Range-per-second the model advances at full pulse for a direction.
@@ -221,6 +296,38 @@ internal sealed record AbsoluteRelativeAxisModifier :
 			return secondsToFull > 0.0
 				? (_Maximum - _Minimum) / secondsToFull
 				: 0.0;
+		}
+
+		private double VelocityFraction(RelativeDirection direction, double pulse)
+		{
+			var deadzone = ResponseDeadzone(direction);
+			if (pulse <= deadzone) return 0.0;
+			var exponent = ResponseExponent(direction);
+			var normalized = Math.Clamp((pulse - deadzone) / Math.Max(1.0 - deadzone, 1e-9), 0.0, 1.0);
+			return Math.Pow(normalized, exponent);
+		}
+
+		private double PulseForVelocityFraction(RelativeDirection direction, double fraction)
+		{
+			if (fraction <= 0.0) return 0.0;
+			var deadzone = ResponseDeadzone(direction);
+			var exponent = ResponseExponent(direction);
+			var normalizedPulse = Math.Pow(Math.Clamp(fraction, 0.0, 1.0), 1.0 / exponent);
+			return deadzone + normalizedPulse * (1.0 - deadzone);
+		}
+
+		private double ResponseDeadzone(RelativeDirection direction) => Math.Clamp(
+			direction == RelativeDirection.Increase
+				? _Options.IncreaseResponseDeadzone
+				: _Options.DecreaseResponseDeadzone,
+			0.0, 0.999999);
+
+		private double ResponseExponent(RelativeDirection direction)
+		{
+			var exponent = direction == RelativeDirection.Increase
+				? _Options.IncreaseResponseExponent
+				: _Options.DecreaseResponseExponent;
+			return double.IsFinite(exponent) && exponent > 0.0 ? exponent : 1.0;
 		}
 
 		private void SetDesired(RelativeDirection direction, double value)
@@ -358,6 +465,14 @@ internal sealed record AbsoluteRelativeAxisModifier :
 			public double DecreaseEdgeHeldSeconds;
 			public long LastTimestamp;
 			public bool HasTimestamp;
+			public double LastTarget;
+			public bool HasTarget;
+			public double SmoothedTargetVelocity;
+			public bool HasSmoothedTargetVelocity;
+			public double SmoothedTarget;
+			public bool HasSmoothedTarget;
+			public int LastTargetDirection;
+			public double ReversalBoostRemainingSeconds;
 		}
 
 		private readonly double _OutputRiseSeconds;
@@ -385,8 +500,43 @@ internal sealed record AbsoluteRelativeAxisModifier :
 			// outside the state struct, so it is only advanced on real frames.
 			var now = TimeSource.GetTimestamp();
 			var elapsedSeconds = ElapsedSeconds(state.HasTimestamp, state.LastTimestamp, now);
-			var desiredIncrease = SharedState.GetDesiredPulseMagnitude(input, RelativeDirection.Increase);
-			var desiredDecrease = SharedState.GetDesiredPulseMagnitude(input, RelativeDirection.Decrease);
+			var rawTarget = SharedState.TargetForInput(input);
+			var target = rawTarget;
+			var targetSmoothingSeconds =
+				SharedState.Options.TargetPositionSmoothingTimeConstant.TotalSeconds;
+			if (state.HasSmoothedTarget && elapsedSeconds > 0.0 && targetSmoothingSeconds > 0.0)
+			{
+				var decay = Math.Exp(-elapsedSeconds / targetSmoothingSeconds);
+				target = rawTarget + (state.SmoothedTarget - rawTarget) * decay;
+			}
+			if (mode == ApplyMode.Update)
+			{
+				state.SmoothedTarget = target;
+				state.HasSmoothedTarget = true;
+			}
+			var controlInput = SharedState.InputForTarget(target);
+			var rawTargetVelocity = state.HasTarget && elapsedSeconds > 0.0
+				? (target - state.LastTarget) / elapsedSeconds
+				: 0.0;
+			var targetVelocity = rawTargetVelocity;
+			var velocitySmoothingSeconds =
+				SharedState.Options.TargetVelocitySmoothingTimeConstant.TotalSeconds;
+			if (state.HasTarget && elapsedSeconds > 0.0 && velocitySmoothingSeconds > 0.0)
+			{
+				var previous = state.HasSmoothedTargetVelocity ? state.SmoothedTargetVelocity : 0.0;
+				var decay = Math.Exp(-elapsedSeconds / velocitySmoothingSeconds);
+				targetVelocity = rawTargetVelocity + (previous - rawTargetVelocity) * decay;
+			}
+			if (mode == ApplyMode.Update)
+			{
+				state.SmoothedTargetVelocity = targetVelocity;
+				state.HasSmoothedTargetVelocity = true;
+			}
+			var velocityFeedForward = SharedState.GetPulseForTargetVelocity(targetVelocity);
+			var desiredIncrease = SharedState.GetDesiredPulseMagnitude(controlInput, RelativeDirection.Increase,
+				velocityFeedForward);
+			var desiredDecrease = SharedState.GetDesiredPulseMagnitude(controlInput, RelativeDirection.Decrease,
+				velocityFeedForward);
 
 			// Edge hold: while the input is pinned at a rail, force full drive
 			// for the configured time so the consumer is slammed to that rail
@@ -404,10 +554,41 @@ internal sealed record AbsoluteRelativeAxisModifier :
 				desiredDecrease = _MaxOutput;
 			}
 
+			if (SharedState.Options.SuppressOpposingPulseUntilSourceReverses)
+			{
+				var velocityEpsilon = Math.Max(0.002,
+					Math.Abs(SharedState.Options.TargetVelocityDeadband));
+				var targetDirection = Math.Abs(targetVelocity) > velocityEpsilon
+					? Math.Sign(targetVelocity)
+					: state.LastTargetDirection;
+				if (mode == ApplyMode.Update && Math.Abs(targetVelocity) > velocityEpsilon)
+				{
+					if (state.LastTargetDirection != 0 && targetDirection != state.LastTargetDirection)
+						state.ReversalBoostRemainingSeconds =
+							SharedState.Options.DirectionReversalBoostTime.TotalSeconds;
+					state.LastTargetDirection = targetDirection;
+				}
+				if (state.ReversalBoostRemainingSeconds > 0.0)
+				{
+					if (targetDirection > 0) desiredIncrease = _MaxOutput;
+					else if (targetDirection < 0) desiredDecrease = _MaxOutput;
+					if (mode == ApplyMode.Update)
+						state.ReversalBoostRemainingSeconds = Math.Max(0.0,
+							state.ReversalBoostRemainingSeconds - elapsedSeconds);
+				}
+				if (targetDirection > 0) desiredDecrease = 0.0;
+				else if (targetDirection < 0) desiredIncrease = 0.0;
+			}
+
 			state.IncreasePulse =
 				Slew(state.IncreasePulse, desiredIncrease, _OutputRiseSeconds, _OutputFallSeconds, elapsedSeconds);
 			state.DecreasePulse =
 				Slew(state.DecreasePulse, desiredDecrease, _OutputRiseSeconds, _OutputFallSeconds, elapsedSeconds);
+			if (SharedState.Options.SuppressOpposingPulseUntilSourceReverses)
+			{
+				if (state.LastTargetDirection > 0) state.DecreasePulse = 0.0;
+				else if (state.LastTargetDirection < 0) state.IncreasePulse = 0.0;
+			}
 
 			// Rest is center: increase pulses push positive, decrease negative.
 			// The consumer only ever sees this NET deflection — during a
@@ -419,9 +600,11 @@ internal sealed record AbsoluteRelativeAxisModifier :
 			{
 				state.IncreaseEdgeHeldSeconds = atTop ? state.IncreaseEdgeHeldSeconds + elapsedSeconds : 0.0;
 				state.DecreaseEdgeHeldSeconds = atBottom ? state.DecreaseEdgeHeldSeconds + elapsedSeconds : 0.0;
-				SharedState.AdvanceNet(input, net, elapsedSeconds);
+				SharedState.AdvanceNet(controlInput, net, elapsedSeconds);
 				state.LastTimestamp = now;
 				state.HasTimestamp = true;
+				state.LastTarget = target;
+				state.HasTarget = true;
 			}
 
 			return net;
