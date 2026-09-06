@@ -1,6 +1,7 @@
 #!/usr/bin/env dotnet
 
 #:package SharpSticks.Editor@0.1.0-debug05
+#:package SharpSticks.Overlay.Integration@0.1.0-debug05
 //#:project ../src/Editor/Editor.csproj
 //#:project ../src/Overlay.Integration/Overlay.Integration.csproj
 
