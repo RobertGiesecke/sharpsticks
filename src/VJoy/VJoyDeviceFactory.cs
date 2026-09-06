@@ -22,37 +22,12 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 	public AvailableOutputDevice DescribeDeclaredOutput(uint deviceId, ImmutableArray<Axis> axes, uint buttonCount) =>
 		new(deviceId, axes, buttonCount, VJoyProductGuid, VJoyProductName);
 
-	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs()
-	{
-		try
-		{
-			VJoyNative.EnsureLoaded();
-			if (!VJoyNative.VJoyEnabled())
-			{
-				return ImmutableArray<AvailableOutputDevice>.Empty;
-			}
-
-			var builder = ImmutableArray.CreateBuilder<AvailableOutputDevice>();
-			for (var deviceId = 1u; deviceId <= VJoyDevices.MaxDeviceId; deviceId++)
-			{
-				var status = VJoyNative.GetVJDStatus(deviceId);
-				if (status is VjdStatus.Missing or VjdStatus.Unknown)
-				{
-					continue;
-				}
-
-				var axes = EnumerateAxes(deviceId);
-				var buttonCount = (uint)Math.Max(0, VJoyNative.GetVJDButtonNumber(deviceId));
-				builder.Add(new(deviceId, axes, buttonCount, VJoyProductGuid, VJoyProductName));
-			}
-
-			return builder.ToImmutable();
-		}
-		catch (Exception ex) when (IsExpectedEnumerationFailure(ex))
-		{
-			return ImmutableArray<AvailableOutputDevice>.Empty;
-		}
-	}
+	/// Design-time snapshot of the configured vJoy slots. Deliberately bypasses
+	/// vJoyInterface.dll: its capability queries leave a device handle open for the life of
+	/// the calling process, so from a compiler server / IDE they lock the slot against the
+	/// actual feeder. See <see cref="VJoyConfigurationReader"/>.
+	public ImmutableArray<AvailableOutputDevice> EnumerateAvailableOutputs() =>
+		VJoyConfigurationReader.EnumerateConfiguredDevices();
 
 	private static ImmutableArray<Axis> EnumerateAxes(uint deviceId)
 	{
@@ -67,10 +42,6 @@ public sealed class VJoyDeviceFactory : IOutputDeviceFactory<VJoyDevice>
 		if (VJoyNative.GetVJDAxisExist(deviceId, 0x37)) builder.Add(Axis.Slider2);
 		return builder.ToImmutable();
 	}
-
-	private static bool IsExpectedEnumerationFailure(Exception exception) =>
-		exception is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException
-			or FileNotFoundException or FileLoadException or InvalidOperationException;
 
 	/// Public convenience overload for callers (tests, examples) that work directly with
 	/// concrete <see cref="VJoyDevice"/> instances.
