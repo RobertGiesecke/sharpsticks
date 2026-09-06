@@ -117,6 +117,52 @@ public sealed class AxisCurveTests : IDisposable
 		Assert.Equal(0.125, _Output.GetAxisValue(Axis.X), Precision);
 	}
 
+	[Theory]
+	// Saturation 0.8: full deflection at 80% of the travel, pinned beyond it, sign kept.
+	[InlineData(0.0, 0.0)]
+	[InlineData(0.4, 0.5)]
+	[InlineData(0.8, 1.0)]
+	[InlineData(0.9, 1.0)]
+	[InlineData(1.0, 1.0)]
+	[InlineData(-0.4, -0.5)]
+	[InlineData(-1.0, -1.0)]
+	public void Saturation_ReachesMaxAtThePoint_AndPinsBeyond(double input, double expected)
+	{
+		using var runtime = BuildRuntime(new() { Max = 1.0, Saturation = 0.8 });
+		_Stick.SetAxisValue(Axis.X, input);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
+	}
+
+	[Theory]
+	// The curve runs over the saturated travel and caps at Max, not at 1.
+	[InlineData(0.4, 0.125)] // 0.5 · (0.4 / 0.8)²
+	[InlineData(0.8, 0.5)]
+	[InlineData(1.0, 0.5)]
+	public void Saturation_CompressesTheCurve_AndCapsAtMax(double input, double expected)
+	{
+		using var runtime = BuildRuntime(new() { Max = 0.5, Exponent = 2.0, Saturation = 0.8 });
+		_Stick.SetAxisValue(Axis.X, input);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.Equal(expected, _Output.GetAxisValue(Axis.X), Precision);
+	}
+
+	[Theory]
+	[InlineData(0.0)]
+	[InlineData(-0.2)]
+	[InlineData(1.5)]
+	public void Saturation_OutsideZeroToOne_Throws(double saturation)
+	{
+		Assert.Throws<ArgumentOutOfRangeException>(() => new AxisCurve { Saturation = saturation });
+	}
+
+	[Fact]
+	public void Saturation_DefaultIsOff()
+	{
+		Assert.False(new AxisCurve().IsSaturating);
+		Assert.True(new AxisCurve { Saturation = 0.8 }.IsSaturating);
+	}
+
 	[Fact]
 	public void Linear_IsLinearAndIsFlatFlagsSetCorrectly()
 	{
