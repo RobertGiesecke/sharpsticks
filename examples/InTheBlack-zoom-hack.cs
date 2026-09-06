@@ -34,7 +34,6 @@ using static System.TimeSpan;
 [assembly: RenameDevice(DeviceNames.VirpilControls20220407VpcRudderPedals, "Pedals")]
 #endif
 
-var VJoy1 = Typed.VJoyDevice;
 var zoomProfile = ZoomProfile.FromEnvironment();
 Console.WriteLine(
 	$"Zoom profile: {zoomProfile.Name} (set SHARPSTICKS_ZOOM_PROFILE to low-latency, balanced, or smooth)");

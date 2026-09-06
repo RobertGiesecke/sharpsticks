@@ -498,7 +498,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 		foreach (var outputDevice in outputDevices)
 		{
-			var vjoyBaseName = GetOutputBaseName(outputDevice, outputDevices);
+			var vjoyBaseName = GetOutputBaseName(outputDevice);
 			var vjoyIdentifier = GetOutputDeviceIdentifier(vjoyBaseName, deviceRenames);
 			var diIdx = directInputNames.IndexOf(vjoyBaseName);
 			var deviceName = diIdx >= 0 ? directInputDevices[diIdx].ProductName : vjoyBaseName;
@@ -788,7 +788,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			// present its name constant is emitted by the input loop above, so we skip it here.
 			foreach (var outputDevice in outputDevices.OrderBy(static device => device.DeviceId))
 			{
-				var baseName = GetOutputBaseName(outputDevice, outputDevices);
+				var baseName = GetOutputBaseName(outputDevice);
 				if (originalNameSet.Contains(baseName))
 				{
 					continue;
@@ -866,7 +866,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			builder.Append(indent).AppendLine("{");
 			foreach (var outputDevice in outputDevices.OrderBy(static device => device.DeviceId))
 			{
-				var baseName = GetOutputBaseName(outputDevice, outputDevices);
+				var baseName = GetOutputBaseName(outputDevice);
 				builder.Append(memberIndent)
 					.Append("public const uint ")
 					.Append(baseName)
@@ -877,7 +877,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 			foreach (var outputDevice in outputDevices.OrderBy(static device => device.DeviceId))
 			{
-				var baseName = GetOutputBaseName(outputDevice, outputDevices);
+				var baseName = GetOutputBaseName(outputDevice);
 				var alias = GetOutputDeviceIdentifier(baseName, deviceRenames);
 				if (alias != baseName)
 				{
@@ -932,7 +932,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 			foreach (var outputDevice in outputDevices.OrderBy(static d => d.DeviceId))
 			{
-				var vjoyBaseName = GetOutputBaseName(outputDevice, outputDevices);
+				var vjoyBaseName = GetOutputBaseName(outputDevice);
 				var vjoyIdentifier = GetOutputDeviceIdentifier(vjoyBaseName, deviceRenames);
 				var diIdx = directInputNames.IndexOf(vjoyBaseName);
 				var deviceName = diIdx >= 0 ? directInputDevices[diIdx].ProductName : vjoyBaseName;
@@ -971,7 +971,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 			foreach (var outputDevice in outputDevices.OrderBy(static d => d.DeviceId))
 			{
-				var vjoyBaseName = GetOutputBaseName(outputDevice, outputDevices);
+				var vjoyBaseName = GetOutputBaseName(outputDevice);
 				var vjoyIdentifier = GetOutputDeviceIdentifier(vjoyBaseName, deviceRenames);
 				var diIdx = directInputNames.IndexOf(vjoyBaseName);
 				var deviceName = diIdx >= 0 ? directInputDevices[diIdx].ProductName : vjoyBaseName;
@@ -1274,16 +1274,16 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 		return baseName;
 	}
 
-	// The VJoyDevice{id} scheme only exists to disambiguate output devices that share a product
-	// name — vJoy's slots are all "vJoy Device", so the id is the only thing telling them apart.
-	// When the name is unique among outputs, use it directly: the identifier is then the device's
-	// real name and coincides with its input-side loopback (named the same way), so the two aren't
-	// listed under different identifiers.
-	private static string GetOutputBaseName(
-		OutputDeviceSnapshot device, ImmutableArray<OutputDeviceSnapshot> outputDevices)
+	// vJoy slots all report the same product name ("vJoy Device"), so a vJoy identifier carries the
+	// slot id — always, not only while several slots are configured. Adding a second slot must not
+	// rename the first, and DeviceNames lists every slot as its own numbered constant even though
+	// the values coincide: rename attributes are resolved by the referenced constant's name, not
+	// its value. Other backends name each device per slot (uinput: "SharpSticks Virtual Joystick 3"),
+	// so their product name is the identifier and coincides with the input-side loopback's.
+	private static string GetOutputBaseName(OutputDeviceSnapshot device)
 	{
-		if (!string.IsNullOrEmpty(device.ProductName)
-		    && outputDevices.Count(other => other.ProductName == device.ProductName) == 1)
+		if (device.InputProductGuid != VirtualOutputProducts.VJoyProductGuid
+		    && !string.IsNullOrEmpty(device.ProductName))
 		{
 			return ToIdentifier(device.ProductName);
 		}
@@ -1346,9 +1346,9 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 		}
 
-		// Second pass, once the output set (and thus each device's base identifier) is final: map
-		// every CodeName onto that identifier. Done here rather than in the merge loop because
-		// GetOutputBaseName needs the whole set to decide unique-name vs VJoyDevice{id}.
+		// Second pass, once the output set is final: map every CodeName onto its device's base
+		// identifier. The merged snapshot carries the backend identity (product GUID and name) that
+		// decides the identifier, which a bare declaration doesn't have.
 		var merged = outputs.ToImmutable();
 		foreach (var declaration in declarations)
 		{
@@ -1358,7 +1358,7 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 			}
 
 			var device = merged.FirstOrDefault(o => o.DeviceId == declaration.DeviceId);
-			var baseName = GetOutputBaseName(device, merged);
+			var baseName = GetOutputBaseName(device);
 			if (!renames.Any(r => r.DeviceName == baseName))
 			{
 				renames.Add(new DeviceRename(baseName, declaration.CodeName!));
@@ -1717,12 +1717,12 @@ public sealed class DevicesGenerator : IIncrementalGenerator
 
 		// Base identifiers of output devices (e.g. "VJoyDevice" from "VJoyDevice1")
 		// — DirectInput devices sharing this base are always numbered even when count == 1, so the
-		// vJoy shadow input aligns with the output id. Unique-named outputs (their own name, no id
-		// suffix) don't drive this; their loopback already matches by name.
+		// vJoy shadow input aligns with the output id. Outputs identified by their product name
+		// (uinput) don't drive this; their loopback already matches by name.
 		using var outputBaseNames = new PooledSet<string>(StringComparer.Ordinal);
 		foreach (var od in outputDevices)
 		{
-			var id = GetOutputBaseName(od, outputDevices);
+			var id = GetOutputBaseName(od);
 			var end = id.Length - 1;
 			while (end >= 0 && char.IsDigit(id[end])) end--;
 			outputBaseNames.Add(id.Substring(0, end + 1));
