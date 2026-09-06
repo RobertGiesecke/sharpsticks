@@ -1,5 +1,5 @@
 #:project ../src/Console/Console.csproj
-#:package SharpSticks.Editor@0.1.0-debug03
+#:package SharpSticks.Editor@0.1.0-debug05
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 // right stick
@@ -25,7 +25,7 @@ var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new AxisCurve() { Max = 1.0d },
 	PrecisionCurve = new AxisCurve() { Max = 0.184d },
-	ModifierAxis = LeftStick.Axes.BrakeLever,
+	ModifierAxes = [LeftStick.Axes.BrakeLever],
 };
 
 // 50% when left 2nd stage trigger is pressed, blended otherwise

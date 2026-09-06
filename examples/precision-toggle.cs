@@ -1,5 +1,4 @@
-﻿#:project ../src/Console/Console.csproj
-#:package SharpSticks.Editor@0.1.0-debug03
+﻿#:package SharpSticks.Editor@0.1.0-debug05
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
@@ -15,8 +14,9 @@
 var dualCurveAxis = new WhenButtonPressedAxisModifier
 {
 	Buttons = [LeftVpcStickWarBRD.Buttons.Btn1],
-	WhenNotPressed = new AxisCurve { Max = 1 },
-	WhenPressed = new AxisCurve { Max = 0.5d },
+	// Full deflection at 80% of the stick's travel; each curve runs over that range and caps at its Max.
+	WhenNotPressed = new AxisCurve { Max = 1, Saturation = 0.8 /* reach 100% at 80% stick deflection */ },
+	WhenPressed = new AxisCurve { Max = 0.5d, Saturation = 0.8 /* reach 100% at 80% stick deflection */ },
 };
 
 BuildAndRunAsConsole(new()

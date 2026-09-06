@@ -1,8 +1,8 @@
 #!/usr/bin/env dotnet
 
-//#:package SharpSticks.Editor@0.1.0-debug04
-#:project ../src/Editor/Editor.csproj
-#:project ../src/Overlay.Integration/Overlay.Integration.csproj
+#:package SharpSticks.Editor@0.1.0-debug05
+//#:project ../src/Editor/Editor.csproj
+//#:project ../src/Overlay.Integration/Overlay.Integration.csproj
 
 using System.Collections.Immutable;
 using SharpSticks.InputSynthesis.Mouse;
