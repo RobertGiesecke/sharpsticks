@@ -54,7 +54,7 @@ BuildAndRunAsConsole(new()
 	[
 		f.ServeOverlay(new()
 		{
-			WebRoot = @"C:\Users\rober\RiderProjects\wasm-test\dist",
+			WebRoot = @"c:\tools\joystick-overlay",
 			WebRootPath = "joyviz.html",
 			Port = 8787,
 		}),

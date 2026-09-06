@@ -10,7 +10,6 @@ using static System.TimeSpan;
 
 [assembly: GenerateDeviceInfos(GenerateDeviceInfosLevels.All)]
 
-
 #if WINDOWS
 [assembly: RenameDevice(DeviceNames.RightVpcStickWarBRD, "RightStick")]
 [assembly: RenameDevice(DeviceNames.LeftVpcStickWarBRD, "LeftStick")]
@@ -43,7 +42,7 @@ Console.WriteLine(
 var groupedZoomAxes = Pedals.Axes.RightToeBrake
 	.GroupWith(LeftStick.Axes.BrakeLever)
 	.WithAxisMode(AxisMode.Unsigned);
-var VJoy1 = Typed.VJoyDevice;
+
 var modifierBlendCurve = new BlendedAxisCurve
 {
 	NormalCurve = new AxisCurve { Max = 1.0d, Exponent = 1.8d },
@@ -66,6 +65,7 @@ BuildAndRunAsConsole(new()
 		{
 			WebRoot = @"c:\tools\joystick-overlay",
 			WebRootPath = "joyviz.html",
+			Port = 8787,
 		}),
 	],
 	Routes =
