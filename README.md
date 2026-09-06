@@ -6,6 +6,7 @@ See [`examples/`](examples/) for working scripts.
 
 ## Prerequisites
 
+### Windows
 Any version of vJoy, and the .NET 10 SDK:
 
 ```
@@ -20,6 +21,17 @@ winget install -e --id Microsoft.VisualStudioCode
 ```
 
 or download it from <https://code.visualstudio.com/>.
+
+### Linux
+
+an editor like vs code or Zed and the dotnet 10 sdk
+
+#### Debian/Ubuntu
+```
+sudo apt-get install -y dotnet-sdk-10.0
+```
+
+or download it from <https://dotnet.microsoft.com/en-us/download/dotnet/10.0>.
 
 ## Writing a script
 
