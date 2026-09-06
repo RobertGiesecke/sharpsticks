@@ -23,6 +23,9 @@
             <SelfNamespace ParameterType="System.String"/>
             <AnalyzerProjects ParameterType="Microsoft.Build.Framework.ITaskItem[]"/>
             <SkipUpstreamMerge ParameterType="System.Boolean"/>
+            <!-- Drop SharpSticksTransitiveAnalyzerProject items (own and inherited): they are
+                 source-tree paths for in-tree consumers and must not ship in a package. -->
+            <StripAnalyzerProjects ParameterType="System.Boolean"/>
             <OutputFile ParameterType="System.String" Required="true"/>
         </ParameterGroup>
         <Task>
@@ -57,10 +60,19 @@ System.Action<string> addElementsFrom = filePath =>
     }
     foreach (var child in doc.Root.Elements())
     {
-        var key = child.ToString(SaveOptions.OmitDuplicateNamespaces);
+        var clone = new XElement(child);
+        if (StripAnalyzerProjects)
+        {
+            clone.Elements("SharpSticksTransitiveAnalyzerProject").Remove();
+            if (clone.Name.LocalName == "ItemGroup" && !clone.HasElements)
+            {
+                continue;
+            }
+        }
+        var key = clone.ToString(SaveOptions.OmitDuplicateNamespaces);
         if (seen.Add(key))
         {
-            merged.Add(new XElement(child));
+            merged.Add(clone);
         }
     }
 };
@@ -85,7 +97,7 @@ if (!string.IsNullOrEmpty(SelfNamespace))
 {
     headerItems.Add(new XElement("Using", new XAttribute("Include", SelfNamespace)));
 }
-if (AnalyzerProjects != null)
+if (AnalyzerProjects != null && !StripAnalyzerProjects)
 {
     var seenAnalyzers = new HashSet<string>();
     foreach (var p in AnalyzerProjects)
@@ -217,16 +229,25 @@ File.WriteAllText(OutputFile, content);
              When PackMergedBuildTransitiveProps=true (opt-in, e.g. SharpSticks.Editor) the
              packed props is the fully-merged set instead: editors that import only the
              directly-referenced package's props for file-based scripts (VS Code / Zed) then
-             get every using + alias from a single file. Skip for Exe (no nupkg). -->
+             get every using + alias from a single file. Either way the packed props carry no
+             SharpSticksTransitiveAnalyzerProject items: those are source-tree paths that only
+             mean something to in-tree consumers, and a package consumer gets the generator
+             through the nuspec dependency on SharpSticks.Generators. Left in, a #:package
+             script inside this repo would resolve them and build the source projects.
+             Skip for Exe (no nupkg). -->
         <WriteTransitiveProps SelfPartialPropsFile="$(_BuildTransitivePartialFile)"
                               SelfNamespace="$(RootNamespace)"
                               SkipUpstreamMerge="true"
+                              StripAnalyzerProjects="true"
                               OutputFile="$(_BuildTransitivePackFile)"
                               Condition="'$(OutputType)' != 'Exe' and '$(PackMergedBuildTransitiveProps)' != 'true'"/>
-        <Copy SourceFiles="$(_BuildTransitiveMergedFile)"
-              DestinationFiles="$(_BuildTransitivePackFile)"
-              SkipUnchangedFiles="true"
-              Condition="'$(OutputType)' != 'Exe' and '$(PackMergedBuildTransitiveProps)' == 'true'"/>
+        <WriteTransitiveProps UpstreamPropsFiles="@(_ProjRefMergedProps)"
+                              SelfPartialPropsFile="$(_BuildTransitivePartialFile)"
+                              SelfNamespace="$(RootNamespace)"
+                              SkipUpstreamMerge="false"
+                              StripAnalyzerProjects="true"
+                              OutputFile="$(_BuildTransitivePackFile)"
+                              Condition="'$(OutputType)' != 'Exe' and '$(PackMergedBuildTransitiveProps)' == 'true'"/>
         <ItemGroup Condition="'$(OutputType)' != 'Exe'">
             <None Include="$(_BuildTransitivePackFile)" Pack="true" PackagePath="buildTransitive\$(PackageId).props"/>
         </ItemGroup>
@@ -236,10 +257,16 @@ File.WriteAllText(OutputFile, content);
         SharpSticksTransitiveAnalyzerProject items come in as live MSBuild items via the
         own .merged.props Import (see Directory.Build.props). Resolve them to assembly
         paths via <MSBuild Targets="GetTargetPath"/> and add as Analyzer items.
+
+        Only meaningful for consumers that reach the generator through a ProjectReference
+        chain. A project without ProjectReferences (a #:package script) gets the generator
+        from the nupkg; any analyzer items it still sees were left behind in its merged.props
+        by an earlier #:project-mode build and must not pull the source projects into its build.
     -->
     <Target Name="ImportProjectRefBuildTransitiveAnalyzers"
             BeforeTargets="CoreCompile"
-            DependsOnTargets="ResolveProjectReferences">
+            DependsOnTargets="ResolveProjectReferences"
+            Condition="'@(ProjectReference)' != ''">
         <ItemGroup>
             <_TransitiveAnalyzerProject Include="$(MSBuildThisFileDirectory)%(SharpSticksTransitiveAnalyzerProject.Identity)"
                                         Condition="'@(SharpSticksTransitiveAnalyzerProject)' != '' and Exists('$(MSBuildThisFileDirectory)%(SharpSticksTransitiveAnalyzerProject.Identity)')"/>
