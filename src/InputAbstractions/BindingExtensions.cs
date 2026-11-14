@@ -296,6 +296,17 @@ public static class BindingExtensions
 			OnRelease = options.OnRelease,
 		};
 
+	public static ButtonMacroRoute PressFor(this ButtonBinding binding, OutputButtonBinding outputButton, TimeSpan duration) =>
+		new()
+		{
+			Binding = binding,
+			Reentry = ButtonMacroRoute.DefaultReentry,
+			OnPress = [outputButton.Press(), Macros.WaitFor(duration), outputButton.Release()],
+		};
+
+	public static ButtonMacroRoute PressShortly(this ButtonBinding binding, OutputButtonBinding outputButton) => 
+		binding.PressFor(outputButton, TimeSpan.FromMilliseconds(15));
+
 	public static ButtonsRoutedToOutput<TDevice> RouteButtonsToOutput<TDevice>(
 		this TDevice device,
 		uint outputDeviceId,
