@@ -6,9 +6,9 @@ namespace SharpSticks.OutputAbstractions;
 /// Drives every <see cref="ButtonMacroRoute"/> across frames: edge-detects the
 /// source button, queues OnPress/OnRelease runs per the route's
 /// <see cref="MacroReentry"/> policy, steps the active session each frame, and
-/// pumps Press/Release events through the <see cref="Runtime"/>-supplied
+/// pumps Press/Release events through the <see cref="Runtime{TInputDevice, TOutputDevice}"/>-supplied
 /// pressers / suppressors callbacks. The engine itself owns no held-state — the
-/// counts live on <see cref="Runtime"/>'s <c>OutputButtonWithBindings</c>.
+/// counts live on <see cref="Runtime{TInputDevice, TOutputDevice}"/>'s <c>OutputButtonWithBindings</c>.
 /// </summary>
 internal sealed class MacroEngine : IDisposable
 {
@@ -73,7 +73,7 @@ internal sealed class MacroEngine : IDisposable
 
 	/// <summary>
 	/// Earliest deadline at which the next sleeping macro must be revisited.
-	/// Null if no macro is sleeping. Used by <see cref="Runtime.Run"/> to set
+	/// Null if no macro is sleeping. Used by <see cref="Runtime{TInputDevice, TOutputDevice}.Run"/> to set
 	/// the timeout on <see cref="WaitHandle.WaitAny(WaitHandle[], int)"/>.
 	/// </summary>
 	public long? NextDeadlineTicks { get; private set; }
@@ -96,9 +96,11 @@ internal sealed class MacroEngine : IDisposable
 	}
 
 	/// <summary>
-	/// Called by <see cref="Runtime"/> on a route group's falling edge: any
-	/// macro that has the button latched as "released-override" drops the
-	/// override so the next route press can assert again.
+	/// Called by <see cref="Runtime{TInputDevice, TOutputDevice}"/> when a route group starts or ends a
+	/// direct press cycle: any macro that has the button latched as a
+	/// "released-override" drops the override. Falling edges finish suppression
+	/// of an assertion that the macro lifted; rising edges prevent a release made
+	/// while the route was already up from consuming that future press.
 	/// </summary>
 	public void ClearSuppressionFor(OutputButtonStateIndex button)
 	{

@@ -370,6 +370,58 @@ public sealed class MacroTests : IDisposable
 	}
 
 	[Fact]
+	public void MacroRelease_LiftsHeldRoute_ButRepeatedReleaseWhileUp_DoesNotConsumeNextPress()
+	{
+		// Mirrors the In The Black weapon-group switch:
+		//   trigger -> Fire directly
+		//   hat press/release -> force-release Fire before switching groups
+		// A force-release must lift an already-held trigger. Once the trigger is
+		// physically up, however, repeated releases from subsequent macro edges
+		// must reconcile as the same released state instead of accumulating an
+		// override that swallows the next trigger press.
+		var fire = _Output.BindButton(1);
+		using var runtime = Build(
+			_Stick.BindButton(1).RouteTo(fire),
+			new ButtonMacroRoute
+			{
+				Binding = _Stick.BindButton(2),
+				OnPress = [Macros.Release(fire)],
+				OnRelease = [Macros.Release(fire)],
+			});
+
+		runtime.ProcessWithDefaultFrameTime();
+
+		// The direct trigger asserts Fire normally.
+		_Stick.PressButton(1);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.True(_Output.GetButtonState(1));
+
+		// Pressing the hat force-releases Fire even though the trigger remains held.
+		_Stick.PressButton(2);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Releasing the trigger ends that suppression cycle.
+		_Stick.ReleaseButton(1);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.False(_Output.GetButtonState(1));
+
+		// Both the hat release and its next press issue Release(Fire) while Fire is
+		// already up. Those releases are idempotent and must not consume a future
+		// direct press.
+		_Stick.ReleaseButton(2);
+		runtime.ProcessWithDefaultFrameTime();
+		_Stick.PressButton(2);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.False(_Output.GetButtonState(1));
+
+		// The first trigger press while the hat is held must register.
+		_Stick.PressButton(1);
+		runtime.ProcessWithDefaultFrameTime();
+		Assert.True(_Output.GetButtonState(1));
+	}
+
+	[Fact]
 	public void MacroReleaseThatDoesNotRePress_KeepsOutputSuppressed_UntilDirectBindFalls()
 	{
 		// stick.B1 → out.B1 directly.

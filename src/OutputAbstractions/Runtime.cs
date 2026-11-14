@@ -813,6 +813,11 @@ public sealed class Runtime<TInputDevice, TOutputDevice>
 		{
 			if (routeAsserting)
 			{
+				// A macro Release is a force-release of the current direct assertion,
+				// not a debt that consumes a future press. If the route was already up
+				// when the macro released it, its next rising edge starts a fresh press
+				// cycle and reconciles every macro route's stale release override.
+				_Macros?.ClearSuppressionFor(route.OutputButtonStateIndex);
 				OutputButtonState.IncrementPressers(ref x);
 			}
 			else
