@@ -7,6 +7,14 @@ public static class Macros
 {
 	public static IMacroAction Press(this OutputButtonBinding button) => new PressAction(button);
 	public static IMacroAction Release(this OutputButtonBinding button) => new ReleaseAction(button);
+	public static ImmutableArray<IMacroAction> PressFor(this OutputButtonBinding button, TimeSpan duration) => [
+		button.Press(),
+		WaitFor(duration), button.Release(),
+	];
+
+	public static ImmutableArray<IMacroAction> PressShortly(this OutputButtonBinding button) => 
+		button.PressFor(TimeSpan.FromMilliseconds(15));
+
 	public static IMacroAction WaitFor(TimeSpan duration) => new WaitAction(duration);
 
 	/// <summary>Synthesize a key press. <paramref name="key"/> accepts <see cref="NamedKey"/> implicitly.</summary>
