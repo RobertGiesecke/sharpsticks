@@ -12,6 +12,10 @@ public static class Macros
 		WaitFor(duration), button.Release(),
 	];
 
+	/// <summary>
+	/// press for 15ms
+	/// </summary>
+	/// <returns>a list of <see cref="IMacroAction"/></returns>
 	public static ImmutableArray<IMacroAction> PressShortly(this OutputButtonBinding button) => 
 		button.PressFor(TimeSpan.FromMilliseconds(15));
 

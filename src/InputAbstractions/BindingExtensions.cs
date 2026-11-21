@@ -304,6 +304,9 @@ public static class BindingExtensions
 			OnPress = [outputButton.Press(), Macros.WaitFor(duration), outputButton.Release()],
 		};
 
+	/// <summary>
+	/// press for 15ms
+	/// </summary>
 	public static ButtonMacroRoute PressShortly(this ButtonBinding binding, OutputButtonBinding outputButton) => 
 		binding.PressFor(outputButton, TimeSpan.FromMilliseconds(15));
 
