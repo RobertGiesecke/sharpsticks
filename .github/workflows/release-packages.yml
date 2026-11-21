@@ -62,6 +62,11 @@ jobs:
           path: artifacts/release/*.nupkg
           if-no-files-found: error
 
+      - name: Publish packages to nuget.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: ./tools/Publish-NuGet.ps1 -Version $env:RELEASE_TAG -PackageDirectory artifacts/release
+
       - name: Attach packages to release
         env:
           GH_TOKEN: ${{ github.token }}

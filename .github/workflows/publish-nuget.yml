@@ -1,0 +1,51 @@
+name: Publish existing release to NuGet
+
+on:
+  push:
+    tags: ['publish-nuget/*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release version to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-publish-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      REQUESTED_TAG: ${{ inputs.tag }}
+      TRIGGER_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download and publish existing release packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if (!$env:NUGET_API_KEY) { throw 'Repository secret NUGET_API_KEY is required' }
+          $version = $env:REQUESTED_TAG
+          if (!$version) { $version = $env:TRIGGER_TAG -replace '^publish-nuget/', '' }
+          if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version' }
+          gh release download $version --pattern '*.nupkg' --dir artifacts/nuget
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download release packages' }
+          ./tools/Publish-NuGet.ps1 -Version $version -PackageDirectory artifacts/nuget
