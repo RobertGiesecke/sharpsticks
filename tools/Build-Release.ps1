@@ -25,9 +25,14 @@ try {
     # Generate transitive imports before compilation in a fresh checkout.
     [xml] $solution = Get-Content SharpSticks.slnx
     foreach ($project in $solution.Solution.Project) {
-        Invoke-DotNet msbuild $project.Path '-t:GenerateBuildTransitiveProps' '-p:BuildProjectReferences=false' @properties '-v:quiet'
+        $evaluation = Invoke-DotNet msbuild $project.Path '-getProperty:TargetFramework,TargetFrameworks' @properties | ConvertFrom-Json
+        $frameworks = $evaluation.Properties.TargetFrameworks
+        if (!$frameworks) { $frameworks = $evaluation.Properties.TargetFramework }
+        foreach ($framework in $frameworks.Split(';', [StringSplitOptions]::RemoveEmptyEntries)) {
+            Invoke-DotNet msbuild $project.Path '-t:GenerateBuildTransitiveProps' '-p:BuildProjectReferences=false' "-p:TargetFramework=$framework" @properties '-v:quiet'
+        }
     }
-    Invoke-DotNet build SharpSticks.slnx --no-restore @properties
+    Invoke-DotNet build src/Tests/Tests.csproj --no-restore @properties
     Invoke-DotNet test src/Tests/Tests.csproj --no-build --no-restore @properties
     Invoke-DotNet pack SharpSticks.slnx --no-restore @properties -o artifacts/release
 

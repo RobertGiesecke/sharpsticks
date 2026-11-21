@@ -25,3 +25,7 @@ SDKs must be installed):
 Use a clean `artifacts/release` directory. The script fails on build, test, pack,
 or version-validation errors. The runner installs .NET 10 and additionally .NET 11
 when the repository's shared build properties target it.
+
+The build compiles and runs the test project before packing the solution. Device-specific
+example executables are not package inputs and do not need attached hardware on CI.
+For multi-target projects, transitive imports are generated for each framework.
