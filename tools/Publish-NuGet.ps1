@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if (!$env:NUGET_API_KEY) {
-    throw 'Configure the repository Actions secret NUGET_API_KEY with nuget.org push access to SharpSticks.* packages, then rerun this job.'
+    throw 'NuGet authentication is missing. Pass the temporary API key from NuGet/login in the NUGET_API_KEY environment variable.'
 }
 if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$') {
     throw "Invalid package version: $Version"
